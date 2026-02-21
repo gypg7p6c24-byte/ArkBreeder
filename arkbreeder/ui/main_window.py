@@ -815,7 +815,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(box)
         label = QtWidgets.QLabel(title)
         label.setStyleSheet("color: #94a3b8; font-size: 11px; text-transform: uppercase;")
-        name_label = QtWidgets.QLabel(creature.name)
+        name_label = QtWidgets.QLabel(f"{self._sex_icon(creature.sex)} {creature.name}")
         name_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
         sex_label = QtWidgets.QLabel(creature.sex or "Unknown")
         sex_label.setStyleSheet(f"color: {accent}; font-weight: 600;")
@@ -877,6 +877,16 @@ class MainWindow(QtWidgets.QMainWindow):
         row_layout.addWidget(tag)
         row_layout.addWidget(bar, 1)
         return row
+
+    def _sex_icon(self, sex: str | None) -> str:
+        if not sex:
+            return "•"
+        lowered = sex.lower()
+        if lowered == "male":
+            return "♂"
+        if lowered == "female":
+            return "♀"
+        return "•"
 
     def _render_mutation_cards(self, creatures: list[Creature]) -> None:
         layout = self._mutations_cards_layout
@@ -1067,8 +1077,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         species_group = [c for c in self._creature_cache if c.species == creature.species]
         if len(species_group) < 2:
-            self._detail_strengths.setText("Strengths: Not enough data yet")
-            self._detail_weaknesses.setText("Weaknesses: Not enough data yet")
+            self._detail_strengths.setText("Strengths: Add more of this species")
+            self._detail_weaknesses.setText("Weaknesses: Compare once you have 2+")
             return
         stats_keys = ["Health", "Stamina", "Weight", "MeleeDamageMultiplier"]
         max_values = {

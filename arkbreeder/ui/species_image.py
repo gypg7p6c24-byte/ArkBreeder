@@ -52,7 +52,7 @@ class SpeciesImageWidget(QtWidgets.QLabel):
             if self._pending_kind == "html" and self._fetch_next_source():
                 return
             self._stop_loading()
-            self.setText("Image unavailable")
+            self.setText("Image not available")
             return
         data = reply.readAll()
         if self._pending_kind == "pageimage":
@@ -61,7 +61,7 @@ class SpeciesImageWidget(QtWidgets.QLabel):
                 if self._fetch_next_source():
                     return
                 self._stop_loading()
-                self.setText("Image unavailable")
+                self.setText("Image not available")
                 return
             self._pending_kind = "image"
             self._pending_url = QtCore.QUrl(image_url)
@@ -88,7 +88,7 @@ class SpeciesImageWidget(QtWidgets.QLabel):
             pixmap.loadFromData(data)
             if pixmap.isNull():
                 self._stop_loading()
-                self.setText("Image unavailable")
+                self.setText("Image not available")
                 return
             if self._pending_species:
                 pixmap.save(str(self._cache_path(self._pending_species)))
