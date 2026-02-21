@@ -1078,7 +1078,7 @@ class MainWindow(QtWidgets.QMainWindow):
         species_group = [c for c in self._creature_cache if c.species == creature.species]
         if len(species_group) < 2:
             self._detail_strengths.setText("Strengths: Add more of this species")
-            self._detail_weaknesses.setText("Weaknesses: Compare once you have 2+")
+            self._detail_weaknesses.setText("Weaknesses: Add more of this species")
             return
         stats_keys = ["Health", "Stamina", "Weight", "MeleeDamageMultiplier"]
         max_values = {
