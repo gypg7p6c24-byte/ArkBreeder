@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=ARK Breeder
+Exec=ark-breeder
+Icon=arkbreeder
+Terminal=false
+Categories=Game;Utility;

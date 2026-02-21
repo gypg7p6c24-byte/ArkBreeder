@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ark-breeder"
+version = "0.1.0"
+description = "Local breeding manager for ARK: Survival Evolved."
+readme = "README.md"
+requires-python = ">=3.12"
+license = {file = "LICENSE"}
+authors = [{name = "ARK Breeder Contributors"}]
+dependencies = [
+    "PySide6>=6.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/ark-breeder"
+Issues = "https://github.com/your-org/ark-breeder/issues"
+
+[project.scripts]
+arkbreeder = "arkbreeder.ui.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["arkbreeder*"]

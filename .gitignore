@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+*.egg-info/
+.eggs/
+
+.venv/
+.env/
+.ENV/
+
+build/
+dist/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+.DS_Store
+.idea/
+.vscode/
+
+# Local app data (if created inside repo by mistake)
+arkbreeder.db
