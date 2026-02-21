@@ -290,6 +290,10 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addLayout(toolbar)
 
         self._breeding_cards_container = QtWidgets.QWidget()
+        self._breeding_cards_container.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding,
+        )
         self._breeding_cards_layout = QtWidgets.QVBoxLayout(self._breeding_cards_container)
         self._breeding_cards_layout.setSpacing(12)
         self._breeding_cards_layout.addStretch(1)
@@ -298,8 +302,11 @@ class MainWindow(QtWidgets.QMainWindow):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
         scroll.setWidget(self._breeding_cards_container)
+        scroll.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding,
+        )
         layout.addWidget(scroll)
-        layout.addStretch(1)
         return widget
 
     def _build_creature_detail_panel(self) -> QtWidgets.QWidget:
@@ -386,8 +393,11 @@ class MainWindow(QtWidgets.QMainWindow):
         tree_layout.addWidget(self._line(True), 3, 1, alignment=QtCore.Qt.AlignCenter)
         tree_layout.addWidget(self._pedigree_subject_box, 4, 1, alignment=QtCore.Qt.AlignCenter)
 
+        self._pedigree_tree.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding,
+        )
         layout.addWidget(self._pedigree_tree)
-        layout.addStretch(1)
         return widget
 
     def _build_mutations_page(self) -> QtWidgets.QWidget:
@@ -403,6 +413,10 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addLayout(toolbar)
 
         self._mutations_cards_container = QtWidgets.QWidget()
+        self._mutations_cards_container.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding,
+        )
         self._mutations_cards_layout = QtWidgets.QVBoxLayout(self._mutations_cards_container)
         self._mutations_cards_layout.setSpacing(12)
         self._mutations_cards_layout.addStretch(1)
@@ -411,8 +425,11 @@ class MainWindow(QtWidgets.QMainWindow):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
         scroll.setWidget(self._mutations_cards_container)
+        scroll.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Expanding,
+        )
         layout.addWidget(scroll)
-        layout.addStretch(1)
         return widget
 
     def _build_placeholder_page(self, subtitle: str) -> QtWidgets.QWidget:
@@ -753,6 +770,10 @@ class MainWindow(QtWidgets.QMainWindow):
             card.setStyleSheet(
                 f"QFrame {{ background: #0f172a; border: 1px solid {border}; border-radius: 12px; }}"
             )
+            card.setSizePolicy(
+                QtWidgets.QSizePolicy.Expanding,
+                QtWidgets.QSizePolicy.Minimum,
+            )
             card_layout = QtWidgets.QHBoxLayout(card)
             card_layout.setSpacing(16)
             max_stats = self._species_max_stats(male.species)
@@ -881,6 +902,10 @@ class MainWindow(QtWidgets.QMainWindow):
             card = QtWidgets.QFrame()
             card.setStyleSheet(
                 "QFrame { background: #0f172a; border: 1px solid #1f2937; border-radius: 12px; }"
+            )
+            card.setSizePolicy(
+                QtWidgets.QSizePolicy.Expanding,
+                QtWidgets.QSizePolicy.Minimum,
             )
             card_layout = QtWidgets.QHBoxLayout(card)
             title = QtWidgets.QLabel(f"{creature.name} ({creature.species})")
