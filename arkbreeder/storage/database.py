@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS creatures (
 CREATE INDEX IF NOT EXISTS idx_creatures_species ON creatures(species);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_creatures_external_id
     ON creatures(external_id) WHERE external_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 '''
 
 

@@ -6,8 +6,10 @@ from typing import Iterable
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from arkbreeder.core.server_settings import parse_ini_file
 from arkbreeder.storage.models import Creature
 from arkbreeder.storage.repository import list_creatures
+from arkbreeder.storage.settings import get_server_settings, set_server_settings
 from arkbreeder.ui.toast import ToastNotification
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._export_dir = export_dir
         self._import_service = None
         self._toasts: list[ToastNotification] = []
+        self._server_settings: dict | None = None
         self._page_titles = [
             "Dashboard",
             "Creatures",
@@ -31,6 +34,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ]
         self._build_ui()
         self.refresh_data()
+        self._load_server_settings()
 
     def _build_ui(self) -> None:
         central = QtWidgets.QWidget()
@@ -53,7 +57,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._stack.addWidget(self._build_placeholder_page("Breeding recommendations"))
         self._stack.addWidget(self._build_placeholder_page("Family trees and lineage"))
         self._stack.addWidget(self._build_placeholder_page("Mutation tracking"))
-        self._stack.addWidget(self._build_placeholder_page("App settings"))
+        self._stack.addWidget(self._build_settings_page())
 
         content = QtWidgets.QWidget()
         content.setObjectName("contentArea")
@@ -240,6 +244,42 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addStretch(1)
         return widget
 
+    def _build_settings_page(self) -> QtWidgets.QWidget:
+        widget = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(widget)
+        layout.setSpacing(12)
+
+        header = QtWidgets.QLabel("Server settings")
+        header.setStyleSheet("font-size: 16px; font-weight: 600;")
+        layout.addWidget(header)
+
+        helper = QtWidgets.QLabel(
+            "Import GameUserSettings.ini and Game.ini to match your server multipliers."
+        )
+        helper.setWordWrap(True)
+        helper.setStyleSheet("color: #cbd5f5;")
+        layout.addWidget(helper)
+
+        actions = QtWidgets.QHBoxLayout()
+        self._import_settings_btn = QtWidgets.QPushButton("Import server settings")
+        self._import_settings_btn.clicked.connect(self._import_server_settings)
+        actions.addWidget(self._import_settings_btn)
+        actions.addStretch(1)
+        layout.addLayout(actions)
+
+        self._settings_summary = QtWidgets.QLabel("No server settings imported yet.")
+        self._settings_summary.setWordWrap(True)
+        self._settings_summary.setStyleSheet("color: #94a3b8;")
+        layout.addWidget(self._settings_summary)
+
+        self._settings_details = QtWidgets.QLabel("")
+        self._settings_details.setWordWrap(True)
+        self._settings_details.setStyleSheet("color: #94a3b8;")
+        layout.addWidget(self._settings_details)
+
+        layout.addStretch(1)
+        return widget
+
     def _update_page_title(self, index: int) -> None:
         if 0 <= index < len(self._page_titles):
             self._page_title.setText(self._page_titles[index])
@@ -324,6 +364,76 @@ class MainWindow(QtWidgets.QMainWindow):
     def _update_last_import_label(self) -> None:
         stamp = QtCore.QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
         self._last_import_label.setText(f"Last import: {stamp}")
+
+    def _load_server_settings(self) -> None:
+        self._server_settings = get_server_settings(self._conn)
+        self._update_settings_view()
+
+    def _update_settings_view(self) -> None:
+        if not self._server_settings:
+            self._settings_summary.setText("No server settings imported yet.")
+            self._settings_details.setText("")
+            return
+
+        sources = self._server_settings.get("sources", {})
+        imported_at = self._server_settings.get("imported_at", "unknown time")
+        summary_lines = [f"Imported at: {imported_at}"]
+        detail_lines = []
+
+        for label, key in (
+            ("GameUserSettings.ini", "game_user_settings"),
+            ("Game.ini", "game_ini"),
+        ):
+            data = self._server_settings.get(key)
+            if not data:
+                detail_lines.append(f"{label}: not provided")
+                continue
+            sections = len(data)
+            keys = sum(len(values) for values in data.values())
+            path = sources.get(key, "unknown path")
+            detail_lines.append(f"{label}: {sections} sections, {keys} values")
+            detail_lines.append(f"Source: {path}")
+
+        self._settings_summary.setText("Server settings loaded.")
+        self._settings_details.setText("\n".join(summary_lines + detail_lines))
+
+    def _import_server_settings(self) -> None:
+        start_dir = str(Path.home())
+        user_settings_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Select GameUserSettings.ini",
+            start_dir,
+            "INI files (*.ini);;All files (*)",
+        )
+        game_ini_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Select Game.ini",
+            start_dir,
+            "INI files (*.ini);;All files (*)",
+        )
+
+        if not user_settings_path and not game_ini_path:
+            self.show_toast("No settings files selected.", "info")
+            return
+
+        payload: dict[str, object] = {
+            "game_user_settings": {},
+            "game_ini": {},
+            "sources": {},
+            "imported_at": QtCore.QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss"),
+        }
+
+        if user_settings_path:
+            payload["game_user_settings"] = parse_ini_file(Path(user_settings_path))
+            payload["sources"]["game_user_settings"] = user_settings_path
+        if game_ini_path:
+            payload["game_ini"] = parse_ini_file(Path(game_ini_path))
+            payload["sources"]["game_ini"] = game_ini_path
+
+        set_server_settings(self._conn, payload)
+        self._server_settings = payload
+        self._update_settings_view()
+        self.show_toast("Server settings imported.", "success")
 
     def show_toast(self, message: str, kind: str = "info") -> None:
         toast = ToastNotification(self, message=message, kind=kind, duration_ms=5000)
