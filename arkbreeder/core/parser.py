@@ -105,10 +105,10 @@ def _read_text(path: Path) -> str:
 
 def _candidate_encodings(raw: bytes) -> Iterable[str]:
     if raw.startswith(b"\xff\xfe"):
-        return ["utf-16-le", "utf-8"]
+        return ["utf-16-le", "utf-8", "cp1252"]
     if raw.startswith(b"\xfe\xff"):
-        return ["utf-16-be", "utf-8"]
-    return ["utf-8", "utf-16-le", "utf-16-be"]
+        return ["utf-16-be", "utf-8", "cp1252"]
+    return ["utf-8", "utf-8-sig", "utf-16-le", "utf-16-be", "cp1252"]
 
 
 def _looks_valid_export(text: str) -> bool:

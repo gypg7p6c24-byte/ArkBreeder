@@ -97,9 +97,10 @@ class ExportImportService:
                 path.name,
             )
             if self._on_notify:
+                kind = "info" if existing_id else "success"
                 self._on_notify(
                     f"{action} {saved.name}",
-                    "success",
+                    kind,
                 )
             if self._delete_after_import:
                 path.unlink(missing_ok=True)
