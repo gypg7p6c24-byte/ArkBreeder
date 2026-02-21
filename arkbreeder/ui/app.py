@@ -19,20 +19,19 @@ def main() -> int:
     init_db(conn)
 
     app = QtWidgets.QApplication([])
-    window = MainWindow()
+    export_path = export_dir()
+    window = MainWindow(conn, export_path)
     window.resize(960, 600)
     window.show()
     app.aboutToQuit.connect(conn.close)
 
-    service = ExportImportService(conn, export_dir(), on_notify=window.show_toast)
+    service = ExportImportService(conn, export_path, on_notify=window.show_toast)
     timer = QtCore.QTimer()
     timer.setInterval(500)
-    timer.timeout.connect(service.poll_once)
-    timer.start()
-    logger.info("Watching export directory: %s", export_dir())
-
     window._import_service = service
-    window._import_timer = timer
+    timer.timeout.connect(window.handle_import_tick)
+    timer.start()
+    logger.info("Watching export directory: %s", export_path)
     return app.exec()
 
 
