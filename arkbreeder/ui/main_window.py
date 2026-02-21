@@ -369,7 +369,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._pedigree_mother = QtWidgets.QLabel("Mother\nUnknown")
         self._pedigree_mother.setAlignment(QtCore.Qt.AlignCenter)
-        self._pedigree_mother.setStyleSheet("color: #94a3b8; font-size: 14px;")
+        self._pedigree_mother.setStyleSheet("color: #f472b6; font-size: 14px;")
         card_layout.addWidget(self._pedigree_mother)
 
         self._pedigree_subject = QtWidgets.QLabel("Select a creature")
@@ -379,7 +379,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._pedigree_father = QtWidgets.QLabel("Father\nUnknown")
         self._pedigree_father.setAlignment(QtCore.Qt.AlignCenter)
-        self._pedigree_father.setStyleSheet("color: #94a3b8; font-size: 14px;")
+        self._pedigree_father.setStyleSheet("color: #60a5fa; font-size: 14px;")
         card_layout.addWidget(self._pedigree_father)
 
         layout.addWidget(self._pedigree_card)
@@ -526,9 +526,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def _populate_creatures_table(self, creatures: Iterable[Creature]) -> None:
         creature_list = list(creatures)
         self._creature_rows = creature_list
+        sorting = self._creatures_table.isSortingEnabled()
+        if sorting:
+            self._creatures_table.setSortingEnabled(False)
         self._creatures_table.setRowCount(len(creature_list))
         for row, creature in enumerate(creature_list):
-            self._set_table_item(row, 0, creature.name)
+            self._set_table_item(row, 0, creature.name, creature.external_id)
             self._set_table_item(row, 1, creature.species)
             self._set_table_item(row, 2, creature.sex)
             self._set_table_item(row, 3, str(creature.level))
@@ -543,6 +546,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self._set_table_item(row, 8, self._format_stat(creature.stats.get("MeleeDamageMultiplier")))
             self._set_table_item(row, 9, self._format_updated_at(creature.updated_at))
         self._creatures_table.resizeColumnsToContents()
+        if sorting:
+            self._creatures_table.setSortingEnabled(True)
         self._restore_creature_selection()
 
     def _restore_creature_selection(self) -> None:
@@ -550,8 +555,9 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         target_id = self._selected_creature.external_id if self._selected_creature else None
         if target_id:
-            for row, creature in enumerate(self._creature_rows):
-                if creature.external_id == target_id:
+            for row in range(self._creatures_table.rowCount()):
+                item = self._creatures_table.item(row, 0)
+                if item and item.data(QtCore.Qt.UserRole) == target_id:
                     self._creatures_table.selectRow(row)
                     return
         self._creatures_table.selectRow(0)
@@ -698,10 +704,11 @@ class MainWindow(QtWidgets.QMainWindow):
             layout.insertWidget(0, empty)
             return
 
-        for score, male, female, male_stat, female_stat in pairs:
+        for index, (score, male, female, male_stat, female_stat) in enumerate(pairs):
             card = QtWidgets.QFrame()
+            border = "#38bdf8" if index == 0 else "#1f2937"
             card.setStyleSheet(
-                "QFrame { background: #0f172a; border: 1px solid #1f2937; border-radius: 12px; }"
+                f"QFrame {{ background: #0f172a; border: 1px solid {border}; border-radius: 12px; }}"
             )
             card_layout = QtWidgets.QHBoxLayout(card)
             card_layout.setSpacing(16)
@@ -725,15 +732,23 @@ class MainWindow(QtWidgets.QMainWindow):
             layout.insertWidget(layout.count() - 1, card)
 
     def _pair_info_box(self, title: str, name: str, sex: str, stat: float) -> QtWidgets.QWidget:
+        sex_lower = sex.lower() if sex else ""
+        accent = "#94a3b8"
+        if sex_lower == "male":
+            accent = "#60a5fa"
+        elif sex_lower == "female":
+            accent = "#f472b6"
         box = QtWidgets.QFrame()
-        box.setStyleSheet("QFrame { background: #111827; border-radius: 10px; }")
+        box.setStyleSheet(
+            f"QFrame {{ background: #111827; border: 1px solid {accent}; border-radius: 10px; }}"
+        )
         layout = QtWidgets.QVBoxLayout(box)
         label = QtWidgets.QLabel(title)
         label.setStyleSheet("color: #94a3b8; font-size: 11px; text-transform: uppercase;")
         name_label = QtWidgets.QLabel(name)
         name_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
         sex_label = QtWidgets.QLabel(sex or "Unknown")
-        sex_label.setStyleSheet("color: #94a3b8;")
+        sex_label.setStyleSheet(f"color: {accent}; font-weight: 600;")
         stat_label = QtWidgets.QLabel(f"Stat: {self._format_score(stat)}")
         stat_label.setStyleSheet("color: #a7f3d0;")
         layout.addWidget(label)
@@ -817,9 +832,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self._pedigree_mother.setText(f"Mother\n{mother.name if mother else 'Unknown'}")
         self._pedigree_father.setText(f"Father\n{father.name if father else 'Unknown'}")
 
-    def _set_table_item(self, row: int, col: int, value: str) -> None:
+    def _set_table_item(self, row: int, col: int, value: str, external_id: str | None = None) -> None:
         item = QtWidgets.QTableWidgetItem(value)
         item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+        if external_id:
+            item.setData(QtCore.Qt.UserRole, external_id)
         self._creatures_table.setItem(row, col, item)
 
     def _format_stat(self, value: float | None) -> str:
@@ -858,9 +875,18 @@ class MainWindow(QtWidgets.QMainWindow):
             self._detail_weaknesses.setText("Weaknesses: -")
             return
         row = rows[0].row()
-        if row < 0 or row >= len(self._creature_rows):
-            return
-        creature = self._creature_rows[row]
+        item = self._creatures_table.item(row, 0)
+        target_id = item.data(QtCore.Qt.UserRole) if item else None
+        creature = None
+        if target_id:
+            for candidate in self._creature_cache:
+                if candidate.external_id == target_id:
+                    creature = candidate
+                    break
+        if creature is None:
+            if row < 0 or row >= len(self._creature_rows):
+                return
+            creature = self._creature_rows[row]
         self._selected_creature = creature
         self._update_creature_detail(creature)
 

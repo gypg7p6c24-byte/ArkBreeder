@@ -22,6 +22,11 @@ class SpeciesImageWidget(QtWidgets.QLabel):
         self._pending_kind: str | None = None
         self._pending_url: QtCore.QUrl | None = None
         self._pending_sources: list[str] = []
+        self._loading_timer = QtCore.QTimer(self)
+        self._loading_timer.setInterval(350)
+        self._loading_timer.timeout.connect(self._tick_loading)
+        self._loading_text = "Loading image"
+        self._loading_dots = 0
 
     def set_species(self, species: str) -> None:
         if not species:
@@ -32,7 +37,7 @@ class SpeciesImageWidget(QtWidgets.QLabel):
         if cached.exists():
             self._set_pixmap(QtGui.QPixmap(str(cached)))
             return
-        self.setText("Loading image...")
+        self._start_loading()
         self._pending_sources = [
             self._wiki_api_url(species),
             self._fandom_api_url(species),
@@ -43,6 +48,7 @@ class SpeciesImageWidget(QtWidgets.QLabel):
         if reply.error() != QtNetwork.QNetworkReply.NoError:
             if self._pending_kind == "html" and self._fetch_next_source():
                 return
+            self._stop_loading()
             self.setText("Image unavailable")
             return
         data = reply.readAll()
@@ -51,6 +57,7 @@ class SpeciesImageWidget(QtWidgets.QLabel):
             if not image_url:
                 if self._fetch_next_source():
                     return
+                self._stop_loading()
                 self.setText("Image unavailable")
                 return
             self._pending_kind = "image"
@@ -61,6 +68,7 @@ class SpeciesImageWidget(QtWidgets.QLabel):
             pixmap = QtGui.QPixmap()
             pixmap.loadFromData(data)
             if pixmap.isNull():
+                self._stop_loading()
                 self.setText("Image unavailable")
                 return
             if self._pending_species:
@@ -77,10 +85,27 @@ class SpeciesImageWidget(QtWidgets.QLabel):
         return True
 
     def _set_pixmap(self, pixmap: QtGui.QPixmap) -> None:
+        self._stop_loading()
         scaled = pixmap.scaled(
             self.size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation
         )
         self.setPixmap(scaled)
+
+    def _start_loading(self) -> None:
+        self._loading_dots = 0
+        self.setText(self._loading_text)
+        if not self._loading_timer.isActive():
+            self._loading_timer.start()
+
+    def _stop_loading(self) -> None:
+        if self._loading_timer.isActive():
+            self._loading_timer.stop()
+        self._loading_dots = 0
+
+    def _tick_loading(self) -> None:
+        self._loading_dots = (self._loading_dots + 1) % 4
+        dots = "." * self._loading_dots
+        self.setText(f\"{self._loading_text}{dots}\")
 
     def _cache_path(self, species: str) -> Path:
         safe = re.sub(r"[^a-zA-Z0-9_-]+", "_", species).lower()
