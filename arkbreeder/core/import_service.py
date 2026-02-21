@@ -133,4 +133,6 @@ class ExportImportService:
             stats=parsed.stats,
             mutations_maternal=parsed.mutations_maternal or 0,
             mutations_paternal=parsed.mutations_paternal or 0,
+            mother_external_id=parsed.mother_external_id,
+            father_external_id=parsed.father_external_id,
         )

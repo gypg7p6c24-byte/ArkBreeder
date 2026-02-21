@@ -17,6 +17,8 @@ class Creature:
     mutations_paternal: int = 0
     mother_id: Optional[int] = None
     father_id: Optional[int] = None
+    mother_external_id: Optional[str] = None
+    father_external_id: Optional[str] = None
     updated_at: Optional[str] = None
 
     def with_id(self, new_id: int) -> "Creature":

@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS creatures (
     mutations_paternal INTEGER NOT NULL DEFAULT 0,
     mother_id INTEGER,
     father_id INTEGER,
+    mother_external_id TEXT,
+    father_external_id TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -44,6 +46,8 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
     _ensure_column(conn, "creatures", "external_id", "TEXT")
     _ensure_column(conn, "creatures", "updated_at", "TEXT")
+    _ensure_column(conn, "creatures", "mother_external_id", "TEXT")
+    _ensure_column(conn, "creatures", "father_external_id", "TEXT")
     conn.execute(
         "UPDATE creatures SET updated_at = COALESCE(updated_at, created_at, CURRENT_TIMESTAMP)"
     )

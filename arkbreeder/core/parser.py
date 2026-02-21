@@ -15,6 +15,8 @@ class ParsedCreature:
     external_id: str | None
     mutations_maternal: int | None
     mutations_paternal: int | None
+    mother_external_id: str | None
+    father_external_id: str | None
     raw_text: str
 
 
@@ -44,6 +46,13 @@ def parse_creature_file(path: Path) -> ParsedCreature:
     mutations_paternal = _parse_int(dino_data.get("RandomMutationsMale"))
     mutations_maternal = _parse_int(dino_data.get("RandomMutationsFemale"))
 
+    mother_external_id: str | None = None
+    father_external_id: str | None = None
+    ancestors = _get_section(sections, "DinoAncestors")
+    if ancestors:
+        ancestor_line = _first_value(ancestors)
+        mother_external_id, father_external_id = _parse_ancestor_line(ancestor_line)
+
     stats: Dict[str, float] = {}
     for key, value in stat_section.items():
         normalized = _normalize_stat_key(key)
@@ -62,6 +71,8 @@ def parse_creature_file(path: Path) -> ParsedCreature:
         external_id=external_id,
         mutations_maternal=mutations_maternal,
         mutations_paternal=mutations_paternal,
+        mother_external_id=mother_external_id,
+        father_external_id=father_external_id,
         raw_text=text,
     )
 
@@ -183,6 +194,38 @@ def _extract_species(dino_class: str) -> str | None:
     if "." in dino_class:
         return dino_class.split(".", 1)[0]
     return dino_class
+
+
+def _first_value(section: dict[str, str]) -> str:
+    if not section:
+        return ""
+    return next(iter(section.values()))
+
+
+def _parse_ancestor_line(line: str) -> tuple[str | None, str | None]:
+    if not line:
+        return None, None
+    male_id = _extract_id_pair(line, "MaleDinoID1", "MaleDinoID2")
+    female_id = _extract_id_pair(line, "FemaleDinoID1", "FemaleDinoID2")
+    return female_id, male_id
+
+
+def _extract_id_pair(line: str, key1: str, key2: str) -> str | None:
+    try:
+        parts = [segment.strip() for segment in line.split(";") if segment.strip()]
+    except Exception:
+        return None
+    values: dict[str, str] = {}
+    for part in parts:
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        values[key.strip()] = value.strip()
+    v1 = values.get(key1)
+    v2 = values.get(key2)
+    if v1 and v2:
+        return f"{v1}-{v2}"
+    return None
 
 
 def _normalize_stat_key(key: str) -> str | None:

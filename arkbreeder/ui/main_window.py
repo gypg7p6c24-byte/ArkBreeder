@@ -904,6 +904,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 return creature
         return None
 
+    def _find_creature_by_external_id(self, external_id: str | None) -> Creature | None:
+        if not external_id:
+            return None
+        for creature in self._creature_cache:
+            if creature.external_id == external_id:
+                return creature
+        return None
+
     def _mutation_bar(self, maternal: int, paternal: int) -> QtWidgets.QWidget:
         if maternal + paternal == 0:
             maternal = 1
@@ -957,8 +965,12 @@ class MainWindow(QtWidgets.QMainWindow):
         creature = selected if isinstance(selected, Creature) else candidates[0]
         if self._pedigree_subject:
             self._pedigree_subject.setText(f"{creature.name}\n{creature.species}")
-        mother = self._find_creature_by_id(creature.mother_id)
-        father = self._find_creature_by_id(creature.father_id)
+        mother = self._find_creature_by_id(creature.mother_id) or self._find_creature_by_external_id(
+            creature.mother_external_id
+        )
+        father = self._find_creature_by_id(creature.father_id) or self._find_creature_by_external_id(
+            creature.father_external_id
+        )
         if self._pedigree_mother:
             self._pedigree_mother.setText(mother.name if mother else "Unknown")
         if self._pedigree_father:

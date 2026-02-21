@@ -19,6 +19,8 @@ def creature_from_row(row) -> Creature:
         mutations_paternal=row["mutations_paternal"],
         mother_id=row["mother_id"],
         father_id=row["father_id"],
+        mother_external_id=row["mother_external_id"] if "mother_external_id" in row.keys() else None,
+        father_external_id=row["father_external_id"] if "father_external_id" in row.keys() else None,
         updated_at=row["updated_at"] if "updated_at" in row.keys() else None,
     )
 
@@ -28,9 +30,10 @@ def add_creature(conn, creature: Creature) -> Creature:
         '''
         INSERT INTO creatures (
             external_id, name, species, sex, level, stats_json,
-            mutations_maternal, mutations_paternal, mother_id, father_id, updated_at
+            mutations_maternal, mutations_paternal, mother_id, father_id,
+            mother_external_id, father_external_id, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ''',
         (
             creature.external_id,
@@ -43,6 +46,8 @@ def add_creature(conn, creature: Creature) -> Creature:
             creature.mutations_paternal,
             creature.mother_id,
             creature.father_id,
+            creature.mother_external_id,
+            creature.father_external_id,
         ),
     )
     return creature.with_id(cursor.lastrowid)
@@ -62,6 +67,8 @@ def update_creature(conn, creature: Creature) -> Creature:
             mutations_paternal = ?,
             mother_id = ?,
             father_id = ?,
+            mother_external_id = ?,
+            father_external_id = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         ''',
@@ -76,6 +83,8 @@ def update_creature(conn, creature: Creature) -> Creature:
             creature.mutations_paternal,
             creature.mother_id,
             creature.father_id,
+            creature.mother_external_id,
+            creature.father_external_id,
             creature.id,
         ),
     )
