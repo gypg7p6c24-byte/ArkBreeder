@@ -6,16 +6,16 @@ from typing import Dict
 
 @dataclass(frozen=True)
 class StatBreakdown:
-    total: int
-    wild_levels: int
-    tamed_levels: int
-    imprinting_bonus: int
-    mutations: int
+    total: float
+    wild_levels: float
+    tamed_levels: float
+    imprinting_bonus: float
+    mutations: float
 
 
-def compute_wild_levels(stats: Dict[str, int]) -> Dict[str, int]:
+def compute_wild_levels(stats: Dict[str, float]) -> Dict[str, float]:
     '''
     Placeholder for wild level computation.
     Returns zeroed values until the real formula is implemented.
     '''
-    return {key: 0 for key in stats}
+    return {key: 0.0 for key in stats}

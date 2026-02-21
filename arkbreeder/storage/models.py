@@ -12,7 +12,7 @@ class Creature:
     species: str
     sex: str
     level: int
-    stats: Dict[str, int] = field(default_factory=dict)
+    stats: Dict[str, float] = field(default_factory=dict)
     mutations_maternal: int = 0
     mutations_paternal: int = 0
     mother_id: Optional[int] = None
