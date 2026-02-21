@@ -24,6 +24,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._import_service = None
         self._toasts: list[ToastNotification] = []
         self._server_settings: dict | None = None
+        self._creature_cache: list[Creature] = []
         self._page_titles = [
             "Dashboard",
             "Creatures",
@@ -54,9 +55,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._stack = QtWidgets.QStackedWidget()
         self._stack.addWidget(self._build_dashboard_page())
         self._stack.addWidget(self._build_creatures_page())
-        self._stack.addWidget(self._build_placeholder_page("Breeding recommendations"))
-        self._stack.addWidget(self._build_placeholder_page("Family trees and lineage"))
-        self._stack.addWidget(self._build_placeholder_page("Mutation tracking"))
+        self._stack.addWidget(self._build_breeding_page())
+        self._stack.addWidget(self._build_pedigree_page())
+        self._stack.addWidget(self._build_mutations_page())
         self._stack.addWidget(self._build_settings_page())
 
         content = QtWidgets.QWidget()
@@ -192,6 +193,15 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.setSpacing(12)
 
         toolbar = QtWidgets.QHBoxLayout()
+        self._creature_search = QtWidgets.QLineEdit()
+        self._creature_search.setPlaceholderText("Search name or species")
+        self._creature_search.textChanged.connect(self._apply_creature_filters)
+        toolbar.addWidget(self._creature_search)
+
+        self._creature_species_filter = QtWidgets.QComboBox()
+        self._creature_species_filter.currentIndexChanged.connect(self._apply_creature_filters)
+        toolbar.addWidget(self._creature_species_filter)
+
         self._refresh_button = QtWidgets.QPushButton("Refresh list")
         self._refresh_button.clicked.connect(self.refresh_data)
         toolbar.addWidget(self._refresh_button)
@@ -223,8 +233,92 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creatures_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self._creatures_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self._creatures_table.verticalHeader().setVisible(False)
+        self._creatures_table.setSortingEnabled(True)
 
         layout.addWidget(self._creatures_table)
+        layout.addStretch(1)
+        return widget
+
+    def _build_breeding_page(self) -> QtWidgets.QWidget:
+        widget = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(widget)
+        layout.setSpacing(12)
+
+        toolbar = QtWidgets.QHBoxLayout()
+        self._breeding_species_filter = QtWidgets.QComboBox()
+        self._breeding_species_filter.currentIndexChanged.connect(self._update_breeding_pairs)
+        toolbar.addWidget(self._breeding_species_filter)
+
+        self._breeding_stat_focus = QtWidgets.QComboBox()
+        self._breeding_stat_focus.addItems(
+            ["Overall", "Health", "Stamina", "Weight", "Melee"]
+        )
+        self._breeding_stat_focus.currentIndexChanged.connect(self._update_breeding_pairs)
+        toolbar.addWidget(self._breeding_stat_focus)
+
+        self._breeding_refresh_btn = QtWidgets.QPushButton("Suggest pairs")
+        self._breeding_refresh_btn.clicked.connect(self._update_breeding_pairs)
+        toolbar.addWidget(self._breeding_refresh_btn)
+        toolbar.addStretch(1)
+        layout.addLayout(toolbar)
+
+        self._breeding_table = QtWidgets.QTableWidget(0, 6)
+        self._breeding_table.setHorizontalHeaderLabels(
+            ["Male", "Female", "Focus", "Male stat", "Female stat", "Score"]
+        )
+        self._breeding_table.horizontalHeader().setStretchLastSection(True)
+        self._breeding_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self._breeding_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self._breeding_table.verticalHeader().setVisible(False)
+        layout.addWidget(self._breeding_table)
+        layout.addStretch(1)
+        return widget
+
+    def _build_pedigree_page(self) -> QtWidgets.QWidget:
+        widget = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(widget)
+        layout.setSpacing(12)
+
+        toolbar = QtWidgets.QHBoxLayout()
+        self._pedigree_species_filter = QtWidgets.QComboBox()
+        self._pedigree_species_filter.currentIndexChanged.connect(self._update_pedigree_table)
+        toolbar.addWidget(self._pedigree_species_filter)
+        toolbar.addStretch(1)
+        layout.addLayout(toolbar)
+
+        self._pedigree_table = QtWidgets.QTableWidget(0, 5)
+        self._pedigree_table.setHorizontalHeaderLabels(
+            ["Name", "Species", "Mother ID", "Father ID", "External ID"]
+        )
+        self._pedigree_table.horizontalHeader().setStretchLastSection(True)
+        self._pedigree_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self._pedigree_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self._pedigree_table.verticalHeader().setVisible(False)
+        layout.addWidget(self._pedigree_table)
+        layout.addStretch(1)
+        return widget
+
+    def _build_mutations_page(self) -> QtWidgets.QWidget:
+        widget = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(widget)
+        layout.setSpacing(12)
+
+        toolbar = QtWidgets.QHBoxLayout()
+        self._mutations_species_filter = QtWidgets.QComboBox()
+        self._mutations_species_filter.currentIndexChanged.connect(self._update_mutations_table)
+        toolbar.addWidget(self._mutations_species_filter)
+        toolbar.addStretch(1)
+        layout.addLayout(toolbar)
+
+        self._mutations_table = QtWidgets.QTableWidget(0, 6)
+        self._mutations_table.setHorizontalHeaderLabels(
+            ["Name", "Species", "Sex", "Maternal", "Paternal", "Total"]
+        )
+        self._mutations_table.horizontalHeader().setStretchLastSection(True)
+        self._mutations_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self._mutations_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self._mutations_table.verticalHeader().setVisible(False)
+        layout.addWidget(self._mutations_table)
         layout.addStretch(1)
         return widget
 
@@ -254,20 +348,24 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(header)
 
         helper = QtWidgets.QLabel(
-            "Import GameUserSettings.ini and Game.ini to match your server multipliers."
+            "Import GameUserSettings.ini or Game.ini to match your server multipliers."
         )
         helper.setWordWrap(True)
         helper.setStyleSheet("color: #cbd5f5;")
         layout.addWidget(helper)
 
         actions = QtWidgets.QHBoxLayout()
-        self._import_settings_btn = QtWidgets.QPushButton("Import server settings")
-        self._import_settings_btn.clicked.connect(self._import_server_settings)
-        actions.addWidget(self._import_settings_btn)
+        self._import_user_settings_btn = QtWidgets.QPushButton("Import GameUserSettings.ini")
+        self._import_user_settings_btn.clicked.connect(self._import_game_user_settings)
+        actions.addWidget(self._import_user_settings_btn)
+
+        self._import_game_ini_btn = QtWidgets.QPushButton("Import Game.ini")
+        self._import_game_ini_btn.clicked.connect(self._import_game_ini)
+        actions.addWidget(self._import_game_ini_btn)
         actions.addStretch(1)
         layout.addLayout(actions)
 
-        self._settings_summary = QtWidgets.QLabel("No server settings imported yet.")
+        self._settings_summary = QtWidgets.QLabel("Using official defaults (x1).")
         self._settings_summary.setWordWrap(True)
         self._settings_summary.setStyleSheet("color: #94a3b8;")
         layout.addWidget(self._settings_summary)
@@ -318,9 +416,13 @@ class MainWindow(QtWidgets.QMainWindow):
             self.refresh_data()
 
     def refresh_data(self) -> None:
-        creatures = list_creatures(self._conn)
-        self._update_dashboard(creatures)
-        self._populate_creatures_table(creatures)
+        self._creature_cache = list(list_creatures(self._conn))
+        self._update_dashboard(self._creature_cache)
+        self._update_species_filters()
+        self._apply_creature_filters()
+        self._update_breeding_pairs()
+        self._update_mutations_table()
+        self._update_pedigree_table()
 
     def _update_dashboard(self, creatures: Iterable[Creature]) -> None:
         creature_list = list(creatures)
@@ -351,6 +453,137 @@ class MainWindow(QtWidgets.QMainWindow):
             self._set_table_item(row, 8, self._format_stat(creature.stats.get("MeleeDamageMultiplier")))
         self._creatures_table.resizeColumnsToContents()
 
+    def _apply_creature_filters(self) -> None:
+        text = self._creature_search.text().strip().lower()
+        species_filter = self._creature_species_filter.currentText()
+        filtered = []
+        for creature in self._creature_cache:
+            if species_filter and species_filter != "All species":
+                if creature.species != species_filter:
+                    continue
+            if text:
+                hay = f"{creature.name} {creature.species}".lower()
+                if text not in hay:
+                    continue
+            filtered.append(creature)
+        self._populate_creatures_table(filtered)
+
+    def _update_species_filters(self) -> None:
+        species_list = sorted({c.species for c in self._creature_cache if c.species})
+        self._update_filter_combo(self._creature_species_filter, species_list)
+        self._update_filter_combo(self._breeding_species_filter, species_list)
+        self._update_filter_combo(self._mutations_species_filter, species_list)
+        self._update_filter_combo(self._pedigree_species_filter, species_list)
+
+    def _update_filter_combo(self, combo: QtWidgets.QComboBox, species: list[str]) -> None:
+        current = combo.currentText() if combo.count() else "All species"
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("All species")
+        combo.addItems(species)
+        if current:
+            index = combo.findText(current)
+            if index >= 0:
+                combo.setCurrentIndex(index)
+        combo.blockSignals(False)
+
+    def _update_breeding_pairs(self) -> None:
+        species = self._breeding_species_filter.currentText()
+        focus = self._breeding_stat_focus.currentText()
+        creatures = [
+            c
+            for c in self._creature_cache
+            if species == "All species" or c.species == species
+        ]
+        males = [c for c in creatures if c.sex.lower() == "male"]
+        females = [c for c in creatures if c.sex.lower() == "female"]
+
+        pairs: list[tuple[float, Creature, Creature, float, float]] = []
+        for male in males:
+            for female in females:
+                score, male_stat, female_stat = self._score_pair(male, female, focus)
+                pairs.append((score, male, female, male_stat, female_stat))
+
+        pairs.sort(key=lambda item: item[0], reverse=True)
+        top_pairs = pairs[:20]
+        self._breeding_table.setRowCount(len(top_pairs))
+        for row, (score, male, female, male_stat, female_stat) in enumerate(top_pairs):
+            self._set_table_item(row, 0, male.name)
+            self._set_table_item(row, 1, female.name)
+            self._set_table_item(row, 2, focus)
+            self._set_table_item(row, 3, self._format_score(male_stat))
+            self._set_table_item(row, 4, self._format_score(female_stat))
+            self._set_table_item(row, 5, self._format_score(score))
+        self._breeding_table.resizeColumnsToContents()
+
+    def _score_pair(self, male: Creature, female: Creature, focus: str) -> tuple[float, float, float]:
+        if focus == "Overall":
+            male_score = self._overall_score(male)
+            female_score = self._overall_score(female)
+            return male_score + female_score, male_score, female_score
+
+        key = {
+            "Health": "Health",
+            "Stamina": "Stamina",
+            "Weight": "Weight",
+            "Melee": "MeleeDamageMultiplier",
+        }.get(focus, "Health")
+        male_stat = self._get_stat_value(male, key)
+        female_stat = self._get_stat_value(female, key)
+        return male_stat + female_stat, male_stat, female_stat
+
+    def _overall_score(self, creature: Creature) -> float:
+        return sum(
+            self._get_stat_value(creature, key)
+            for key in ("Health", "Stamina", "Weight", "MeleeDamageMultiplier")
+        )
+
+    def _get_stat_value(self, creature: Creature, key: str) -> float:
+        value = creature.stats.get(key)
+        if value is None:
+            return 0.0
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _format_score(self, value: float) -> str:
+        return f"{value:.2f}"
+
+    def _update_mutations_table(self) -> None:
+        species = self._mutations_species_filter.currentText()
+        creatures = [
+            c
+            for c in self._creature_cache
+            if species == "All species" or c.species == species
+        ]
+        self._mutations_table.setRowCount(len(creatures))
+        for row, creature in enumerate(creatures):
+            total = creature.mutations_maternal + creature.mutations_paternal
+            self._set_table_item(row, 0, creature.name)
+            self._set_table_item(row, 1, creature.species)
+            self._set_table_item(row, 2, creature.sex)
+            self._set_table_item(row, 3, str(creature.mutations_maternal))
+            self._set_table_item(row, 4, str(creature.mutations_paternal))
+            self._set_table_item(row, 5, str(total))
+        self._mutations_table.resizeColumnsToContents()
+
+    def _update_pedigree_table(self) -> None:
+        species = self._pedigree_species_filter.currentText()
+        creatures = [
+            c
+            for c in self._creature_cache
+            if species == "All species" or c.species == species
+        ]
+        self._pedigree_table.setRowCount(len(creatures))
+        for row, creature in enumerate(creatures):
+            self._set_table_item(row, 0, creature.name)
+            self._set_table_item(row, 1, creature.species)
+            self._set_table_item(row, 2, str(creature.mother_id or "-"))
+            self._set_table_item(row, 3, str(creature.father_id or "-"))
+            self._set_table_item(row, 4, creature.external_id or "-")
+        self._pedigree_table.resizeColumnsToContents()
+
     def _set_table_item(self, row: int, col: int, value: str) -> None:
         item = QtWidgets.QTableWidgetItem(value)
         item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
@@ -371,7 +604,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _update_settings_view(self) -> None:
         if not self._server_settings:
-            self._settings_summary.setText("No server settings imported yet.")
+            self._settings_summary.setText("Using official defaults (x1).")
             self._settings_details.setText("")
             return
 
@@ -397,43 +630,54 @@ class MainWindow(QtWidgets.QMainWindow):
         self._settings_summary.setText("Server settings loaded.")
         self._settings_details.setText("\n".join(summary_lines + detail_lines))
 
-    def _import_server_settings(self) -> None:
-        start_dir = str(Path.home())
-        user_settings_path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self,
-            "Select GameUserSettings.ini",
-            start_dir,
-            "INI files (*.ini);;All files (*)",
-        )
-        game_ini_path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self,
-            "Select Game.ini",
-            start_dir,
-            "INI files (*.ini);;All files (*)",
-        )
-
-        if not user_settings_path and not game_ini_path:
-            self.show_toast("No settings files selected.", "info")
+    def _import_game_user_settings(self) -> None:
+        path = self._select_ini_file("Select GameUserSettings.ini")
+        if not path:
             return
+        payload = self._ensure_server_settings_payload()
+        payload["game_user_settings"] = parse_ini_file(Path(path))
+        payload["sources"]["game_user_settings"] = path
+        self._save_server_settings(payload, "GameUserSettings.ini imported.")
 
-        payload: dict[str, object] = {
-            "game_user_settings": {},
-            "game_ini": {},
-            "sources": {},
-            "imported_at": QtCore.QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss"),
-        }
+    def _import_game_ini(self) -> None:
+        path = self._select_ini_file("Select Game.ini")
+        if not path:
+            return
+        payload = self._ensure_server_settings_payload()
+        payload["game_ini"] = parse_ini_file(Path(path))
+        payload["sources"]["game_ini"] = path
+        self._save_server_settings(payload, "Game.ini imported.")
 
-        if user_settings_path:
-            payload["game_user_settings"] = parse_ini_file(Path(user_settings_path))
-            payload["sources"]["game_user_settings"] = user_settings_path
-        if game_ini_path:
-            payload["game_ini"] = parse_ini_file(Path(game_ini_path))
-            payload["sources"]["game_ini"] = game_ini_path
+    def _select_ini_file(self, title: str) -> str | None:
+        start_dir = str(Path.home())
+        selected, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            title,
+            start_dir,
+            "INI files (*.ini);;All files (*)",
+        )
+        if not selected:
+            self.show_toast("No settings file selected.", "info")
+            return None
+        return selected
 
+    def _ensure_server_settings_payload(self) -> dict[str, object]:
+        payload: dict[str, object]
+        if self._server_settings:
+            payload = dict(self._server_settings)
+            payload.setdefault("game_user_settings", {})
+            payload.setdefault("game_ini", {})
+            payload.setdefault("sources", {})
+        else:
+            payload = {"game_user_settings": {}, "game_ini": {}, "sources": {}}
+        payload["imported_at"] = QtCore.QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+        return payload
+
+    def _save_server_settings(self, payload: dict[str, object], message: str) -> None:
         set_server_settings(self._conn, payload)
         self._server_settings = payload
         self._update_settings_view()
-        self.show_toast("Server settings imported.", "success")
+        self.show_toast(message, "success")
 
     def show_toast(self, message: str, kind: str = "info") -> None:
         toast = ToastNotification(self, message=message, kind=kind, duration_ms=5000)
