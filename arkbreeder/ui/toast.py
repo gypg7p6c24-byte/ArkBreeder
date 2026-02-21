@@ -55,9 +55,10 @@ class ToastNotification(QtWidgets.QWidget):
 
     def _apply_style(self, container: QtWidgets.QFrame, close_btn: QtWidgets.QToolButton) -> None:
         palette = {
-            "info": ("#1f2937", "#e5e7eb"),
+            "info": ("#1e3a8a", "#eff6ff"),
             "success": ("#065f46", "#ecfdf3"),
             "error": ("#7f1d1d", "#fee2e2"),
+            "warning": ("#7c2d12", "#ffedd5"),
         }
         background, text = palette.get(self._kind, palette["info"])
 

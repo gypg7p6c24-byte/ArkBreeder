@@ -202,6 +202,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creature_species_filter.currentIndexChanged.connect(self._apply_creature_filters)
         toolbar.addWidget(self._creature_species_filter)
 
+        self._creature_updated_filter = QtWidgets.QComboBox()
+        self._creature_updated_filter.addItems(
+            ["All updates", "Updated today", "Last 7 days", "Last 30 days"]
+        )
+        self._creature_updated_filter.currentIndexChanged.connect(self._apply_creature_filters)
+        toolbar.addWidget(self._creature_updated_filter)
+
         self._refresh_button = QtWidgets.QPushButton("Refresh list")
         self._refresh_button.clicked.connect(self.refresh_data)
         toolbar.addWidget(self._refresh_button)
@@ -452,12 +459,14 @@ class MainWindow(QtWidgets.QMainWindow):
             self._set_table_item(row, 6, self._format_stat(creature.stats.get("Stamina")))
             self._set_table_item(row, 7, self._format_stat(creature.stats.get("Weight")))
             self._set_table_item(row, 8, self._format_stat(creature.stats.get("MeleeDamageMultiplier")))
-            self._set_table_item(row, 9, creature.updated_at or "-")
+            self._set_table_item(row, 9, self._format_updated_at(creature.updated_at))
         self._creatures_table.resizeColumnsToContents()
 
     def _apply_creature_filters(self) -> None:
         text = self._creature_search.text().strip().lower()
         species_filter = self._creature_species_filter.currentText()
+        update_filter = self._creature_updated_filter.currentText()
+        cutoff = self._updated_cutoff(update_filter)
         filtered = []
         for creature in self._creature_cache:
             if species_filter and species_filter != "All species":
@@ -466,6 +475,15 @@ class MainWindow(QtWidgets.QMainWindow):
             if text:
                 hay = f"{creature.name} {creature.species}".lower()
                 if text not in hay:
+                    continue
+            if cutoff and creature.updated_at:
+                try:
+                    updated = QtCore.QDateTime.fromString(
+                        creature.updated_at, "yyyy-MM-dd HH:mm:ss"
+                    )
+                except Exception:
+                    updated = QtCore.QDateTime()
+                if updated.isValid() and updated < cutoff:
                     continue
             filtered.append(creature)
         self._populate_creatures_table(filtered)
@@ -599,6 +617,37 @@ class MainWindow(QtWidgets.QMainWindow):
         if value is None:
             return "-"
         return f"{value:.2f}"
+
+    def _format_updated_at(self, value: str | None) -> str:
+        if not value:
+            return "-"
+        dt = QtCore.QDateTime.fromString(value, "yyyy-MM-dd HH:mm:ss")
+        if not dt.isValid():
+            return value
+        now = QtCore.QDateTime.currentDateTime()
+        seconds = dt.secsTo(now)
+        if seconds < 0:
+            return value
+        if seconds < 60:
+            return "just now"
+        if seconds < 3600:
+            minutes = seconds // 60
+            return f"{minutes} min ago"
+        if seconds < 86400:
+            hours = seconds // 3600
+            return f"{hours} h ago"
+        days = seconds // 86400
+        return f"{days} d ago"
+
+    def _updated_cutoff(self, filter_label: str) -> QtCore.QDateTime | None:
+        now = QtCore.QDateTime.currentDateTime()
+        if filter_label == "Updated today":
+            return now.addDays(-1)
+        if filter_label == "Last 7 days":
+            return now.addDays(-7)
+        if filter_label == "Last 30 days":
+            return now.addDays(-30)
+        return None
 
     def _update_last_import_label(self) -> None:
         stamp = QtCore.QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
