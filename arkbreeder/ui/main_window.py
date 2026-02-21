@@ -56,14 +56,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self._stack.addWidget(self._build_placeholder_page("App settings"))
 
         content = QtWidgets.QWidget()
-        content.setStyleSheet("background: #f1f5f9;")
+        content.setObjectName("contentArea")
         content_layout = QtWidgets.QVBoxLayout(content)
         content_layout.setContentsMargins(24, 24, 24, 24)
         content_layout.setSpacing(16)
 
         header = QtWidgets.QHBoxLayout()
         self._page_title = QtWidgets.QLabel(self._page_titles[0])
-        self._page_title.setStyleSheet("font-size: 22px; font-weight: 600;")
+        self._page_title.setStyleSheet("font-size: 22px; font-weight: 600; color: #f8fafc;")
         header.addWidget(self._page_title)
         header.addStretch(1)
 
@@ -78,6 +78,43 @@ class MainWindow(QtWidgets.QMainWindow):
         self._nav.currentRowChanged.connect(self._update_page_title)
         self._nav.setCurrentRow(0)
 
+        central.setStyleSheet(
+            """
+            #contentArea {
+                background: #0b1220;
+                color: #e5e7eb;
+            }
+            #contentArea QLabel {
+                color: #e5e7eb;
+            }
+            #contentArea QPushButton {
+                background: #1e293b;
+                color: #e5e7eb;
+                border: 1px solid #334155;
+                padding: 6px 10px;
+                border-radius: 6px;
+            }
+            #contentArea QPushButton:hover {
+                background: #243247;
+            }
+            #contentArea QPushButton:pressed {
+                background: #1b2536;
+            }
+            #contentArea QTableWidget {
+                background: #0f172a;
+                gridline-color: #1f2937;
+                color: #e5e7eb;
+                border: 1px solid #1f2937;
+            }
+            #contentArea QHeaderView::section {
+                background: #111827;
+                color: #e5e7eb;
+                padding: 6px;
+                border: 0px;
+            }
+            """
+        )
+
     def _build_dashboard_page(self) -> QtWidgets.QWidget:
         widget = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(widget)
@@ -85,19 +122,20 @@ class MainWindow(QtWidgets.QMainWindow):
 
         hero = QtWidgets.QFrame()
         hero.setStyleSheet('''
-        QFrame { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px; }
+        QFrame { background: #0f172a; border: 1px solid #1f2937; border-radius: 12px; }
         ''')
         hero_layout = QtWidgets.QVBoxLayout(hero)
         hero_title = QtWidgets.QLabel("Welcome to ARK Breeder")
-        hero_title.setStyleSheet("font-size: 18px; font-weight: 600;")
+        hero_title.setStyleSheet("font-size: 18px; font-weight: 600; color: #f8fafc;")
         hero_sub = QtWidgets.QLabel(
             "Start by importing creature export files. The app will parse stats, mutations, and lineage."
         )
         hero_sub.setWordWrap(True)
+        hero_sub.setStyleSheet("color: #cbd5f5;")
         self._export_dir_label = QtWidgets.QLabel(str(self._export_dir))
-        self._export_dir_label.setStyleSheet("color: #6b7280; font-size: 12px;")
+        self._export_dir_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
         self._last_import_label = QtWidgets.QLabel("Last import: --")
-        self._last_import_label.setStyleSheet("color: #6b7280; font-size: 12px;")
+        self._last_import_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
         hero_layout.addWidget(hero_title)
         hero_layout.addWidget(hero_sub)
         hero_layout.addWidget(self._export_dir_label)
@@ -131,14 +169,14 @@ class MainWindow(QtWidgets.QMainWindow):
     ) -> QtWidgets.QWidget:
         card = QtWidgets.QFrame()
         card.setStyleSheet('''
-        QFrame { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px; }
+        QFrame { background: #111827; border: 1px solid #1f2937; border-radius: 12px; }
         ''')
         layout = QtWidgets.QVBoxLayout(card)
         title_label = QtWidgets.QLabel(title)
-        title_label.setStyleSheet("color: #64748b; font-size: 12px; text-transform: uppercase;")
+        title_label.setStyleSheet("color: #94a3b8; font-size: 12px; text-transform: uppercase;")
         value_label.setStyleSheet("font-size: 26px; font-weight: 700;")
         caption_label = QtWidgets.QLabel(caption)
-        caption_label.setStyleSheet("color: #64748b;")
+        caption_label.setStyleSheet("color: #94a3b8;")
         layout.addWidget(title_label)
         layout.addWidget(value_label)
         layout.addWidget(caption_label)
@@ -172,6 +210,12 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self._creatures_table.horizontalHeader().setStretchLastSection(True)
         self._creatures_table.setAlternatingRowColors(True)
+        self._creatures_table.setStyleSheet(
+            """
+            QTableWidget::item:selected { background: #1f2937; }
+            QTableWidget::item:alternate { background: #0b1324; }
+            """
+        )
         self._creatures_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self._creatures_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self._creatures_table.verticalHeader().setVisible(False)

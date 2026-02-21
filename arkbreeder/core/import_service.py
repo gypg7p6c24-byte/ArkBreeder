@@ -53,7 +53,7 @@ class ExportImportService:
                 )
                 if self._on_notify:
                     self._on_notify(
-                        f"Imported {saved.name} ({saved.external_id or 'no-id'})",
+                        f"Imported {saved.name}",
                         "success",
                     )
                 if self._delete_after_import:
