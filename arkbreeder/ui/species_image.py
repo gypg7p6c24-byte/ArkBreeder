@@ -21,7 +21,8 @@ class SpeciesImageWidget(QtWidgets.QLabel):
         self._pending_species: str | None = None
         self._pending_kind: str | None = None
         self._pending_url: QtCore.QUrl | None = None
-        self._pending_sources: list[str] = []
+        self._pending_sources: list[tuple[str, str, str]] = []
+        self._pending_base: str | None = None
         self._loading_timer = QtCore.QTimer(self)
         self._loading_timer.setInterval(350)
         self._loading_timer.timeout.connect(self._tick_loading)
@@ -39,8 +40,10 @@ class SpeciesImageWidget(QtWidgets.QLabel):
             return
         self._start_loading()
         self._pending_sources = [
-            self._wiki_api_url(species),
-            self._fandom_api_url(species),
+            ("pageimage", "wiki", self._wiki_api_url(species)),
+            ("search", "wiki", self._wiki_search_url(species)),
+            ("pageimage", "fandom", self._fandom_api_url(species)),
+            ("search", "fandom", self._fandom_search_url(species)),
         ]
         self._fetch_next_source()
 
@@ -52,7 +55,7 @@ class SpeciesImageWidget(QtWidgets.QLabel):
             self.setText("Image unavailable")
             return
         data = reply.readAll()
-        if self._pending_kind == "html":
+        if self._pending_kind == "pageimage":
             image_url = self._extract_api_image(bytes(data))
             if not image_url:
                 if self._fetch_next_source():
@@ -62,6 +65,22 @@ class SpeciesImageWidget(QtWidgets.QLabel):
                 return
             self._pending_kind = "image"
             self._pending_url = QtCore.QUrl(image_url)
+            self._manager.get(self._build_request(self._pending_url))
+            return
+        if self._pending_kind == "search":
+            title = self._extract_search_title(bytes(data))
+            if not title:
+                if self._fetch_next_source():
+                    return
+                self._stop_loading()
+                self.setText("Image unavailable")
+                return
+            if self._pending_base == "fandom":
+                self._pending_kind = "pageimage"
+                self._pending_url = QtCore.QUrl(self._fandom_api_url(title))
+            else:
+                self._pending_kind = "pageimage"
+                self._pending_url = QtCore.QUrl(self._wiki_api_url(title))
             self._manager.get(self._build_request(self._pending_url))
             return
         if self._pending_kind == "image":
@@ -78,8 +97,9 @@ class SpeciesImageWidget(QtWidgets.QLabel):
     def _fetch_next_source(self) -> bool:
         if not self._pending_sources:
             return False
-        page_url = self._pending_sources.pop(0)
-        self._pending_kind = "html"
+        kind, base, page_url = self._pending_sources.pop(0)
+        self._pending_kind = kind
+        self._pending_base = base
         self._pending_url = QtCore.QUrl(page_url)
         self._manager.get(self._build_request(self._pending_url))
         return True
@@ -127,6 +147,20 @@ class SpeciesImageWidget(QtWidgets.QLabel):
             f"&pithumbsize=400&titles={urllib.parse.quote(mapped)}"
         )
 
+    def _wiki_search_url(self, species: str) -> str:
+        mapped = _SPECIES_PAGE_OVERRIDES.get(species, species)
+        return (
+            "https://ark.wiki.gg/api.php?action=query&list=search&format=json"
+            f"&srsearch={urllib.parse.quote(mapped)}"
+        )
+
+    def _fandom_search_url(self, species: str) -> str:
+        mapped = _SPECIES_PAGE_OVERRIDES.get(species, species)
+        return (
+            "https://ark.fandom.com/api.php?action=query&list=search&format=json"
+            f"&srsearch={urllib.parse.quote(mapped)}"
+        )
+
     def _extract_api_image(self, raw: bytes) -> str | None:
         try:
             text = raw.decode("utf-8", errors="replace")
@@ -145,6 +179,27 @@ class SpeciesImageWidget(QtWidgets.QLabel):
                 source = thumbnail.get("source")
                 if isinstance(source, str):
                     return source
+        return None
+
+    def _extract_search_title(self, raw: bytes) -> str | None:
+        try:
+            text = raw.decode("utf-8", errors="replace")
+            data = QtCore.QJsonDocument.fromJson(text.encode("utf-8")).toVariant()
+        except Exception:
+            return None
+        if not isinstance(data, dict):
+            return None
+        query = data.get("query", {})
+        if not isinstance(query, dict):
+            return None
+        results = query.get("search", [])
+        if not isinstance(results, list) or not results:
+            return None
+        first = results[0]
+        if isinstance(first, dict):
+            title = first.get("title")
+            if isinstance(title, str):
+                return title
         return None
 
     def _build_request(self, url: QtCore.QUrl) -> QtNetwork.QNetworkRequest:

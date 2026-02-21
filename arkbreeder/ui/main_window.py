@@ -1066,6 +1066,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._detail_image.set_species(creature.species)
 
         species_group = [c for c in self._creature_cache if c.species == creature.species]
+        if len(species_group) < 2:
+            self._detail_strengths.setText("Strengths: Not enough data yet")
+            self._detail_weaknesses.setText("Weaknesses: Not enough data yet")
+            return
         stats_keys = ["Health", "Stamina", "Weight", "MeleeDamageMultiplier"]
         max_values = {
             key: max((self._get_stat_value(c, key) for c in species_group), default=0.0)
