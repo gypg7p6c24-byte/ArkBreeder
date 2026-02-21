@@ -69,7 +69,7 @@ class ExportImportService:
                 result.failed += 1
                 logger.warning("Skipped %s due to missing Dino IDs", path.name)
                 if self._on_notify:
-                    self._on_notify(f"Skipped {path.name} (missing ID)", "warning")
+                    self._on_notify(f"Skipped {path.name} (missing ID)", "error")
                 if self._delete_after_import:
                     path.unlink(missing_ok=True)
                     if allow_dir_cleanup:
