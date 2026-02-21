@@ -34,8 +34,8 @@ class SpeciesImageWidget(QtWidgets.QLabel):
             return
         self.setText("Loading image...")
         self._pending_sources = [
-            self._wiki_page_url(species),
-            self._fandom_page_url(species),
+            self._wiki_api_url(species),
+            self._fandom_api_url(species),
         ]
         self._fetch_next_source()
 
@@ -47,8 +47,7 @@ class SpeciesImageWidget(QtWidgets.QLabel):
             return
         data = reply.readAll()
         if self._pending_kind == "html":
-            html = bytes(data).decode("utf-8", errors="replace")
-            image_url = self._extract_og_image(html)
+            image_url = self._extract_api_image(bytes(data))
             if not image_url:
                 if self._fetch_next_source():
                     return
@@ -89,20 +88,38 @@ class SpeciesImageWidget(QtWidgets.QLabel):
         cache_dir.mkdir(parents=True, exist_ok=True)
         return cache_dir / f"{safe}.png"
 
-    def _wiki_page_url(self, species: str) -> str:
+    def _wiki_api_url(self, species: str) -> str:
         mapped = _SPECIES_PAGE_OVERRIDES.get(species, species)
-        slug = mapped.replace(" ", "_")
-        return f"https://ark.wiki.gg/wiki/{urllib.parse.quote(slug)}"
+        return (
+            "https://ark.wiki.gg/api.php?action=query&prop=pageimages&format=json"
+            f"&pithumbsize=400&titles={urllib.parse.quote(mapped)}"
+        )
 
-    def _fandom_page_url(self, species: str) -> str:
+    def _fandom_api_url(self, species: str) -> str:
         mapped = _SPECIES_PAGE_OVERRIDES.get(species, species)
-        slug = mapped.replace(" ", "_")
-        return f"https://ark.fandom.com/wiki/{urllib.parse.quote(slug)}"
+        return (
+            "https://ark.fandom.com/api.php?action=query&prop=pageimages&format=json"
+            f"&pithumbsize=400&titles={urllib.parse.quote(mapped)}"
+        )
 
-    def _extract_og_image(self, html: str) -> str | None:
-        match = re.search(r'property="og:image"\\s+content="([^"]+)"', html)
-        if match:
-            return match.group(1)
+    def _extract_api_image(self, raw: bytes) -> str | None:
+        try:
+            text = raw.decode("utf-8", errors="replace")
+            data = QtCore.QJsonDocument.fromJson(text.encode("utf-8")).toVariant()
+        except Exception:
+            return None
+        if not isinstance(data, dict):
+            return None
+        query = data.get("query", {})
+        pages = query.get("pages", {}) if isinstance(query, dict) else {}
+        for page in pages.values():
+            if not isinstance(page, dict):
+                continue
+            thumbnail = page.get("thumbnail", {})
+            if isinstance(thumbnail, dict):
+                source = thumbnail.get("source")
+                if isinstance(source, str):
+                    return source
         return None
 
     def _build_request(self, url: QtCore.QUrl) -> QtNetwork.QNetworkRequest:
