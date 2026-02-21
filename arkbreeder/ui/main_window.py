@@ -10,6 +10,8 @@ from arkbreeder.core.server_settings import parse_ini_file
 from arkbreeder.storage.models import Creature
 from arkbreeder.storage.repository import list_creatures
 from arkbreeder.storage.settings import get_server_settings, set_server_settings
+from arkbreeder.ui.radar_chart import RadarChart
+from arkbreeder.ui.species_image import SpeciesImageWidget
 from arkbreeder.ui.toast import ToastNotification
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._toasts: list[ToastNotification] = []
         self._server_settings: dict | None = None
         self._creature_cache: list[Creature] = []
+        self._creature_rows: list[Creature] = []
+        self._selected_creature: Creature | None = None
         self._page_titles = [
             "Dashboard",
             "Creatures",
@@ -189,8 +193,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _build_creatures_page(self) -> QtWidgets.QWidget:
         widget = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(widget)
+        layout = QtWidgets.QHBoxLayout(widget)
         layout.setSpacing(12)
+
+        left = QtWidgets.QWidget()
+        left_layout = QtWidgets.QVBoxLayout(left)
+        left_layout.setSpacing(12)
 
         toolbar = QtWidgets.QHBoxLayout()
         self._creature_search = QtWidgets.QLineEdit()
@@ -213,7 +221,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._refresh_button.clicked.connect(self.refresh_data)
         toolbar.addWidget(self._refresh_button)
         toolbar.addStretch(1)
-        layout.addLayout(toolbar)
+        left_layout.addLayout(toolbar)
 
         self._creatures_table = QtWidgets.QTableWidget(0, 10)
         self._creatures_table.setHorizontalHeaderLabels(
@@ -242,9 +250,20 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creatures_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self._creatures_table.verticalHeader().setVisible(False)
         self._creatures_table.setSortingEnabled(True)
+        self._creatures_table.itemSelectionChanged.connect(self._on_creature_selected)
 
-        layout.addWidget(self._creatures_table)
-        layout.addStretch(1)
+        left_layout.addWidget(self._creatures_table)
+        left_layout.addStretch(1)
+
+        right = self._build_creature_detail_panel()
+
+        splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        splitter.addWidget(left)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+
+        layout.addWidget(splitter)
         return widget
 
     def _build_breeding_page(self) -> QtWidgets.QWidget:
@@ -281,6 +300,48 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self._breeding_table)
         layout.addStretch(1)
         return widget
+
+    def _build_creature_detail_panel(self) -> QtWidgets.QWidget:
+        panel = QtWidgets.QFrame()
+        panel.setStyleSheet(
+            """
+            QFrame {
+                background: #0f172a;
+                border: 1px solid #1f2937;
+                border-radius: 12px;
+            }
+            """
+        )
+        layout = QtWidgets.QVBoxLayout(panel)
+        layout.setSpacing(12)
+
+        self._detail_title = QtWidgets.QLabel("Select a creature")
+        self._detail_title.setStyleSheet("font-size: 16px; font-weight: 600; color: #f8fafc;")
+        layout.addWidget(self._detail_title)
+
+        self._detail_subtitle = QtWidgets.QLabel("")
+        self._detail_subtitle.setStyleSheet("color: #94a3b8;")
+        self._detail_subtitle.setWordWrap(True)
+        layout.addWidget(self._detail_subtitle)
+
+        self._detail_image = SpeciesImageWidget()
+        layout.addWidget(self._detail_image, alignment=QtCore.Qt.AlignCenter)
+
+        self._detail_radar = RadarChart(["Health", "Stamina", "Weight", "Melee"])
+        layout.addWidget(self._detail_radar)
+
+        self._detail_strengths = QtWidgets.QLabel("Strengths: -")
+        self._detail_strengths.setStyleSheet("color: #a7f3d0;")
+        self._detail_strengths.setWordWrap(True)
+        layout.addWidget(self._detail_strengths)
+
+        self._detail_weaknesses = QtWidgets.QLabel("Weaknesses: -")
+        self._detail_weaknesses.setStyleSheet("color: #fecaca;")
+        self._detail_weaknesses.setWordWrap(True)
+        layout.addWidget(self._detail_weaknesses)
+
+        layout.addStretch(1)
+        return panel
 
     def _build_pedigree_page(self) -> QtWidgets.QWidget:
         widget = QtWidgets.QWidget()
@@ -444,6 +505,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _populate_creatures_table(self, creatures: Iterable[Creature]) -> None:
         creature_list = list(creatures)
+        self._creature_rows = creature_list
         self._creatures_table.setRowCount(len(creature_list))
         for row, creature in enumerate(creature_list):
             self._set_table_item(row, 0, creature.name)
@@ -461,6 +523,18 @@ class MainWindow(QtWidgets.QMainWindow):
             self._set_table_item(row, 8, self._format_stat(creature.stats.get("MeleeDamageMultiplier")))
             self._set_table_item(row, 9, self._format_updated_at(creature.updated_at))
         self._creatures_table.resizeColumnsToContents()
+        self._restore_creature_selection()
+
+    def _restore_creature_selection(self) -> None:
+        if not self._creature_rows:
+            return
+        target_id = self._selected_creature.external_id if self._selected_creature else None
+        if target_id:
+            for row, creature in enumerate(self._creature_rows):
+                if creature.external_id == target_id:
+                    self._creatures_table.selectRow(row)
+                    return
+        self._creatures_table.selectRow(0)
 
     def _apply_creature_filters(self) -> None:
         text = self._creature_search.text().strip().lower()
@@ -638,6 +712,81 @@ class MainWindow(QtWidgets.QMainWindow):
             return f"{hours} h ago"
         days = seconds // 86400
         return f"{days} d ago"
+
+    def _on_creature_selected(self) -> None:
+        rows = self._creatures_table.selectionModel().selectedRows()
+        if not rows:
+            self._selected_creature = None
+            self._detail_title.setText("Select a creature")
+            self._detail_subtitle.setText("")
+            self._detail_strengths.setText("Strengths: -")
+            self._detail_weaknesses.setText("Weaknesses: -")
+            return
+        row = rows[0].row()
+        if row < 0 or row >= len(self._creature_rows):
+            return
+        creature = self._creature_rows[row]
+        self._selected_creature = creature
+        self._update_creature_detail(creature)
+
+    def _update_creature_detail(self, creature: Creature) -> None:
+        self._detail_title.setText(creature.name or "Unknown")
+        subtitle = f"{creature.species} • {creature.sex} • L{creature.level}"
+        self._detail_subtitle.setText(subtitle)
+        self._detail_image.set_species(creature.species)
+
+        species_group = [c for c in self._creature_cache if c.species == creature.species]
+        stats_keys = ["Health", "Stamina", "Weight", "MeleeDamageMultiplier"]
+        max_values = {
+            key: max((self._get_stat_value(c, key) for c in species_group), default=0.0)
+            for key in stats_keys
+        }
+        values = {
+            "Health": self._get_stat_value(creature, "Health"),
+            "Stamina": self._get_stat_value(creature, "Stamina"),
+            "Weight": self._get_stat_value(creature, "Weight"),
+            "Melee": self._get_stat_value(creature, "MeleeDamageMultiplier"),
+        }
+        radar_max = {
+            "Health": max_values.get("Health", 1.0),
+            "Stamina": max_values.get("Stamina", 1.0),
+            "Weight": max_values.get("Weight", 1.0),
+            "Melee": max_values.get("MeleeDamageMultiplier", 1.0),
+        }
+        self._detail_radar.set_values(values, radar_max)
+
+        strengths, weaknesses = self._compute_strengths_weaknesses(creature, species_group)
+        self._detail_strengths.setText("Strengths: " + (", ".join(strengths) if strengths else "-"))
+        self._detail_weaknesses.setText("Weaknesses: " + (", ".join(weaknesses) if weaknesses else "-"))
+
+    def _compute_strengths_weaknesses(
+        self,
+        creature: Creature,
+        species_group: list[Creature],
+    ) -> tuple[list[str], list[str]]:
+        strengths: list[str] = []
+        weaknesses: list[str] = []
+        stat_map = {
+            "Health": "Health",
+            "Stamina": "Stamina",
+            "Weight": "Weight",
+            "Melee": "MeleeDamageMultiplier",
+        }
+        for label, key in stat_map.items():
+            values = [self._get_stat_value(c, key) for c in species_group]
+            percentile = self._stat_percentile(self._get_stat_value(creature, key), values)
+            if percentile >= 0.9:
+                strengths.append(f"{label} (top 10%)")
+            elif percentile <= 0.1:
+                weaknesses.append(f"{label} (bottom 10%)")
+        return strengths, weaknesses
+
+    def _stat_percentile(self, value: float, values: list[float]) -> float:
+        if len(values) < 2:
+            return 0.0
+        total = len(values)
+        count = sum(1 for v in values if v <= value)
+        return count / total
 
     def _updated_cutoff(self, filter_label: str) -> QtCore.QDateTime | None:
         now = QtCore.QDateTime.currentDateTime()
