@@ -9,6 +9,7 @@ from arkbreeder.config import database_path, ensure_app_dirs
 SCHEMA = '''
 CREATE TABLE IF NOT EXISTS creatures (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    external_id TEXT,
     name TEXT NOT NULL,
     species TEXT NOT NULL,
     sex TEXT NOT NULL,
@@ -21,6 +22,8 @@ CREATE TABLE IF NOT EXISTS creatures (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_creatures_species ON creatures(species);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_creatures_external_id
+    ON creatures(external_id) WHERE external_id IS NOT NULL;
 '''
 
 
@@ -34,7 +37,15 @@ def get_connection(path: Path | None = None) -> sqlite3.Connection:
 
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    _ensure_column(conn, "creatures", "external_id", "TEXT")
     conn.commit()
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, col_type: str) -> None:
+    try:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+    except sqlite3.OperationalError:
+        pass
 
 
 @contextmanager

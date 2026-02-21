@@ -7,6 +7,7 @@ from typing import Dict, Optional
 @dataclass(frozen=True)
 class Creature:
     id: Optional[int]
+    external_id: Optional[str] = None
     name: str
     species: str
     sex: str

@@ -5,6 +5,17 @@ import os
 
 APP_NAME = "ARK Breeder"
 APP_SLUG = "ark-breeder"
+DEFAULT_EXPORT_DIR = (
+    Path.home()
+    / ".steam"
+    / "steam"
+    / "steamapps"
+    / "common"
+    / "ARK"
+    / "ShooterGame"
+    / "Saved"
+    / "DinoExports"
+)
 
 
 def user_data_dir() -> Path:
@@ -20,3 +31,10 @@ def ensure_app_dirs() -> Path:
 
 def database_path() -> Path:
     return user_data_dir() / "arkbreeder.db"
+
+
+def export_dir() -> Path:
+    override = os.getenv("ARKBREEDER_EXPORT_DIR")
+    if override:
+        return Path(override).expanduser()
+    return DEFAULT_EXPORT_DIR

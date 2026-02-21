@@ -9,6 +9,7 @@ from arkbreeder.storage.models import Creature
 def creature_from_row(row) -> Creature:
     return Creature(
         id=row["id"],
+        external_id=row["external_id"],
         name=row["name"],
         species=row["species"],
         sex=row["sex"],
@@ -25,12 +26,13 @@ def add_creature(conn, creature: Creature) -> Creature:
     cursor = conn.execute(
         '''
         INSERT INTO creatures (
-            name, species, sex, level, stats_json,
+            external_id, name, species, sex, level, stats_json,
             mutations_maternal, mutations_paternal, mother_id, father_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''',
         (
+            creature.external_id,
             creature.name,
             creature.species,
             creature.sex,
@@ -43,6 +45,50 @@ def add_creature(conn, creature: Creature) -> Creature:
         ),
     )
     return creature.with_id(cursor.lastrowid)
+
+
+def update_creature(conn, creature: Creature) -> Creature:
+    conn.execute(
+        '''
+        UPDATE creatures SET
+            external_id = ?,
+            name = ?,
+            species = ?,
+            sex = ?,
+            level = ?,
+            stats_json = ?,
+            mutations_maternal = ?,
+            mutations_paternal = ?,
+            mother_id = ?,
+            father_id = ?
+        WHERE id = ?
+        ''',
+        (
+            creature.external_id,
+            creature.name,
+            creature.species,
+            creature.sex,
+            creature.level,
+            json.dumps(creature.stats),
+            creature.mutations_maternal,
+            creature.mutations_paternal,
+            creature.mother_id,
+            creature.father_id,
+            creature.id,
+        ),
+    )
+    return creature
+
+
+def upsert_creature(conn, creature: Creature) -> Creature:
+    if creature.external_id:
+        row = conn.execute(
+            "SELECT * FROM creatures WHERE external_id = ?",
+            (creature.external_id,),
+        ).fetchone()
+        if row is not None:
+            return update_creature(conn, creature.with_id(row["id"]))
+    return add_creature(conn, creature)
 
 
 def get_creature(conn, creature_id: int) -> Optional[Creature]:

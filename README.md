@@ -25,6 +25,15 @@ arkbreeder
 ARKBREEDER_LOG_LEVEL=DEBUG arkbreeder
 ```
 
+## Export watcher
+By default the app watches:
+`~/.steam/steam/steamapps/common/ARK/ShooterGame/Saved/DinoExports`
+
+Override the path if needed:
+```bash
+ARKBREEDER_EXPORT_DIR=/custom/path arkbreeder
+```
+
 ## Project layout
 - `arkbreeder/core`: parsing and breeding domain logic
 - `arkbreeder/storage`: SQLite persistence and repositories
