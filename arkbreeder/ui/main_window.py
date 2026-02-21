@@ -505,7 +505,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 pairs.append((score, male, female, male_stat, female_stat))
 
         pairs.sort(key=lambda item: item[0], reverse=True)
-        top_pairs = pairs[:20]
+        top_pairs = pairs[:10]
         self._breeding_table.setRowCount(len(top_pairs))
         for row, (score, male, female, male_stat, female_stat) in enumerate(top_pairs):
             self._set_table_item(row, 0, male.name)
@@ -518,9 +518,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _score_pair(self, male: Creature, female: Creature, focus: str) -> tuple[float, float, float]:
         if focus == "Overall":
-            male_score = self._overall_score(male)
-            female_score = self._overall_score(female)
-            return male_score + female_score, male_score, female_score
+            best_stats = [
+                max(self._get_stat_value(male, key), self._get_stat_value(female, key))
+                for key in ("Health", "Stamina", "Weight", "MeleeDamageMultiplier")
+            ]
+            score = sum(best_stats)
+            return score, self._overall_score(male), self._overall_score(female)
 
         key = {
             "Health": "Health",
@@ -530,7 +533,8 @@ class MainWindow(QtWidgets.QMainWindow):
         }.get(focus, "Health")
         male_stat = self._get_stat_value(male, key)
         female_stat = self._get_stat_value(female, key)
-        return male_stat + female_stat, male_stat, female_stat
+        score = max(male_stat, female_stat)
+        return score, male_stat, female_stat
 
     def _overall_score(self, creature: Creature) -> float:
         return sum(
