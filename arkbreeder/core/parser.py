@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Iterable
 
 
 @dataclass(frozen=True)
@@ -23,7 +23,7 @@ def parse_creature_file(path: Path) -> ParsedCreature:
     Placeholder parser for exported creature files.
     This implementation reads the file and extracts a few common fields if present.
     """
-    text = path.read_text(encoding="utf-8", errors="replace")
+    text = _read_text(path)
     sections = _parse_sections(text)
     dino_data = _get_section(sections, "Dino Data")
     stat_section = _get_section(sections, "Max Character Status Values")
@@ -46,9 +46,12 @@ def parse_creature_file(path: Path) -> ParsedCreature:
 
     stats: Dict[str, float] = {}
     for key, value in stat_section.items():
+        normalized = _normalize_stat_key(key)
+        if normalized is None:
+            continue
         parsed = _parse_float(value)
         if parsed is not None:
-            stats[key] = parsed
+            stats[normalized] = parsed
 
     return ParsedCreature(
         name=name,
@@ -88,6 +91,36 @@ def _parse_sections(text: str) -> dict[str, dict[str, str]]:
     return sections
 
 
+def _read_text(path: Path) -> str:
+    raw = path.read_bytes()
+    for encoding in _candidate_encodings(raw):
+        try:
+            text = raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+        if _looks_valid_export(text):
+            return text
+    return raw.decode("utf-8", errors="replace")
+
+
+def _candidate_encodings(raw: bytes) -> Iterable[str]:
+    if raw.startswith(b"\xff\xfe"):
+        return ["utf-16-le", "utf-8"]
+    if raw.startswith(b"\xfe\xff"):
+        return ["utf-16-be", "utf-8"]
+    return ["utf-8", "utf-16-le", "utf-16-be"]
+
+
+def _looks_valid_export(text: str) -> bool:
+    if "\x00" in text:
+        return False
+    if "[Dino Data]" in text:
+        return True
+    if "[DinoData]" in text:
+        return True
+    return "DinoID1=" in text and "DinoID2=" in text
+
+
 def _get_section(
     sections: dict[str, dict[str, str]],
     name: str,
@@ -95,7 +128,18 @@ def _get_section(
     if name in sections:
         return sections[name]
     lowered = {key.lower(): key for key in sections}
-    return sections.get(lowered.get(name.lower(), ""), {})
+    if name.lower() in lowered:
+        return sections[lowered[name.lower()]]
+    normalized = _normalize_section_name(name)
+    if normalized:
+        for key in sections:
+            if _normalize_section_name(key) == normalized:
+                return sections[key]
+    return {}
+
+
+def _normalize_section_name(name: str) -> str:
+    return "".join(ch for ch in name.lower() if ch.isalnum())
 
 
 def _parse_sex(value: str | None) -> str:
@@ -138,3 +182,26 @@ def _extract_species(dino_class: str) -> str | None:
     if "." in dino_class:
         return dino_class.split(".", 1)[0]
     return dino_class
+
+
+def _normalize_stat_key(key: str) -> str | None:
+    cleaned = key.strip()
+    if not cleaned:
+        return None
+    collapsed = cleaned.replace(" ", "").lower()
+    mapping = {
+        "health": "Health",
+        "stamina": "Stamina",
+        "torpidity": "Torpidity",
+        "oxygen": "Oxygen",
+        "food": "Food",
+        "water": "Water",
+        "temperature": "Temperature",
+        "weight": "Weight",
+        "meleedamage": "MeleeDamageMultiplier",
+        "meleedamagemultiplier": "MeleeDamageMultiplier",
+        "movementspeed": "MovementSpeed",
+        "fortitude": "Fortitude",
+        "craftingskill": "CraftingSkill",
+    }
+    return mapping.get(collapsed, cleaned)
