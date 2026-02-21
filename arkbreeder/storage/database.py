@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS creatures (
     mutations_paternal INTEGER NOT NULL DEFAULT 0,
     mother_id INTEGER,
     father_id INTEGER,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_creatures_species ON creatures(species);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_creatures_external_id
@@ -42,6 +43,10 @@ def get_connection(path: Path | None = None) -> sqlite3.Connection:
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
     _ensure_column(conn, "creatures", "external_id", "TEXT")
+    _ensure_column(conn, "creatures", "updated_at", "TEXT")
+    conn.execute(
+        "UPDATE creatures SET updated_at = COALESCE(updated_at, created_at, CURRENT_TIMESTAMP)"
+    )
     conn.commit()
 
 

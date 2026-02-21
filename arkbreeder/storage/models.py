@@ -17,6 +17,7 @@ class Creature:
     mutations_paternal: int = 0
     mother_id: Optional[int] = None
     father_id: Optional[int] = None
+    updated_at: Optional[str] = None
 
     def with_id(self, new_id: int) -> "Creature":
         return replace(self, id=new_id)

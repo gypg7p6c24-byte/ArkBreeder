@@ -208,7 +208,7 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.addStretch(1)
         layout.addLayout(toolbar)
 
-        self._creatures_table = QtWidgets.QTableWidget(0, 9)
+        self._creatures_table = QtWidgets.QTableWidget(0, 10)
         self._creatures_table.setHorizontalHeaderLabels(
             [
                 "Name",
@@ -220,6 +220,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 "Stamina",
                 "Weight",
                 "Melee",
+                "Updated",
             ]
         )
         self._creatures_table.horizontalHeader().setStretchLastSection(True)
@@ -451,6 +452,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._set_table_item(row, 6, self._format_stat(creature.stats.get("Stamina")))
             self._set_table_item(row, 7, self._format_stat(creature.stats.get("Weight")))
             self._set_table_item(row, 8, self._format_stat(creature.stats.get("MeleeDamageMultiplier")))
+            self._set_table_item(row, 9, creature.updated_at or "-")
         self._creatures_table.resizeColumnsToContents()
 
     def _apply_creature_filters(self) -> None:

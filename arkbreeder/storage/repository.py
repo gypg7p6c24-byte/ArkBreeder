@@ -19,6 +19,7 @@ def creature_from_row(row) -> Creature:
         mutations_paternal=row["mutations_paternal"],
         mother_id=row["mother_id"],
         father_id=row["father_id"],
+        updated_at=row["updated_at"] if "updated_at" in row.keys() else None,
     )
 
 
@@ -27,9 +28,9 @@ def add_creature(conn, creature: Creature) -> Creature:
         '''
         INSERT INTO creatures (
             external_id, name, species, sex, level, stats_json,
-            mutations_maternal, mutations_paternal, mother_id, father_id
+            mutations_maternal, mutations_paternal, mother_id, father_id, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ''',
         (
             creature.external_id,
@@ -60,7 +61,8 @@ def update_creature(conn, creature: Creature) -> Creature:
             mutations_maternal = ?,
             mutations_paternal = ?,
             mother_id = ?,
-            father_id = ?
+            father_id = ?,
+            updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         ''',
         (

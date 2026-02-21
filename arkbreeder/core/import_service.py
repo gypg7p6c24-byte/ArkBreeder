@@ -21,6 +21,8 @@ class ImportResult:
 
 
 class ExportImportService:
+    _REJECTED_DIR = "_rejected"
+
     def __init__(
         self,
         conn,
@@ -40,6 +42,8 @@ class ExportImportService:
             return result
 
         for entry in sorted(self._export_dir.iterdir()):
+            if entry.name == self._REJECTED_DIR:
+                continue
             if entry.is_file():
                 self._handle_file(entry, result)
                 continue
@@ -65,6 +69,18 @@ class ExportImportService:
     ) -> None:
         try:
             parsed = parse_creature_file(path)
+            if not parsed.external_id:
+                result.failed += 1
+                logger.warning("Skipped %s due to missing Dino IDs", path.name)
+                if self._on_notify:
+                    self._on_notify(f"Skipped {path.name} (missing ID)", "error")
+                if self._delete_after_import:
+                    self._quarantine_file(path)
+                    if allow_dir_cleanup:
+                        parent = path.parent
+                        if parent != self._export_dir and self._is_dir_empty(parent):
+                            shutil.rmtree(parent)
+                return
             existing_id: int | None = None
             if parsed.external_id:
                 row = self._conn.execute(
@@ -104,10 +120,22 @@ class ExportImportService:
     def _list_export_files(self, folder: Path) -> Iterable[Path]:
         for child in sorted(folder.rglob("*")):
             if child.is_file():
+                if self._REJECTED_DIR in child.parts:
+                    continue
                 yield child
 
     def _is_dir_empty(self, folder: Path) -> bool:
         return not any(folder.iterdir())
+
+    def _quarantine_file(self, path: Path) -> None:
+        rejected_dir = self._export_dir / self._REJECTED_DIR
+        rejected_dir.mkdir(parents=True, exist_ok=True)
+        target = rejected_dir / path.name
+        counter = 1
+        while target.exists():
+            target = rejected_dir / f"{path.stem}_{counter}{path.suffix}"
+            counter += 1
+        path.rename(target)
 
     def _to_creature(self, parsed: ParsedCreature) -> Creature:
         return Creature(
