@@ -105,7 +105,7 @@ class SpeciesImageWidget(QtWidgets.QLabel):
     def _tick_loading(self) -> None:
         self._loading_dots = (self._loading_dots + 1) % 4
         dots = "." * self._loading_dots
-        self.setText(f\"{self._loading_text}{dots}\")
+        self.setText(f"{self._loading_text}{dots}")
 
     def _cache_path(self, species: str) -> Path:
         safe = re.sub(r"[^a-zA-Z0-9_-]+", "_", species).lower()
