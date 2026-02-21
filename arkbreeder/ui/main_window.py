@@ -4,6 +4,8 @@ import logging
 
 from PySide6 import QtCore, QtWidgets
 
+from arkbreeder.ui.toast import ToastNotification
+
 logger = logging.getLogger(__name__)
 
 
@@ -11,6 +13,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("ARK Breeder")
+        self._toasts: list[ToastNotification] = []
         self._page_titles = [
             "Dashboard",
             "Creatures",
@@ -153,3 +156,14 @@ class MainWindow(QtWidgets.QMainWindow):
             "Not implemented",
             "This action is a placeholder and will be wired later.",
         )
+
+    def show_toast(self, message: str, kind: str = "info") -> None:
+        toast = ToastNotification(self, message=message, kind=kind, duration_ms=5000)
+        self._toasts.append(toast)
+
+        def _cleanup(_=None) -> None:
+            if toast in self._toasts:
+                self._toasts.remove(toast)
+
+        toast.destroyed.connect(_cleanup)
+        toast.show_at_bottom_right()

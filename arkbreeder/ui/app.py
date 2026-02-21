@@ -24,7 +24,7 @@ def main() -> int:
     window.show()
     app.aboutToQuit.connect(conn.close)
 
-    service = ExportImportService(conn, export_dir())
+    service = ExportImportService(conn, export_dir(), on_notify=window.show_toast)
     timer = QtCore.QTimer()
     timer.setInterval(500)
     timer.timeout.connect(service.poll_once)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 from pathlib import Path
+from typing import Callable, Optional
 
 from arkbreeder.core.parser import ParsedCreature, parse_creature_file
 from arkbreeder.storage.models import Creature
@@ -19,10 +20,17 @@ class ImportResult:
 
 
 class ExportImportService:
-    def __init__(self, conn, export_dir: Path, delete_after_import: bool = True) -> None:
+    def __init__(
+        self,
+        conn,
+        export_dir: Path,
+        delete_after_import: bool = True,
+        on_notify: Optional[Callable[[str, str], None]] = None,
+    ) -> None:
         self._conn = conn
         self._export_dir = export_dir
         self._delete_after_import = delete_after_import
+        self._on_notify = on_notify
 
     def poll_once(self) -> ImportResult:
         result = ImportResult()
@@ -44,11 +52,18 @@ class ExportImportService:
                     saved.external_id or "no-id",
                     path.name,
                 )
+                if self._on_notify:
+                    self._on_notify(
+                        f"Imported {saved.name} ({saved.external_id or 'no-id'})",
+                        "success",
+                    )
                 if self._delete_after_import:
                     path.unlink()
             except Exception:
                 result.failed += 1
                 logger.exception("Failed to import %s", path)
+                if self._on_notify:
+                    self._on_notify(f"Failed to import {path.name}", "error")
         return result
 
     def _to_creature(self, parsed: ParsedCreature) -> Creature:
