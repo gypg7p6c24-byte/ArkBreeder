@@ -65,18 +65,28 @@ class ExportImportService:
     ) -> None:
         try:
             parsed = parse_creature_file(path)
+            existing_id: int | None = None
+            if parsed.external_id:
+                row = self._conn.execute(
+                    "SELECT id FROM creatures WHERE external_id = ?",
+                    (parsed.external_id,),
+                ).fetchone()
+                if row is not None:
+                    existing_id = row["id"]
             creature = self._to_creature(parsed)
             saved = upsert_creature(self._conn, creature)
             result.imported += 1
+            action = "Updated" if existing_id else "Imported"
             logger.info(
-                "Imported %s (%s) from %s",
+                "%s %s (%s) from %s",
+                action,
                 saved.name,
                 saved.external_id or "no-id",
                 path.name,
             )
             if self._on_notify:
                 self._on_notify(
-                    f"Imported {saved.name}",
+                    f"{action} {saved.name}",
                     "success",
                 )
             if self._delete_after_import:
