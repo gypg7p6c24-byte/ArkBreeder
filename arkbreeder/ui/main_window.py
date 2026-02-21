@@ -360,29 +360,33 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.addStretch(1)
         layout.addLayout(toolbar)
 
-        self._pedigree_card = QtWidgets.QFrame()
-        self._pedigree_card.setStyleSheet(
-            "QFrame { background: #0f172a; border: 1px solid #1f2937; border-radius: 12px; }"
-        )
-        card_layout = QtWidgets.QHBoxLayout(self._pedigree_card)
-        card_layout.setSpacing(24)
+        self._pedigree_tree = QtWidgets.QWidget()
+        tree_layout = QtWidgets.QGridLayout(self._pedigree_tree)
+        tree_layout.setHorizontalSpacing(24)
+        tree_layout.setVerticalSpacing(8)
+        tree_layout.setColumnStretch(0, 1)
+        tree_layout.setColumnStretch(1, 1)
+        tree_layout.setColumnStretch(2, 1)
 
-        self._pedigree_mother = QtWidgets.QLabel("Mother\nUnknown")
-        self._pedigree_mother.setAlignment(QtCore.Qt.AlignCenter)
-        self._pedigree_mother.setStyleSheet("color: #f472b6; font-size: 14px;")
-        card_layout.addWidget(self._pedigree_mother)
+        self._pedigree_mother_box = self._pedigree_node("Mother", "Unknown", "#f472b6")
+        self._pedigree_father_box = self._pedigree_node("Father", "Unknown", "#60a5fa")
+        self._pedigree_subject_box = self._pedigree_node("Selected", "Select a creature", "#38bdf8")
 
-        self._pedigree_subject = QtWidgets.QLabel("Select a creature")
-        self._pedigree_subject.setAlignment(QtCore.Qt.AlignCenter)
-        self._pedigree_subject.setStyleSheet("color: #f8fafc; font-size: 16px; font-weight: 600;")
-        card_layout.addWidget(self._pedigree_subject, 1)
+        self._pedigree_mother = self._pedigree_mother_box.findChild(QtWidgets.QLabel, "value")
+        self._pedigree_father = self._pedigree_father_box.findChild(QtWidgets.QLabel, "value")
+        self._pedigree_subject = self._pedigree_subject_box.findChild(QtWidgets.QLabel, "value")
 
-        self._pedigree_father = QtWidgets.QLabel("Father\nUnknown")
-        self._pedigree_father.setAlignment(QtCore.Qt.AlignCenter)
-        self._pedigree_father.setStyleSheet("color: #60a5fa; font-size: 14px;")
-        card_layout.addWidget(self._pedigree_father)
+        tree_layout.addWidget(self._pedigree_mother_box, 0, 0, alignment=QtCore.Qt.AlignCenter)
+        tree_layout.addWidget(self._pedigree_father_box, 0, 2, alignment=QtCore.Qt.AlignCenter)
 
-        layout.addWidget(self._pedigree_card)
+        tree_layout.addWidget(self._line(True), 1, 0, alignment=QtCore.Qt.AlignCenter)
+        tree_layout.addWidget(self._line(True), 1, 2, alignment=QtCore.Qt.AlignCenter)
+
+        tree_layout.addWidget(self._line(False), 2, 0, 1, 3)
+        tree_layout.addWidget(self._line(True), 3, 1, alignment=QtCore.Qt.AlignCenter)
+        tree_layout.addWidget(self._pedigree_subject_box, 4, 1, alignment=QtCore.Qt.AlignCenter)
+
+        layout.addWidget(self._pedigree_tree)
         layout.addStretch(1)
         return widget
 
@@ -674,6 +678,18 @@ class MainWindow(QtWidgets.QMainWindow):
             for key in ("Health", "Stamina", "Weight", "MeleeDamageMultiplier")
         )
 
+    def _species_max_stats(self, species: str) -> dict[str, float]:
+        candidates = [c for c in self._creature_cache if c.species == species]
+        stats = {
+            "Health": 1.0,
+            "Stamina": 1.0,
+            "Weight": 1.0,
+            "MeleeDamageMultiplier": 1.0,
+        }
+        for key in stats:
+            stats[key] = max((self._get_stat_value(c, key) for c in candidates), default=1.0)
+        return stats
+
     def _get_stat_value(self, creature: Creature, key: str) -> float:
         value = creature.stats.get(key)
         if value is None:
@@ -685,6 +701,33 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _format_score(self, value: float) -> str:
         return f"{value:.2f}"
+
+    def _line(self, vertical: bool) -> QtWidgets.QFrame:
+        line = QtWidgets.QFrame()
+        if vertical:
+            line.setFixedWidth(2)
+            line.setFixedHeight(24)
+        else:
+            line.setFixedHeight(2)
+        line.setStyleSheet("QFrame { background: #1f2937; }")
+        return line
+
+    def _pedigree_node(self, title: str, value: str, accent: str) -> QtWidgets.QFrame:
+        node = QtWidgets.QFrame()
+        node.setStyleSheet(
+            f"QFrame {{ background: #111827; border: 1px solid {accent}; border-radius: 10px; }}"
+        )
+        layout = QtWidgets.QVBoxLayout(node)
+        layout.setSpacing(4)
+        label = QtWidgets.QLabel(title)
+        label.setStyleSheet("color: #94a3b8; font-size: 11px; text-transform: uppercase;")
+        value_label = QtWidgets.QLabel(value)
+        value_label.setObjectName("value")
+        value_label.setAlignment(QtCore.Qt.AlignCenter)
+        value_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
+        layout.addWidget(label, alignment=QtCore.Qt.AlignCenter)
+        layout.addWidget(value_label)
+        return node
 
     def _render_breeding_cards(
         self,
@@ -712,9 +755,9 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             card_layout = QtWidgets.QHBoxLayout(card)
             card_layout.setSpacing(16)
-
-            male_box = self._pair_info_box("Male", male.name, male.sex, male_stat)
-            female_box = self._pair_info_box("Female", female.name, female.sex, female_stat)
+            max_stats = self._species_max_stats(male.species)
+            male_box = self._pair_info_box("Male", male, male_stat, max_stats)
+            female_box = self._pair_info_box("Female", female, female_stat, max_stats)
 
             summary = QtWidgets.QVBoxLayout()
             focus_label = QtWidgets.QLabel(f"Focus: {focus}")
@@ -731,8 +774,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
             layout.insertWidget(layout.count() - 1, card)
 
-    def _pair_info_box(self, title: str, name: str, sex: str, stat: float) -> QtWidgets.QWidget:
-        sex_lower = sex.lower() if sex else ""
+    def _pair_info_box(
+        self,
+        title: str,
+        creature: Creature,
+        focus_stat: float,
+        max_stats: dict[str, float],
+    ) -> QtWidgets.QWidget:
+        sex_lower = creature.sex.lower() if creature.sex else ""
         accent = "#94a3b8"
         if sex_lower == "male":
             accent = "#60a5fa"
@@ -745,17 +794,68 @@ class MainWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(box)
         label = QtWidgets.QLabel(title)
         label.setStyleSheet("color: #94a3b8; font-size: 11px; text-transform: uppercase;")
-        name_label = QtWidgets.QLabel(name)
+        name_label = QtWidgets.QLabel(creature.name)
         name_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
-        sex_label = QtWidgets.QLabel(sex or "Unknown")
+        sex_label = QtWidgets.QLabel(creature.sex or "Unknown")
         sex_label.setStyleSheet(f"color: {accent}; font-weight: 600;")
-        stat_label = QtWidgets.QLabel(f"Stat: {self._format_score(stat)}")
+        stat_label = QtWidgets.QLabel(f"Stat: {self._format_score(focus_stat)}")
         stat_label.setStyleSheet("color: #a7f3d0;")
         layout.addWidget(label)
         layout.addWidget(name_label)
         layout.addWidget(sex_label)
         layout.addWidget(stat_label)
+        layout.addWidget(self._stat_bar_row("H", creature, "Health", max_stats.get("Health", 1.0), "#22c55e"))
+        layout.addWidget(self._stat_bar_row("S", creature, "Stamina", max_stats.get("Stamina", 1.0), "#38bdf8"))
+        layout.addWidget(self._stat_bar_row("W", creature, "Weight", max_stats.get("Weight", 1.0), "#f59e0b"))
+        layout.addWidget(
+            self._stat_bar_row(
+                "M",
+                creature,
+                "MeleeDamageMultiplier",
+                max_stats.get("MeleeDamageMultiplier", 1.0),
+                "#f97316",
+            )
+        )
         return box
+
+    def _stat_bar_row(
+        self,
+        label: str,
+        creature: Creature,
+        key: str,
+        max_value: float,
+        color: str,
+    ) -> QtWidgets.QWidget:
+        row = QtWidgets.QWidget()
+        row_layout = QtWidgets.QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(6)
+        tag = QtWidgets.QLabel(label)
+        tag.setFixedWidth(12)
+        tag.setStyleSheet("color: #94a3b8; font-size: 10px;")
+        bar = QtWidgets.QProgressBar()
+        bar.setMaximum(100)
+        value = self._get_stat_value(creature, key)
+        ratio = 0.0 if max_value <= 0 else min(max(value / max_value, 0.0), 1.0)
+        bar.setValue(int(ratio * 100))
+        bar.setTextVisible(False)
+        bar.setFixedHeight(8)
+        bar.setStyleSheet(
+            f"""
+            QProgressBar {{
+                background: #0f172a;
+                border: 1px solid #1f2937;
+                border-radius: 4px;
+            }}
+            QProgressBar::chunk {{
+                background: {color};
+                border-radius: 4px;
+            }}
+            """
+        )
+        row_layout.addWidget(tag)
+        row_layout.addWidget(bar, 1)
+        return row
 
     def _render_mutation_cards(self, creatures: list[Creature]) -> None:
         layout = self._mutations_cards_layout
@@ -792,6 +892,7 @@ class MainWindow(QtWidgets.QMainWindow):
             counts.setStyleSheet("color: #94a3b8;")
             card_layout.addWidget(title)
             card_layout.addStretch(1)
+            card_layout.addWidget(self._mutation_bar(creature.mutations_maternal, creature.mutations_paternal))
             card_layout.addWidget(counts)
             layout.insertWidget(layout.count() - 1, card)
 
@@ -802,6 +903,31 @@ class MainWindow(QtWidgets.QMainWindow):
             if creature.id == creature_id:
                 return creature
         return None
+
+    def _mutation_bar(self, maternal: int, paternal: int) -> QtWidgets.QWidget:
+        if maternal + paternal == 0:
+            maternal = 1
+            paternal = 0
+            empty = True
+        else:
+            empty = False
+        container = QtWidgets.QFrame()
+        container.setFixedWidth(120)
+        container.setFixedHeight(10)
+        container.setStyleSheet("QFrame { background: #0f172a; border: 1px solid #1f2937; border-radius: 5px; }")
+        layout = QtWidgets.QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        maternal_bar = QtWidgets.QFrame()
+        maternal_color = "#334155" if empty else "#f472b6"
+        paternal_color = "#334155" if empty else "#60a5fa"
+        maternal_bar.setStyleSheet(f"QFrame {{ background: {maternal_color}; border-radius: 4px; }}")
+        paternal_bar = QtWidgets.QFrame()
+        paternal_bar.setStyleSheet(f"QFrame {{ background: {paternal_color}; border-radius: 4px; }}")
+        layout.addWidget(maternal_bar, maternal)
+        layout.addWidget(paternal_bar, paternal)
+        return container
 
     def _update_mutations_table(self) -> None:
         species = self._mutations_species_filter.currentText()
@@ -820,17 +946,23 @@ class MainWindow(QtWidgets.QMainWindow):
             if species == "All species" or c.species == species
         ]
         if not candidates:
-            self._pedigree_subject.setText("Select a creature")
-            self._pedigree_mother.setText("Mother\nUnknown")
-            self._pedigree_father.setText("Father\nUnknown")
+            if self._pedigree_subject:
+                self._pedigree_subject.setText("Select a creature")
+            if self._pedigree_mother:
+                self._pedigree_mother.setText("Unknown")
+            if self._pedigree_father:
+                self._pedigree_father.setText("Unknown")
             return
         selected = self._pedigree_creature_picker.currentData()
         creature = selected if isinstance(selected, Creature) else candidates[0]
-        self._pedigree_subject.setText(f"{creature.name}\n{creature.species}")
+        if self._pedigree_subject:
+            self._pedigree_subject.setText(f"{creature.name}\n{creature.species}")
         mother = self._find_creature_by_id(creature.mother_id)
         father = self._find_creature_by_id(creature.father_id)
-        self._pedigree_mother.setText(f"Mother\n{mother.name if mother else 'Unknown'}")
-        self._pedigree_father.setText(f"Father\n{father.name if father else 'Unknown'}")
+        if self._pedigree_mother:
+            self._pedigree_mother.setText(mother.name if mother else "Unknown")
+        if self._pedigree_father:
+            self._pedigree_father.setText(father.name if father else "Unknown")
 
     def _set_table_item(self, row: int, col: int, value: str, external_id: str | None = None) -> None:
         item = QtWidgets.QTableWidgetItem(value)
