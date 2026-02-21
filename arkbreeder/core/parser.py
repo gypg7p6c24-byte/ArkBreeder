@@ -98,6 +98,7 @@ def _read_text(path: Path) -> str:
             text = raw.decode(encoding)
         except UnicodeDecodeError:
             continue
+        text = text.lstrip("\ufeff")
         if _looks_valid_export(text):
             return text
     return raw.decode("utf-8", errors="replace")

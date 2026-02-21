@@ -289,15 +289,16 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.addStretch(1)
         layout.addLayout(toolbar)
 
-        self._breeding_table = QtWidgets.QTableWidget(0, 6)
-        self._breeding_table.setHorizontalHeaderLabels(
-            ["Male", "Female", "Focus", "Male stat", "Female stat", "Score"]
-        )
-        self._breeding_table.horizontalHeader().setStretchLastSection(True)
-        self._breeding_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self._breeding_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self._breeding_table.verticalHeader().setVisible(False)
-        layout.addWidget(self._breeding_table)
+        self._breeding_cards_container = QtWidgets.QWidget()
+        self._breeding_cards_layout = QtWidgets.QVBoxLayout(self._breeding_cards_container)
+        self._breeding_cards_layout.setSpacing(12)
+        self._breeding_cards_layout.addStretch(1)
+
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll.setWidget(self._breeding_cards_container)
+        layout.addWidget(scroll)
         layout.addStretch(1)
         return widget
 
@@ -350,20 +351,38 @@ class MainWindow(QtWidgets.QMainWindow):
 
         toolbar = QtWidgets.QHBoxLayout()
         self._pedigree_species_filter = QtWidgets.QComboBox()
-        self._pedigree_species_filter.currentIndexChanged.connect(self._update_pedigree_table)
+        self._pedigree_species_filter.currentIndexChanged.connect(self._update_pedigree_view)
         toolbar.addWidget(self._pedigree_species_filter)
+
+        self._pedigree_creature_picker = QtWidgets.QComboBox()
+        self._pedigree_creature_picker.currentIndexChanged.connect(self._update_pedigree_view)
+        toolbar.addWidget(self._pedigree_creature_picker)
         toolbar.addStretch(1)
         layout.addLayout(toolbar)
 
-        self._pedigree_table = QtWidgets.QTableWidget(0, 5)
-        self._pedigree_table.setHorizontalHeaderLabels(
-            ["Name", "Species", "Mother ID", "Father ID", "External ID"]
+        self._pedigree_card = QtWidgets.QFrame()
+        self._pedigree_card.setStyleSheet(
+            "QFrame { background: #0f172a; border: 1px solid #1f2937; border-radius: 12px; }"
         )
-        self._pedigree_table.horizontalHeader().setStretchLastSection(True)
-        self._pedigree_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self._pedigree_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self._pedigree_table.verticalHeader().setVisible(False)
-        layout.addWidget(self._pedigree_table)
+        card_layout = QtWidgets.QHBoxLayout(self._pedigree_card)
+        card_layout.setSpacing(24)
+
+        self._pedigree_mother = QtWidgets.QLabel("Mother\nUnknown")
+        self._pedigree_mother.setAlignment(QtCore.Qt.AlignCenter)
+        self._pedigree_mother.setStyleSheet("color: #94a3b8; font-size: 14px;")
+        card_layout.addWidget(self._pedigree_mother)
+
+        self._pedigree_subject = QtWidgets.QLabel("Select a creature")
+        self._pedigree_subject.setAlignment(QtCore.Qt.AlignCenter)
+        self._pedigree_subject.setStyleSheet("color: #f8fafc; font-size: 16px; font-weight: 600;")
+        card_layout.addWidget(self._pedigree_subject, 1)
+
+        self._pedigree_father = QtWidgets.QLabel("Father\nUnknown")
+        self._pedigree_father.setAlignment(QtCore.Qt.AlignCenter)
+        self._pedigree_father.setStyleSheet("color: #94a3b8; font-size: 14px;")
+        card_layout.addWidget(self._pedigree_father)
+
+        layout.addWidget(self._pedigree_card)
         layout.addStretch(1)
         return widget
 
@@ -379,15 +398,16 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.addStretch(1)
         layout.addLayout(toolbar)
 
-        self._mutations_table = QtWidgets.QTableWidget(0, 6)
-        self._mutations_table.setHorizontalHeaderLabels(
-            ["Name", "Species", "Sex", "Maternal", "Paternal", "Total"]
-        )
-        self._mutations_table.horizontalHeader().setStretchLastSection(True)
-        self._mutations_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self._mutations_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self._mutations_table.verticalHeader().setVisible(False)
-        layout.addWidget(self._mutations_table)
+        self._mutations_cards_container = QtWidgets.QWidget()
+        self._mutations_cards_layout = QtWidgets.QVBoxLayout(self._mutations_cards_container)
+        self._mutations_cards_layout.setSpacing(12)
+        self._mutations_cards_layout.addStretch(1)
+
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll.setWidget(self._mutations_cards_container)
+        layout.addWidget(scroll)
         layout.addStretch(1)
         return widget
 
@@ -491,7 +511,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._apply_creature_filters()
         self._update_breeding_pairs()
         self._update_mutations_table()
-        self._update_pedigree_table()
+        self._update_pedigree_view()
 
     def _update_dashboard(self, creatures: Iterable[Creature]) -> None:
         creature_list = list(creatures)
@@ -568,6 +588,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._update_filter_combo(self._breeding_species_filter, species_list)
         self._update_filter_combo(self._mutations_species_filter, species_list)
         self._update_filter_combo(self._pedigree_species_filter, species_list)
+        self._update_pedigree_creature_picker()
 
     def _update_filter_combo(self, combo: QtWidgets.QComboBox, species: list[str]) -> None:
         current = combo.currentText() if combo.count() else "All species"
@@ -580,6 +601,25 @@ class MainWindow(QtWidgets.QMainWindow):
             if index >= 0:
                 combo.setCurrentIndex(index)
         combo.blockSignals(False)
+
+    def _update_pedigree_creature_picker(self) -> None:
+        species = self._pedigree_species_filter.currentText()
+        candidates = [
+            c
+            for c in self._creature_cache
+            if species == "All species" or c.species == species
+        ]
+        current = self._pedigree_creature_picker.currentText() if self._pedigree_creature_picker.count() else ""
+        self._pedigree_creature_picker.blockSignals(True)
+        self._pedigree_creature_picker.clear()
+        for creature in candidates:
+            label = f"{creature.name} ({creature.sex})"
+            self._pedigree_creature_picker.addItem(label, creature)
+        if current:
+            index = self._pedigree_creature_picker.findText(current)
+            if index >= 0:
+                self._pedigree_creature_picker.setCurrentIndex(index)
+        self._pedigree_creature_picker.blockSignals(False)
 
     def _update_breeding_pairs(self) -> None:
         species = self._breeding_species_filter.currentText()
@@ -600,15 +640,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         pairs.sort(key=lambda item: item[0], reverse=True)
         top_pairs = pairs[:10]
-        self._breeding_table.setRowCount(len(top_pairs))
-        for row, (score, male, female, male_stat, female_stat) in enumerate(top_pairs):
-            self._set_table_item(row, 0, male.name)
-            self._set_table_item(row, 1, female.name)
-            self._set_table_item(row, 2, focus)
-            self._set_table_item(row, 3, self._format_score(male_stat))
-            self._set_table_item(row, 4, self._format_score(female_stat))
-            self._set_table_item(row, 5, self._format_score(score))
-        self._breeding_table.resizeColumnsToContents()
+        self._render_breeding_cards(top_pairs, focus)
 
     def _score_pair(self, male: Creature, female: Creature, focus: str) -> tuple[float, float, float]:
         if focus == "Overall":
@@ -648,6 +680,114 @@ class MainWindow(QtWidgets.QMainWindow):
     def _format_score(self, value: float) -> str:
         return f"{value:.2f}"
 
+    def _render_breeding_cards(
+        self,
+        pairs: list[tuple[float, Creature, Creature, float, float]],
+        focus: str,
+    ) -> None:
+        layout = self._breeding_cards_layout
+        while layout.count() > 1:
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        if not pairs:
+            empty = QtWidgets.QLabel("No breeding pairs found for this filter.")
+            empty.setStyleSheet("color: #94a3b8;")
+            layout.insertWidget(0, empty)
+            return
+
+        for score, male, female, male_stat, female_stat in pairs:
+            card = QtWidgets.QFrame()
+            card.setStyleSheet(
+                "QFrame { background: #0f172a; border: 1px solid #1f2937; border-radius: 12px; }"
+            )
+            card_layout = QtWidgets.QHBoxLayout(card)
+            card_layout.setSpacing(16)
+
+            male_box = self._pair_info_box("Male", male.name, male.sex, male_stat)
+            female_box = self._pair_info_box("Female", female.name, female.sex, female_stat)
+
+            summary = QtWidgets.QVBoxLayout()
+            focus_label = QtWidgets.QLabel(f"Focus: {focus}")
+            focus_label.setStyleSheet("color: #93c5fd; font-weight: 600;")
+            score_label = QtWidgets.QLabel(f"Combined score: {self._format_score(score)}")
+            score_label.setStyleSheet("color: #f8fafc; font-size: 14px;")
+            summary.addWidget(focus_label)
+            summary.addWidget(score_label)
+            summary.addStretch(1)
+
+            card_layout.addWidget(male_box)
+            card_layout.addWidget(female_box)
+            card_layout.addLayout(summary)
+
+            layout.insertWidget(layout.count() - 1, card)
+
+    def _pair_info_box(self, title: str, name: str, sex: str, stat: float) -> QtWidgets.QWidget:
+        box = QtWidgets.QFrame()
+        box.setStyleSheet("QFrame { background: #111827; border-radius: 10px; }")
+        layout = QtWidgets.QVBoxLayout(box)
+        label = QtWidgets.QLabel(title)
+        label.setStyleSheet("color: #94a3b8; font-size: 11px; text-transform: uppercase;")
+        name_label = QtWidgets.QLabel(name)
+        name_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
+        sex_label = QtWidgets.QLabel(sex or "Unknown")
+        sex_label.setStyleSheet("color: #94a3b8;")
+        stat_label = QtWidgets.QLabel(f"Stat: {self._format_score(stat)}")
+        stat_label.setStyleSheet("color: #a7f3d0;")
+        layout.addWidget(label)
+        layout.addWidget(name_label)
+        layout.addWidget(sex_label)
+        layout.addWidget(stat_label)
+        return box
+
+    def _render_mutation_cards(self, creatures: list[Creature]) -> None:
+        layout = self._mutations_cards_layout
+        while layout.count() > 1:
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        if not creatures:
+            empty = QtWidgets.QLabel("No mutations data available for this filter.")
+            empty.setStyleSheet("color: #94a3b8;")
+            layout.insertWidget(0, empty)
+            return
+
+        creatures = sorted(
+            creatures,
+            key=lambda c: c.mutations_maternal + c.mutations_paternal,
+            reverse=True,
+        )
+        for creature in creatures[:10]:
+            total = creature.mutations_maternal + creature.mutations_paternal
+            card = QtWidgets.QFrame()
+            card.setStyleSheet(
+                "QFrame { background: #0f172a; border: 1px solid #1f2937; border-radius: 12px; }"
+            )
+            card_layout = QtWidgets.QHBoxLayout(card)
+            title = QtWidgets.QLabel(f"{creature.name} ({creature.species})")
+            title.setStyleSheet("color: #f8fafc; font-weight: 600;")
+            counts = QtWidgets.QLabel(
+                f"Maternal {creature.mutations_maternal} • "
+                f"Paternal {creature.mutations_paternal} • Total {total}"
+            )
+            counts.setStyleSheet("color: #94a3b8;")
+            card_layout.addWidget(title)
+            card_layout.addStretch(1)
+            card_layout.addWidget(counts)
+            layout.insertWidget(layout.count() - 1, card)
+
+    def _find_creature_by_id(self, creature_id: int | None) -> Creature | None:
+        if creature_id is None:
+            return None
+        for creature in self._creature_cache:
+            if creature.id == creature_id:
+                return creature
+        return None
+
     def _update_mutations_table(self) -> None:
         species = self._mutations_species_filter.currentText()
         creatures = [
@@ -655,32 +795,27 @@ class MainWindow(QtWidgets.QMainWindow):
             for c in self._creature_cache
             if species == "All species" or c.species == species
         ]
-        self._mutations_table.setRowCount(len(creatures))
-        for row, creature in enumerate(creatures):
-            total = creature.mutations_maternal + creature.mutations_paternal
-            self._set_table_item(row, 0, creature.name)
-            self._set_table_item(row, 1, creature.species)
-            self._set_table_item(row, 2, creature.sex)
-            self._set_table_item(row, 3, str(creature.mutations_maternal))
-            self._set_table_item(row, 4, str(creature.mutations_paternal))
-            self._set_table_item(row, 5, str(total))
-        self._mutations_table.resizeColumnsToContents()
+        self._render_mutation_cards(creatures)
 
-    def _update_pedigree_table(self) -> None:
+    def _update_pedigree_view(self) -> None:
         species = self._pedigree_species_filter.currentText()
-        creatures = [
+        candidates = [
             c
             for c in self._creature_cache
             if species == "All species" or c.species == species
         ]
-        self._pedigree_table.setRowCount(len(creatures))
-        for row, creature in enumerate(creatures):
-            self._set_table_item(row, 0, creature.name)
-            self._set_table_item(row, 1, creature.species)
-            self._set_table_item(row, 2, str(creature.mother_id or "-"))
-            self._set_table_item(row, 3, str(creature.father_id or "-"))
-            self._set_table_item(row, 4, creature.external_id or "-")
-        self._pedigree_table.resizeColumnsToContents()
+        if not candidates:
+            self._pedigree_subject.setText("Select a creature")
+            self._pedigree_mother.setText("Mother\nUnknown")
+            self._pedigree_father.setText("Father\nUnknown")
+            return
+        selected = self._pedigree_creature_picker.currentData()
+        creature = selected if isinstance(selected, Creature) else candidates[0]
+        self._pedigree_subject.setText(f"{creature.name}\n{creature.species}")
+        mother = self._find_creature_by_id(creature.mother_id)
+        father = self._find_creature_by_id(creature.father_id)
+        self._pedigree_mother.setText(f"Mother\n{mother.name if mother else 'Unknown'}")
+        self._pedigree_father.setText(f"Father\n{father.name if father else 'Unknown'}")
 
     def _set_table_item(self, row: int, col: int, value: str) -> None:
         item = QtWidgets.QTableWidgetItem(value)
@@ -764,6 +899,8 @@ class MainWindow(QtWidgets.QMainWindow):
         creature: Creature,
         species_group: list[Creature],
     ) -> tuple[list[str], list[str]]:
+        if len(species_group) < 5:
+            return [], []
         strengths: list[str] = []
         weaknesses: list[str] = []
         stat_map = {
