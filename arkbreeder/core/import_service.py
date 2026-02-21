@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 from pathlib import Path
-from typing import Callable, Optional
+import shutil
+from typing import Callable, Optional, Tuple, Iterable
 
 from arkbreeder.core.parser import ParsedCreature, parse_creature_file
 from arkbreeder.storage.models import Creature
@@ -38,9 +39,7 @@ class ExportImportService:
             logger.debug("Export directory does not exist: %s", self._export_dir)
             return result
 
-        for path in sorted(self._export_dir.iterdir()):
-            if not path.is_file():
-                continue
+        for path, cleanup_target in self._iter_export_targets():
             try:
                 parsed = parse_creature_file(path)
                 creature = self._to_creature(parsed)
@@ -58,13 +57,41 @@ class ExportImportService:
                         "success",
                     )
                 if self._delete_after_import:
-                    path.unlink()
+                    self._cleanup_path(cleanup_target)
             except Exception:
                 result.failed += 1
                 logger.exception("Failed to import %s", path)
                 if self._on_notify:
                     self._on_notify(f"Failed to import {path.name}", "error")
         return result
+
+    def _iter_export_targets(self) -> Iterable[Tuple[Path, Path]]:
+        for entry in sorted(self._export_dir.iterdir()):
+            if entry.is_file():
+                yield entry, entry
+                continue
+            if not entry.is_dir():
+                continue
+            export_file = self._find_export_file(entry)
+            if export_file is None:
+                logger.debug("No export file found in %s", entry)
+                continue
+            yield export_file, entry
+
+    def _find_export_file(self, folder: Path) -> Path | None:
+        direct_files = [child for child in folder.iterdir() if child.is_file()]
+        if direct_files:
+            return sorted(direct_files)[0]
+        for child in folder.rglob("*"):
+            if child.is_file():
+                return child
+        return None
+
+    def _cleanup_path(self, target: Path) -> None:
+        if target.is_dir():
+            shutil.rmtree(target)
+        elif target.exists():
+            target.unlink()
 
     def _to_creature(self, parsed: ParsedCreature) -> Creature:
         return Creature(

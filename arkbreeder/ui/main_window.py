@@ -56,6 +56,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._stack.addWidget(self._build_placeholder_page("App settings"))
 
         content = QtWidgets.QWidget()
+        content.setStyleSheet("background: #f1f5f9;")
         content_layout = QtWidgets.QVBoxLayout(content)
         content_layout.setContentsMargins(24, 24, 24, 24)
         content_layout.setSpacing(16)
@@ -65,10 +66,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._page_title.setStyleSheet("font-size: 22px; font-weight: 600;")
         header.addWidget(self._page_title)
         header.addStretch(1)
-
-        self._import_button = QtWidgets.QPushButton("Import creature exports")
-        self._import_button.clicked.connect(self._trigger_import)
-        header.addWidget(self._import_button)
 
         content_layout.addLayout(header)
         content_layout.addWidget(self._stack)
@@ -88,7 +85,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         hero = QtWidgets.QFrame()
         hero.setStyleSheet('''
-        QFrame { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; }
+        QFrame { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px; }
         ''')
         hero_layout = QtWidgets.QVBoxLayout(hero)
         hero_title = QtWidgets.QLabel("Welcome to ARK Breeder")
@@ -107,11 +104,8 @@ class MainWindow(QtWidgets.QMainWindow):
         hero_layout.addWidget(self._last_import_label)
 
         actions = QtWidgets.QHBoxLayout()
-        import_btn = QtWidgets.QPushButton("Import files")
-        import_btn.clicked.connect(self._trigger_import)
         open_btn = QtWidgets.QPushButton("Open export folder")
         open_btn.clicked.connect(self._open_export_folder)
-        actions.addWidget(import_btn)
         actions.addWidget(open_btn)
         actions.addStretch(1)
         hero_layout.addLayout(actions)
@@ -137,7 +131,7 @@ class MainWindow(QtWidgets.QMainWindow):
     ) -> QtWidgets.QWidget:
         card = QtWidgets.QFrame()
         card.setStyleSheet('''
-        QFrame { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }
+        QFrame { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px; }
         ''')
         layout = QtWidgets.QVBoxLayout(card)
         title_label = QtWidgets.QLabel(title)
