@@ -54,6 +54,38 @@ _POINT_STAT_CONFIG: list[tuple[str, str, str]] = [
 
 _BREEDING_FOCUS_OPTIONS = ["Overall"] + [title for _short, _key, title in _POINT_STAT_CONFIG]
 
+_FLYING_SPECIES = {
+    "argentavis",
+    "pteranodon",
+    "quetzal",
+    "tapejara",
+    "tropeognathus",
+    "pelagornis",
+    "ichthyornis",
+    "dimorphodon",
+    "griffin",
+    "snow owl",
+    "desmodus",
+    "wyvern",
+    "phoenix",
+}
+
+_FLYING_BLUEPRINT_HINTS = (
+    "/dinos/argent",
+    "/dinos/ptero/",
+    "/dinos/quetz",
+    "/dinos/tapejara",
+    "/dinos/tropeo",
+    "/dinos/pelagornis",
+    "/dinos/ichthyornis",
+    "/dinos/dimorphodon",
+    "/dinos/griffin",
+    "/dinos/snowowl",
+    "/dinos/desmodus",
+    "/dinos/wyvern",
+    "/dinos/phoenix",
+)
+
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, conn, export_dir: Path) -> None:
@@ -1446,6 +1478,13 @@ class MainWindow(QtWidgets.QMainWindow):
             return "Unknown"
         return _SPECIES_DISPLAY_OVERRIDES.get(species, species)
 
+    def _is_flying_creature(self, creature: Creature) -> bool:
+        species = self._display_species(creature.species).strip().lower()
+        if species in _FLYING_SPECIES:
+            return True
+        blueprint = (creature.blueprint or "").strip().lower()
+        return any(token in blueprint for token in _FLYING_BLUEPRINT_HINTS)
+
     def _line(self, vertical: bool) -> QtWidgets.QFrame:
         line = QtWidgets.QFrame()
         if vertical:
@@ -1639,7 +1678,7 @@ class MainWindow(QtWidgets.QMainWindow):
         elif points_only:
             displayed_value = "-"
         else:
-            displayed_value = self._format_stat(creature.stats.get(key), key)
+            displayed_value = self._format_stat(creature.stats.get(key), key, creature=creature)
         value_label = QtWidgets.QLabel(displayed_value)
         value_label.setStyleSheet("color: #cbd5f5; font-size: 11px; font-weight: 700;")
         value_label.setMinimumWidth(54)
@@ -1719,7 +1758,7 @@ class MainWindow(QtWidgets.QMainWindow):
             icon = self._point_icon(label)
             value = points.get(key) if points else None
             raw_value = self._get_stat_value(creature, key, use_points=False)
-            raw_text = self._format_stat(raw_value, key)
+            raw_text = self._format_stat(raw_value, key, creature=creature)
             if value is None:
                 badge.setText(icon)
                 badge.setStyleSheet(self._point_badge_style("#111827", "#94a3b8"))
@@ -1946,15 +1985,22 @@ class MainWindow(QtWidgets.QMainWindow):
             item.setData(QtCore.Qt.UserRole, external_id)
         self._creatures_table.setItem(row, col, item)
 
-    def _format_stat(self, value: float | None, key: str | None = None) -> str:
+    def _format_stat(
+        self,
+        value: float | None,
+        key: str | None = None,
+        creature: Creature | None = None,
+    ) -> str:
         if value is None:
             return "-"
         if key == "MeleeDamageMultiplier":
             return f"{(value + 1.0) * 100:.1f}%"
         if key == "MovementSpeed":
+            if creature is not None and self._is_flying_creature(creature):
+                return "100.0%"
             return f"{(value + 1.0) * 100:.1f}%"
         precision = 3 if key in {"MeleeDamageMultiplier", "MovementSpeed"} else 2
-        return f"{value:.{precision}f}"
+        return QtCore.QLocale.system().toString(float(value), "f", precision)
 
     def _format_updated_at(self, value: str | None) -> str:
         if not value:
@@ -2039,7 +2085,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         for key, label in self._detail_stat_values.items():
             raw_value = creature.stats.get(key)
-            label.setText(self._format_stat(raw_value, key))
+            label.setText(self._format_stat(raw_value, key, creature=creature))
             label.setToolTip("")
 
         strengths, weaknesses = self._compute_strengths_weaknesses(
