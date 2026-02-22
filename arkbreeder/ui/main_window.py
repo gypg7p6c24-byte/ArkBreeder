@@ -221,6 +221,26 @@ class MainWindow(QtWidgets.QMainWindow):
         charts.addWidget(left, 1)
         charts.addWidget(right, 1)
 
+        extras = QtWidgets.QHBoxLayout()
+        extras.setSpacing(16)
+
+        gender_panel, self._dashboard_gender_layout = self._dashboard_panel("Gender split")
+        self._gender_donut = DonutChartWidget()
+        self._dashboard_gender_layout.addWidget(self._gender_donut, 1)
+        self._gender_legend = QtWidgets.QVBoxLayout()
+        self._gender_legend.setSpacing(6)
+        self._dashboard_gender_layout.addLayout(self._gender_legend)
+
+        mutation_panel, self._dashboard_mutation_layout = self._dashboard_panel("Mutation pressure")
+        self._mutation_bar = BarChartWidget()
+        self._dashboard_mutation_layout.addWidget(self._mutation_bar, 1)
+
+        points_panel, self._dashboard_points_layout = self._dashboard_panel("Best stat points")
+
+        extras.addWidget(gender_panel, 1)
+        extras.addWidget(mutation_panel, 1)
+        extras.addWidget(points_panel, 1)
+
         insights = QtWidgets.QHBoxLayout()
         insights.setSpacing(16)
         pairs_panel, self._dashboard_pairs_layout = self._dashboard_panel("Top breeding pairs")
@@ -231,6 +251,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(hero)
         layout.addLayout(cards)
         layout.addLayout(charts)
+        layout.addLayout(extras)
         layout.addLayout(insights)
         layout.addStretch(1)
         return widget
@@ -716,14 +737,19 @@ class MainWindow(QtWidgets.QMainWindow):
         ]
         self._levels_bar.set_series(bar_series)
 
+        self._update_dashboard_gender(creature_list)
+        self._update_dashboard_mutations(creature_list)
+        self._update_dashboard_best_points(creature_list)
         self._update_dashboard_pairs(creature_list)
         self._update_dashboard_attention(creature_list)
 
     def _update_species_legend(self, series: list[tuple[str, float, str]]) -> None:
-        if not hasattr(self, "_species_legend"):
-            return
-        while self._species_legend.count():
-            item = self._species_legend.takeAt(0)
+        if hasattr(self, "_species_legend"):
+            self._update_legend(self._species_legend, series)
+
+    def _update_legend(self, layout: QtWidgets.QVBoxLayout, series: list[tuple[str, float, str]]) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
             widget = item.widget()
             if widget:
                 widget.deleteLater()
@@ -744,7 +770,103 @@ class MainWindow(QtWidgets.QMainWindow):
             row.addWidget(count)
             container = QtWidgets.QWidget()
             container.setLayout(row)
-            self._species_legend.addWidget(container)
+            layout.addWidget(container)
+
+    def _update_dashboard_gender(self, creatures: list[Creature]) -> None:
+        if not hasattr(self, "_gender_donut"):
+            return
+        counts = {"Male": 0, "Female": 0, "Unknown": 0}
+        for creature in creatures:
+            sex = (creature.sex or "").lower()
+            if sex == "male":
+                counts["Male"] += 1
+            elif sex == "female":
+                counts["Female"] += 1
+            else:
+                counts["Unknown"] += 1
+        series = [
+            ("Male", counts["Male"], "#60a5fa"),
+            ("Female", counts["Female"], "#f472b6"),
+            ("Unknown", counts["Unknown"], "#94a3b8"),
+        ]
+        self._gender_donut.set_series(series)
+        if hasattr(self, "_gender_legend"):
+            self._update_legend(self._gender_legend, series)
+
+    def _update_dashboard_mutations(self, creatures: list[Creature]) -> None:
+        if not hasattr(self, "_mutation_bar"):
+            return
+        grouped: dict[str, list[Creature]] = {}
+        for creature in creatures:
+            if creature.species:
+                grouped.setdefault(creature.species, []).append(creature)
+        averages = []
+        for species, group in grouped.items():
+            total = sum(c.mutations_maternal + c.mutations_paternal for c in group)
+            avg = total / max(len(group), 1)
+            if avg > 0:
+                averages.append((species, avg))
+        averages.sort(key=lambda item: item[1], reverse=True)
+        series = [
+            (label, value, _DASHBOARD_COLORS[idx % len(_DASHBOARD_COLORS)])
+            for idx, (label, value) in enumerate(averages[:6])
+        ]
+        self._mutation_bar.set_series(series)
+
+    def _update_dashboard_best_points(self, creatures: list[Creature]) -> None:
+        if not hasattr(self, "_dashboard_points_layout"):
+            return
+        self._clear_layout(self._dashboard_points_layout)
+        if self._values_store.count() == 0:
+            self._dashboard_points_layout.addWidget(
+                self._empty_dashboard_label("Import values.json to compute stat points.")
+            )
+            return
+        if not creatures:
+            self._dashboard_points_layout.addWidget(
+                self._empty_dashboard_label("No creatures yet.")
+            )
+            return
+        entries = []
+        for label, key in (
+            ("Health", "Health"),
+            ("Stamina", "Stamina"),
+            ("Weight", "Weight"),
+            ("Melee", "MeleeDamageMultiplier"),
+        ):
+            best_value = -1
+            best_creature: Creature | None = None
+            for creature in creatures:
+                value = self._get_stat_points_value(creature, key)
+                if value is None:
+                    continue
+                if value > best_value:
+                    best_value = int(value)
+                    best_creature = creature
+            if best_creature:
+                entries.append((label, best_value, best_creature))
+        if not entries:
+            self._dashboard_points_layout.addWidget(
+                self._empty_dashboard_label("Stat points unavailable for current creatures.")
+            )
+            return
+        for label, value, creature in entries:
+            card = QtWidgets.QFrame()
+            card.setStyleSheet(
+                "QFrame { background: rgba(11, 19, 36, 0.8); border-radius: 12px; }"
+            )
+            layout = QtWidgets.QVBoxLayout(card)
+            layout.setSpacing(4)
+            title = QtWidgets.QLabel(label)
+            title.setStyleSheet("color: #93c5fd; font-weight: 600;")
+            name = QtWidgets.QLabel(f"{creature.name} ({creature.species})")
+            name.setStyleSheet("color: #e2e8f0;")
+            points = QtWidgets.QLabel(f"{value} points")
+            points.setStyleSheet("color: #facc15; font-weight: 600;")
+            layout.addWidget(title)
+            layout.addWidget(name)
+            layout.addWidget(points)
+            self._dashboard_points_layout.addWidget(card)
 
     def _update_dashboard_pairs(self, creatures: list[Creature]) -> None:
         if not hasattr(self, "_dashboard_pairs_layout"):
