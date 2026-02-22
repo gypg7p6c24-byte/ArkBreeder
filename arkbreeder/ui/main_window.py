@@ -301,6 +301,13 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.addStretch(1)
         layout.addLayout(toolbar)
 
+        self._breeding_points_info = QtWidgets.QLabel(
+            "Stat points unavailable — import values.json in Settings."
+        )
+        self._breeding_points_info.setStyleSheet("color: #fbbf24;")
+        self._breeding_points_info.setWordWrap(True)
+        layout.addWidget(self._breeding_points_info)
+
         self._breeding_cards_container = QtWidgets.QWidget()
         self._breeding_cards_container.setSizePolicy(
             QtWidgets.QSizePolicy.Expanding,
@@ -364,6 +371,13 @@ class MainWindow(QtWidgets.QMainWindow):
             points_row.addWidget(badge)
         points_row.addStretch(1)
         layout.addLayout(points_row)
+
+        self._points_info = QtWidgets.QLabel(
+            "Stat points unavailable — import values.json in Settings."
+        )
+        self._points_info.setStyleSheet("color: #fbbf24;")
+        self._points_info.setWordWrap(True)
+        layout.addWidget(self._points_info)
 
         self._detail_strengths = QtWidgets.QLabel("Strengths: -")
         self._detail_strengths.setStyleSheet("color: #a7f3d0;")
@@ -583,6 +597,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def refresh_data(self) -> None:
         self._creature_cache = list(list_creatures(self._conn))
         self._recompute_stat_points()
+        self._update_points_info_labels()
         self._update_dashboard(self._creature_cache)
         self._update_species_filters()
         self._apply_creature_filters()
@@ -599,6 +614,13 @@ class MainWindow(QtWidgets.QMainWindow):
             creature.mutations_maternal + creature.mutations_paternal for creature in creature_list
         )
         self._mutations_count.setText(str(mutations_total))
+
+    def _update_points_info_labels(self) -> None:
+        has_values = self._values_store.count() > 0
+        if hasattr(self, "_points_info"):
+            self._points_info.setVisible(not has_values)
+        if hasattr(self, "_breeding_points_info"):
+            self._breeding_points_info.setVisible(not has_values)
 
     def _recompute_stat_points(self) -> None:
         self._stat_points = {}
@@ -1438,6 +1460,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 except Exception:
                     logger.exception("Failed to load values.json from %s", path)
         self._update_values_view()
+        self._update_points_info_labels()
         self._recompute_stat_points()
 
     def _update_values_view(self) -> None:
@@ -1486,6 +1509,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._values_path = path
         set_setting(self._conn, "values_json_path", path)
         self._update_values_view()
+        self._update_points_info_labels()
         self._recompute_stat_points()
         self.refresh_data()
         self.show_toast("values.json imported.", "success")
