@@ -59,6 +59,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, conn, export_dir: Path) -> None:
         super().__init__()
         self.setWindowTitle("ARK Breeder")
+        self.setMinimumSize(1120, 720)
         self._conn = conn
         self._export_dir = export_dir
         self._import_service = None
@@ -171,6 +172,20 @@ class MainWindow(QtWidgets.QMainWindow):
                 border: none;
                 width: 20px;
             }
+            #contentArea QScrollBar:vertical {
+                background: #0f172a;
+                width: 10px;
+                margin: 2px;
+            }
+            #contentArea QScrollBar::handle:vertical {
+                background: #334155;
+                min-height: 30px;
+                border-radius: 5px;
+            }
+            #contentArea QScrollBar::add-line:vertical,
+            #contentArea QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
             #contentArea QComboBox QAbstractItemView {
                 background: #0f172a;
                 color: #e5e7eb;
@@ -195,41 +210,42 @@ class MainWindow(QtWidgets.QMainWindow):
     def _build_dashboard_page(self) -> QtWidgets.QWidget:
         widget = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(widget)
-        layout.setSpacing(10)
+        layout.setSpacing(8)
 
         hero = QtWidgets.QFrame()
         hero.setStyleSheet('''
         QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }
         ''')
         hero_layout = QtWidgets.QVBoxLayout(hero)
-        hero_layout.setContentsMargins(12, 10, 12, 10)
+        hero_layout.setContentsMargins(12, 8, 12, 8)
         hero_title = QtWidgets.QLabel("Welcome to ARK Breeder")
         hero_title.setStyleSheet("font-size: 18px; font-weight: 600; color: #f8fafc;")
         hero_layout.addWidget(hero_title)
 
         charts = QtWidgets.QHBoxLayout()
-        charts.setSpacing(10)
+        charts.setSpacing(8)
 
         left = QtWidgets.QFrame()
         left.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }")
         left_layout = QtWidgets.QVBoxLayout(left)
-        left_layout.setContentsMargins(10, 10, 10, 10)
-        left_layout.setSpacing(6)
+        left_layout.setContentsMargins(8, 8, 8, 8)
+        left_layout.setSpacing(4)
         left_title = QtWidgets.QLabel("Species distribution")
         left_title.setStyleSheet("color: #e2e8f0; font-weight: 600;")
         left_layout.addWidget(left_title)
         self._species_donut = DonutChartWidget()
-        self._species_donut.setMinimumSize(140, 140)
+        self._species_donut.setMinimumSize(110, 110)
+        self._species_donut.setMaximumSize(130, 130)
         left_layout.addWidget(self._species_donut, 1)
         self._species_legend = QtWidgets.QVBoxLayout()
-        self._species_legend.setSpacing(4)
+        self._species_legend.setSpacing(2)
         left_layout.addLayout(self._species_legend)
 
         right = QtWidgets.QFrame()
         right.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }")
         right_layout = QtWidgets.QVBoxLayout(right)
-        right_layout.setContentsMargins(10, 10, 10, 10)
-        right_layout.setSpacing(6)
+        right_layout.setContentsMargins(8, 8, 8, 8)
+        right_layout.setSpacing(4)
         right_title = QtWidgets.QLabel("Average level by species")
         right_title.setStyleSheet("color: #e2e8f0; font-weight: 600;")
         right_layout.addWidget(right_title)
@@ -240,14 +256,15 @@ class MainWindow(QtWidgets.QMainWindow):
         charts.addWidget(right, 1)
 
         extras = QtWidgets.QHBoxLayout()
-        extras.setSpacing(10)
+        extras.setSpacing(8)
 
         gender_panel, self._dashboard_gender_layout = self._dashboard_panel("Gender split")
         self._gender_donut = DonutChartWidget()
-        self._gender_donut.setMinimumSize(140, 140)
+        self._gender_donut.setMinimumSize(110, 110)
+        self._gender_donut.setMaximumSize(130, 130)
         self._dashboard_gender_layout.addWidget(self._gender_donut, 1)
         self._gender_legend = QtWidgets.QVBoxLayout()
-        self._gender_legend.setSpacing(4)
+        self._gender_legend.setSpacing(2)
         self._dashboard_gender_layout.addLayout(self._gender_legend)
 
         mutation_panel, self._dashboard_mutation_layout = self._dashboard_panel("Mutation pressure")
@@ -290,13 +307,13 @@ class MainWindow(QtWidgets.QMainWindow):
         panel = QtWidgets.QFrame()
         panel.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }")
         layout = QtWidgets.QVBoxLayout(panel)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(6)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
         title_label = QtWidgets.QLabel(title)
         title_label.setStyleSheet("color: #e2e8f0; font-weight: 600;")
         layout.addWidget(title_label)
         content = QtWidgets.QVBoxLayout()
-        content.setSpacing(6)
+        content.setSpacing(4)
         layout.addLayout(content)
         return panel, content
 
@@ -354,11 +371,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creatures_table.setStyleSheet(
             """
             QTableWidget { background: transparent; border: none; gridline-color: transparent; }
-            QTableWidget::item { padding: 6px; }
+            QTableWidget::item { padding: 6px; border-bottom: 1px solid rgba(148, 163, 184, 0.18); }
             QTableWidget::item:selected { background: #1f2937; color: #f8fafc; }
             """
         )
         self._creatures_table.setShowGrid(False)
+        self._creatures_table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self._creatures_table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self._creatures_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self._creatures_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self._creatures_table.verticalHeader().setVisible(False)
@@ -626,7 +645,7 @@ class MainWindow(QtWidgets.QMainWindow):
         export_header.setStyleSheet("font-size: 16px; font-weight: 600;")
         layout.addWidget(export_header)
 
-        self._settings_export_path = QtWidgets.QLabel(str(self._export_dir))
+        self._settings_export_path = QtWidgets.QLabel(f"Default: {self._export_dir}")
         self._settings_export_path.setWordWrap(True)
         self._settings_export_path.setStyleSheet("color: #94a3b8;")
         layout.addWidget(self._settings_export_path)
@@ -1497,12 +1516,8 @@ class MainWindow(QtWidgets.QMainWindow):
             header = QtWidgets.QHBoxLayout()
             species_label = QtWidgets.QLabel(species_name)
             species_label.setStyleSheet("color: #cbd5f5; font-weight: 700; font-size: 14px;")
-            suffix = "pts" if use_points else "raw"
-            score_label = QtWidgets.QLabel(f"Score ({suffix}): {self._format_score(score)}")
-            score_label.setStyleSheet("color: #93c5fd; font-weight: 600;")
             header.addWidget(species_label)
             header.addStretch(1)
-            header.addWidget(score_label)
             row_layout.addLayout(header)
 
             pair_layout = QtWidgets.QHBoxLayout()
@@ -1532,8 +1547,8 @@ class MainWindow(QtWidgets.QMainWindow):
         elif sex_lower == "female":
             accent = "#f472b6"
         box = QtWidgets.QFrame()
-        box.setMinimumWidth(260)
-        box.setMaximumWidth(340)
+        box.setMinimumWidth(240)
+        box.setMaximumWidth(300)
         box.setStyleSheet(
             "QFrame {"
             "background: rgba(11, 19, 36, 0.85);"
@@ -1547,7 +1562,7 @@ class MainWindow(QtWidgets.QMainWindow):
         name_label.setStyleSheet(f"color: {accent}; font-weight: 700; font-size: 15px;")
         layout.addWidget(name_label)
 
-        avatar = self._small_species_image(self._display_species(creature.species), size=96)
+        avatar = self._small_species_image(self._display_species(creature.species), size=120)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
 
         colors = {
@@ -1588,7 +1603,8 @@ class MainWindow(QtWidgets.QMainWindow):
         row_layout.setContentsMargins(0, 0, 0, 0)
         row_layout.setSpacing(6)
         tag = QtWidgets.QLabel(self._point_icon(label))
-        tag.setFixedWidth(30)
+        tag.setAlignment(QtCore.Qt.AlignCenter)
+        tag.setFixedWidth(34)
         tag.setStyleSheet(f"color: {color}; font-size: 11px; font-weight: 700;")
         bar = QtWidgets.QProgressBar()
         bar.setMaximum(100)
@@ -1625,7 +1641,9 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             displayed_value = self._format_stat(creature.stats.get(key), key)
         value_label = QtWidgets.QLabel(displayed_value)
-        value_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
+        value_label.setStyleSheet("color: #cbd5f5; font-size: 11px; font-weight: 700;")
+        value_label.setMinimumWidth(54)
+        value_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
         row_layout.addWidget(value_label)
         return row
 
@@ -1652,9 +1670,9 @@ class MainWindow(QtWidgets.QMainWindow):
             "S": "⚗",
             "O": "O₂",
             "F": "🍖",
-            "W": "⚒",
+            "W": "⚖",
             "M": "✊",
-            "Sp": "⇄",
+            "Sp": "⏩",
         }
         return icons.get(code, code)
 

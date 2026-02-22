@@ -127,7 +127,9 @@ class BarChartWidget(QtWidgets.QWidget):
             painter.drawText(self.rect(), QtCore.Qt.AlignCenter, "No data")
             return
 
-        row_height = rect.height() / max(len(self._series), 1)
+        row_height = min(24.0, rect.height() / max(len(self._series), 1))
+        total_height = row_height * len(self._series)
+        y_start = rect.top() + max(0.0, (rect.height() - total_height) / 2)
         font = painter.font()
         font.setPointSize(9)
         painter.setFont(font)
@@ -139,8 +141,8 @@ class BarChartWidget(QtWidgets.QWidget):
         bar_width = max(10, bar_right - bar_left)
 
         for idx, slice_ in enumerate(self._series):
-            bar_height = min(18.0, max(6.0, row_height * 0.45))
-            top = rect.top() + idx * row_height + (row_height - bar_height) / 2
+            bar_height = min(16.0, max(6.0, row_height * 0.5))
+            top = y_start + idx * row_height + (row_height - bar_height) / 2
             label_rect = QtCore.QRectF(rect.left(), top, label_width + 6, bar_height)
             value_rect = QtCore.QRectF(bar_right + 6, top, value_width, bar_height)
 

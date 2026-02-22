@@ -21,7 +21,7 @@ def main() -> int:
     app = QtWidgets.QApplication([])
     export_path = export_dir()
     window = MainWindow(conn, export_path)
-    window.resize(960, 600)
+    window.resize(1360, 860)
     window.show()
     app.aboutToQuit.connect(conn.close)
 
