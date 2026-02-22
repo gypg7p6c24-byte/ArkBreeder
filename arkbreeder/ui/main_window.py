@@ -1415,13 +1415,13 @@ class MainWindow(QtWidgets.QMainWindow):
             key = self._display_species(creature.species)
             grouped.setdefault(key, []).append(creature)
         use_points = True
-        pairs: list[tuple[str, float, Creature, Creature]] = []
+        rows: list[tuple[str, list[tuple[str, int]], list[tuple[int, float, Creature, Creature]]]] = []
         for species_name, group in grouped.items():
             males = [c for c in group if c.sex.lower() == "male"]
             females = [c for c in group if c.sex.lower() == "female"]
             if not males or not females:
                 continue
-            best_pair: tuple[float, Creature, Creature] | None = None
+            all_pairs: list[tuple[float, Creature, Creature]] = []
             for male in males:
                 for female in females:
                     score, _, _ = self._score_pair(
@@ -1430,14 +1430,41 @@ class MainWindow(QtWidgets.QMainWindow):
                         focus,
                         use_points=use_points,
                     )
-                    if best_pair is None or score > best_pair[0]:
-                        best_pair = (score, male, female)
-            if best_pair:
-                best_score, best_male, best_female = best_pair
-                pairs.append((species_name, best_score, best_male, best_female))
+                    all_pairs.append((score, male, female))
 
-        pairs.sort(key=lambda item: item[1], reverse=True)
-        self._render_breeding_cards(pairs, focus, use_points)
+            if not all_pairs:
+                continue
+            all_pairs.sort(
+                key=lambda item: (
+                    -item[0],
+                    item[1].name.lower(),
+                    item[2].name.lower(),
+                )
+            )
+
+            limit = 1 if species == "All species" else min(12, len(all_pairs))
+            ranked_pairs = [
+                (rank + 1, score, male, female)
+                for rank, (score, male, female) in enumerate(all_pairs[:limit])
+            ]
+            targets = self._species_target_points(group)
+            rows.append((species_name, targets, ranked_pairs))
+
+        rows.sort(key=lambda item: item[2][0][1] if item[2] else -1.0, reverse=True)
+        self._render_breeding_cards(rows, focus, use_points)
+
+    def _species_target_points(self, group: list[Creature]) -> list[tuple[str, int]]:
+        targets: list[tuple[str, int]] = []
+        for short, key, _title in _POINT_STAT_CONFIG:
+            values = [
+                int(value)
+                for creature in group
+                if (value := self._get_stat_points_value(creature, key)) is not None
+            ]
+            if not values:
+                continue
+            targets.append((short, max(values)))
+        return targets
 
     def _score_pair(
         self,
@@ -1578,21 +1605,21 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _render_breeding_cards(
         self,
-        pairs: list[tuple[str, float, Creature, Creature]],
+        rows: list[tuple[str, list[tuple[str, int]], list[tuple[int, float, Creature, Creature]]]],
         focus: str,
         use_points: bool,
     ) -> None:
         layout = self._breeding_cards_layout
         self._clear_layout(layout)
 
-        if not pairs:
+        if not rows:
             empty = QtWidgets.QLabel("No breeding pairs found for this filter.")
             empty.setStyleSheet("color: #94a3b8;")
             layout.addWidget(empty, 0, 0)
             return
 
         row_index = 0
-        for species_name, score, male, female in pairs:
+        for species_name, targets, ranked_pairs in rows:
             row_card = QtWidgets.QWidget()
             row_card.setSizePolicy(
                 QtWidgets.QSizePolicy.Expanding,
@@ -1610,16 +1637,51 @@ class MainWindow(QtWidgets.QMainWindow):
             header.addStretch(1)
             row_layout.addLayout(header)
 
-            pair_layout = QtWidgets.QHBoxLayout()
-            pair_layout.setSpacing(2)
-            pair_layout.setContentsMargins(0, 0, 0, 0)
+            if targets:
+                target_row = QtWidgets.QHBoxLayout()
+                target_row.setContentsMargins(0, 0, 0, 0)
+                target_row.setSpacing(4)
+                target_label = QtWidgets.QLabel("Target:")
+                target_label.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 600;")
+                target_row.addWidget(target_label)
+                for short, value in targets:
+                    chip = QtWidgets.QLabel(f"{self._point_icon(short)} {value}")
+                    chip.setStyleSheet(
+                        "color: #e2e8f0; font-size: 11px; font-weight: 600;"
+                        "background: #0f172a; border: 1px solid #1f2937; border-radius: 7px;"
+                        "padding: 1px 6px;"
+                    )
+                    target_row.addWidget(chip)
+                target_row.addStretch(1)
+                row_layout.addLayout(target_row)
+
             max_stats = self._species_max_stats(species_name, use_points=use_points)
-            male_box = self._pair_info_box(male, max_stats, use_points=use_points, points_only=True)
-            female_box = self._pair_info_box(female, max_stats, use_points=use_points, points_only=True)
-            pair_layout.addWidget(male_box)
-            pair_layout.addWidget(female_box)
-            pair_layout.addStretch(1)
-            row_layout.addLayout(pair_layout)
+            for rank, score, male, female in ranked_pairs:
+                pair_layout = QtWidgets.QHBoxLayout()
+                pair_layout.setSpacing(2)
+                pair_layout.setContentsMargins(0, 0, 0, 0)
+                rank_label = QtWidgets.QLabel(f"#{rank}")
+                rank_label.setAlignment(QtCore.Qt.AlignCenter)
+                rank_label.setFixedWidth(28)
+                rank_label.setStyleSheet(
+                    "color: #facc15; font-size: 11px; font-weight: 700;"
+                    "background: #0f172a; border: 1px solid #1f2937; border-radius: 7px;"
+                )
+                pair_layout.addWidget(rank_label)
+                score_label = QtWidgets.QLabel(f"{int(round(score))} pts")
+                score_label.setAlignment(QtCore.Qt.AlignCenter)
+                score_label.setFixedWidth(58)
+                score_label.setStyleSheet(
+                    "color: #93c5fd; font-size: 10px; font-weight: 700;"
+                    "background: #0f172a; border: 1px solid #1f2937; border-radius: 7px;"
+                )
+                pair_layout.addWidget(score_label)
+                male_box = self._pair_info_box(male, max_stats, use_points=use_points, points_only=True)
+                female_box = self._pair_info_box(female, max_stats, use_points=use_points, points_only=True)
+                pair_layout.addWidget(male_box)
+                pair_layout.addWidget(female_box)
+                pair_layout.addStretch(1)
+                row_layout.addLayout(pair_layout)
             layout.addWidget(row_card, row_index, 0)
             row_index += 1
 
@@ -1639,7 +1701,7 @@ class MainWindow(QtWidgets.QMainWindow):
         box = QtWidgets.QFrame()
         box.setObjectName("pairCard")
         box.setMinimumWidth(186)
-        box.setMaximumWidth(210)
+        box.setMaximumWidth(198)
         box.setStyleSheet(
             "#pairCard {"
             "background: rgba(11, 19, 36, 0.85);"
@@ -2326,8 +2388,12 @@ class MainWindow(QtWidgets.QMainWindow):
         path = self._select_ini_file("Select GameUserSettings.ini")
         if not path:
             return
+        parsed = parse_ini_file(Path(path))
+        if not self._is_valid_game_user_settings_ini(parsed, path):
+            self.show_toast("Fichier non conforme (GameUserSettings.ini attendu).", "error")
+            return
         payload = self._ensure_server_settings_payload()
-        payload["game_user_settings"] = parse_ini_file(Path(path))
+        payload["game_user_settings"] = parsed
         payload["sources"]["game_user_settings"] = path
         self._save_server_settings(payload, "GameUserSettings.ini imported.")
 
@@ -2335,10 +2401,62 @@ class MainWindow(QtWidgets.QMainWindow):
         path = self._select_ini_file("Select Game.ini")
         if not path:
             return
+        parsed = parse_ini_file(Path(path))
+        if not self._is_valid_game_ini(parsed, path):
+            self.show_toast("Fichier non conforme (Game.ini attendu).", "error")
+            return
         payload = self._ensure_server_settings_payload()
-        payload["game_ini"] = parse_ini_file(Path(path))
+        payload["game_ini"] = parsed
         payload["sources"]["game_ini"] = path
         self._save_server_settings(payload, "Game.ini imported.")
+
+    def _is_valid_game_user_settings_ini(self, data: dict[str, dict[str, str]], _path: str) -> bool:
+        if not data:
+            return False
+        sections = [section.lower() for section in data.keys()]
+        known_sections = ("serversettings", "shootergameusersettings")
+        if any(any(token in section for token in known_sections) for section in sections):
+            return True
+
+        known_keys = {
+            "sessionname",
+            "serverpassword",
+            "serveradminpassword",
+            "difficultyoffset",
+            "xpmultiplier",
+            "tamingspeedmultiplier",
+            "harvestamountmultiplier",
+            "allowflyerspeedleveling",
+        }
+        keys = {
+            key.strip().lower()
+            for section in data.values()
+            for key in section.keys()
+            if isinstance(key, str)
+        }
+        return any(key in known_keys for key in keys)
+
+    def _is_valid_game_ini(self, data: dict[str, dict[str, str]], _path: str) -> bool:
+        if not data:
+            return False
+        sections = [section.lower() for section in data.keys()]
+        known_sections = ("shootergamemode", "shootergame")
+        if any(any(token in section for token in known_sections) for section in sections):
+            return True
+
+        keys = {
+            key.strip().lower()
+            for section in data.values()
+            for key in section.keys()
+            if isinstance(key, str)
+        }
+        return any(
+            key.startswith("perlevelstatsmultiplier_")
+            or key.startswith("babyimprintingstatscale")
+            or key.startswith("matingintervalmultiplier")
+            or key.startswith("ballowspeedleveling")
+            for key in keys
+        )
 
     def _import_values_json(self) -> None:
         path = self._select_values_file("Select values.json")
