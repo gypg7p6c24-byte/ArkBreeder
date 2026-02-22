@@ -1553,8 +1553,8 @@ class MainWindow(QtWidgets.QMainWindow):
         row_layout = QtWidgets.QHBoxLayout(row)
         row_layout.setContentsMargins(0, 0, 0, 0)
         row_layout.setSpacing(6)
-        tag = QtWidgets.QLabel(label)
-        tag.setFixedWidth(22)
+        tag = QtWidgets.QLabel(self._point_icon(label))
+        tag.setFixedWidth(30)
         tag.setStyleSheet("color: #94a3b8; font-size: 10px;")
         bar = QtWidgets.QProgressBar()
         bar.setMaximum(100)
@@ -1596,9 +1596,9 @@ class MainWindow(QtWidgets.QMainWindow):
         return row
 
     def _make_point_badge(self, label: str) -> QtWidgets.QLabel:
-        badge = QtWidgets.QLabel(f"{label}-")
+        badge = QtWidgets.QLabel(f"{self._point_icon(label)}-")
         badge.setAlignment(QtCore.Qt.AlignCenter)
-        badge.setMinimumWidth(64)
+        badge.setMinimumWidth(76)
         badge.setStyleSheet(
             """
             QLabel {
@@ -1611,6 +1611,18 @@ class MainWindow(QtWidgets.QMainWindow):
             """
         )
         return badge
+
+    def _point_icon(self, code: str) -> str:
+        icons = {
+            "H": "✚",
+            "S": "➤",
+            "O": "O₂",
+            "F": "🍖",
+            "W": "⚒T",
+            "M": "✊",
+            "Sp": "↻",
+        }
+        return icons.get(code, code)
 
     def _small_species_image(self, species: str, size: int = 48) -> QtWidgets.QLabel:
         label = QtWidgets.QLabel()
@@ -1652,11 +1664,12 @@ class MainWindow(QtWidgets.QMainWindow):
             )
         for key, badge in self._detail_point_badges.items():
             label = labels.get(key, "?")
+            icon = self._point_icon(label)
             value = points.get(key) if points else None
             raw_value = self._get_stat_value(creature, key, use_points=False)
             raw_text = self._format_stat(raw_value, key)
             if value is None:
-                badge.setText(f"{label}-")
+                badge.setText(f"{icon}-")
                 badge.setStyleSheet(self._point_badge_style("#111827", "#94a3b8"))
                 badge.setToolTip(f"Raw: {raw_text}\nPoints: -")
                 continue
@@ -1664,7 +1677,7 @@ class MainWindow(QtWidgets.QMainWindow):
             ratio = 0.0 if max_value <= 0 else min(max(value / max_value, 0.0), 1.0)
             color = self._point_badge_color(ratio)
             text_color = "#0b1220" if ratio >= 0.6 else "#f8fafc"
-            badge.setText(f"{label}-{int(value)}")
+            badge.setText(f"{icon}-{int(value)}")
             badge.setStyleSheet(self._point_badge_style(color, text_color))
             badge.setToolTip(f"Raw: {raw_text}\nPoints: {int(value)}")
 
