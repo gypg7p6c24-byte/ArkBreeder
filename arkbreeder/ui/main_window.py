@@ -62,6 +62,16 @@ _BREEDING_FOCUS_OPTIONS = ["Overall"] + [
     title for _short, _key, title in _BREEDING_POINT_STAT_CONFIG
 ]
 
+_STAT_INDEX_BY_POINT_KEY: dict[str, int] = {
+    "Health": 0,
+    "Stamina": 1,
+    "Oxygen": 3,
+    "Food": 4,
+    "Weight": 7,
+    "MeleeDamageMultiplier": 8,
+    "MovementSpeed": 9,
+}
+
 _FLYING_SPECIES = {
     "argentavis",
     "pteranodon",
@@ -1695,8 +1705,20 @@ class MainWindow(QtWidgets.QMainWindow):
                     pair_layout.addWidget(rank_label)
                 male_box = self._pair_info_box(male, max_stats, use_points=use_points, points_only=True)
                 female_box = self._pair_info_box(female, max_stats, use_points=use_points, points_only=True)
+                child_box = self._pair_child_box(
+                    male,
+                    female,
+                    max_stats,
+                    use_points=use_points,
+                )
                 pair_layout.addWidget(male_box)
                 pair_layout.addWidget(female_box)
+                arrow = QtWidgets.QLabel("→")
+                arrow.setAlignment(QtCore.Qt.AlignCenter)
+                arrow.setFixedWidth(18)
+                arrow.setStyleSheet("color: #93c5fd; font-size: 18px; font-weight: 700;")
+                pair_layout.addWidget(arrow)
+                pair_layout.addWidget(child_box)
                 pair_layout.addStretch(1)
                 row_layout.addLayout(pair_layout)
             layout.addWidget(row_card, row_index, 0)
@@ -1761,6 +1783,67 @@ class MainWindow(QtWidgets.QMainWindow):
             )
         return box
 
+    def _pair_child_box(
+        self,
+        male: Creature,
+        female: Creature,
+        max_stats: dict[str, float],
+        use_points: bool = False,
+    ) -> QtWidgets.QWidget:
+        box = QtWidgets.QFrame()
+        box.setObjectName("pairCardChild")
+        box.setMinimumWidth(168)
+        box.setMaximumWidth(184)
+        box.setStyleSheet(
+            "#pairCardChild {"
+            "background: rgba(11, 19, 36, 0.85);"
+            "border: 1px solid #64748b;"
+            "border-radius: 14px;"
+            "}"
+        )
+        layout = QtWidgets.QVBoxLayout(box)
+        layout.setContentsMargins(7, 7, 7, 7)
+        layout.setSpacing(2)
+        name_label = QtWidgets.QLabel("◌ Expected")
+        name_label.setStyleSheet(
+            "color: #cbd5f5; font-weight: 700; font-size: 13px; background: transparent; border: none;"
+        )
+        layout.addWidget(name_label)
+
+        child_points = self._expected_child_points(male, female, use_points=use_points)
+        colors = {
+            "Health": "#22c55e",
+            "Stamina": "#38bdf8",
+            "Oxygen": "#14b8a6",
+            "Food": "#facc15",
+            "Weight": "#f59e0b",
+            "MeleeDamageMultiplier": "#f97316",
+            "MovementSpeed": "#a78bfa",
+        }
+        for short_label, key, _title in _BREEDING_POINT_STAT_CONFIG:
+            layout.addWidget(
+                self._stat_bar_value_row(
+                    short_label,
+                    float(child_points.get(key, 0.0)),
+                    max_stats.get(key, 1.0),
+                    colors.get(key, "#64748b"),
+                )
+            )
+        return box
+
+    def _expected_child_points(
+        self,
+        male: Creature,
+        female: Creature,
+        use_points: bool = False,
+    ) -> dict[str, float]:
+        result: dict[str, float] = {}
+        for _short, key, _title in _BREEDING_POINT_STAT_CONFIG:
+            male_value = self._get_stat_value(male, key, use_points=use_points, points_only=use_points)
+            female_value = self._get_stat_value(female, key, use_points=use_points, points_only=use_points)
+            result[key] = max(float(male_value), float(female_value))
+        return result
+
     def _stat_bar_row(
         self,
         label: str,
@@ -1818,6 +1901,66 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             displayed_value = self._format_stat(creature.stats.get(key), key, creature=creature)
         value_label = QtWidgets.QLabel(displayed_value)
+        if is_top_value:
+            tag.setStyleSheet(
+                "color: #dcfce7; font-size: 11px; font-weight: 700;"
+                "background: #14532d; border: 1px solid #22c55e; border-radius: 6px;"
+            )
+            value_label.setStyleSheet(
+                "color: #dcfce7; font-size: 11px; font-weight: 700;"
+                "background: #14532d; border: 1px solid #22c55e; border-radius: 6px; padding: 1px 4px;"
+            )
+        else:
+            value_label.setStyleSheet(
+                "color: #cbd5f5; font-size: 11px; font-weight: 700;"
+                "background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; padding: 1px 4px;"
+            )
+        value_label.setMinimumWidth(34)
+        value_label.setAlignment(QtCore.Qt.AlignCenter)
+        row_layout.addWidget(value_label)
+        return row
+
+    def _stat_bar_value_row(
+        self,
+        label: str,
+        value: float,
+        max_value: float,
+        color: str,
+    ) -> QtWidgets.QWidget:
+        row = QtWidgets.QWidget()
+        row_layout = QtWidgets.QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(4)
+        tag = QtWidgets.QLabel(self._point_icon(label))
+        tag.setAlignment(QtCore.Qt.AlignCenter)
+        tag.setFixedWidth(20)
+        tag.setStyleSheet(
+            "color: #e2e8f0; font-size: 11px; font-weight: 700;"
+            "background: #0f172a; border: 1px solid #1f2937; border-radius: 6px;"
+        )
+        bar = QtWidgets.QProgressBar()
+        bar.setMaximum(100)
+        ratio = 0.0 if max_value <= 0 else min(max(float(value) / float(max_value), 0.0), 1.0)
+        is_top_value = max_value > 0 and value >= (max_value - 0.001)
+        bar.setValue(int(ratio * 100))
+        bar.setTextVisible(False)
+        bar.setFixedHeight(7)
+        bar.setStyleSheet(
+            f"""
+            QProgressBar {{
+                background: #0f172a;
+                border: 1px solid #1f2937;
+                border-radius: 4px;
+            }}
+            QProgressBar::chunk {{
+                background: {color};
+                border-radius: 4px;
+            }}
+            """
+        )
+        row_layout.addWidget(tag)
+        row_layout.addWidget(bar, 1)
+        value_label = QtWidgets.QLabel(str(int(round(value))))
         if is_top_value:
             tag.setStyleSheet(
                 "color: #dcfce7; font-size: 11px; font-weight: 700;"
@@ -2361,7 +2504,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _update_settings_view(self) -> None:
         if not self._server_settings:
             self._settings_summary.setText("Using official defaults (x1).")
-            self._settings_details.setText("")
+            self._settings_details.setText("Stat calculation: official defaults.")
             return
 
         sources = self._server_settings.get("sources", {})
@@ -2383,8 +2526,53 @@ class MainWindow(QtWidgets.QMainWindow):
             detail_lines.append(f"{label}: {sections} sections, {keys} values")
             detail_lines.append(f"Source: {path}")
 
+        calc_lines = self._calc_multiplier_lines()
+        detail_lines.append("")
+        detail_lines.extend(calc_lines)
+
         self._settings_summary.setText("Server settings loaded.")
         self._settings_details.setText("\n".join(summary_lines + detail_lines))
+
+    def _calc_multiplier_lines(self) -> list[str]:
+        multipliers = self._stat_multipliers
+        if not multipliers:
+            return ["Stat calculation: official defaults."]
+
+        non_default_count = 0
+        lines = ["Stat calculation inputs:"]
+        if abs(float(multipliers.imprinting) - 1.0) > 0.0001:
+            non_default_count += 1
+        lines.append(f"- Imprinting scale: x{self._fmt_multiplier(multipliers.imprinting)}")
+
+        for short, key, title in _POINT_STAT_CONFIG:
+            idx = _STAT_INDEX_BY_POINT_KEY.get(key)
+            if idx is None:
+                continue
+            wild = float(multipliers.wild.get(idx, 1.0))
+            tamed = float(multipliers.tamed.get(idx, 1.0))
+            add = float(multipliers.tamed_add.get(idx, 1.0))
+            affinity = float(multipliers.tamed_affinity.get(idx, 1.0))
+            is_custom = any(abs(value - 1.0) > 0.0001 for value in (wild, tamed, add, affinity))
+            if is_custom:
+                non_default_count += 1
+            if not is_custom:
+                continue
+            lines.append(
+                f"- {short} {title}: "
+                f"Wild x{self._fmt_multiplier(wild)}, "
+                f"Tamed x{self._fmt_multiplier(tamed)}, "
+                f"Add x{self._fmt_multiplier(add)}, "
+                f"Affinity x{self._fmt_multiplier(affinity)}"
+            )
+
+        if len(lines) == 2 and non_default_count == 0:
+            lines.append("- All tracked stat multipliers are at official defaults (x1).")
+        lines.insert(1, f"- Non-default inputs detected: {non_default_count}")
+        return lines
+
+    def _fmt_multiplier(self, value: float) -> str:
+        formatted = f"{value:.4f}".rstrip("0").rstrip(".")
+        return formatted or "0"
 
     def _load_species_values(self) -> None:
         self._values_store = SpeciesValuesStore()
