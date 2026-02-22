@@ -42,6 +42,18 @@ _SPECIES_DISPLAY_OVERRIDES = {
     "Argent": "Argentavis",
 }
 
+_POINT_STAT_CONFIG: list[tuple[str, str, str]] = [
+    ("H", "Health", "Health"),
+    ("S", "Stamina", "Stamina"),
+    ("O", "Oxygen", "Oxygen"),
+    ("F", "Food", "Food"),
+    ("W", "Weight", "Weight"),
+    ("M", "MeleeDamageMultiplier", "Melee"),
+    ("Sp", "MovementSpeed", "Speed"),
+]
+
+_BREEDING_FOCUS_OPTIONS = ["Overall"] + [title for _short, _key, title in _POINT_STAT_CONFIG]
+
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, conn, export_dir: Path) -> None:
@@ -388,9 +400,7 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.addWidget(self._breeding_species_filter)
 
         self._breeding_stat_focus = QtWidgets.QComboBox()
-        self._breeding_stat_focus.addItems(
-            ["Overall", "Health", "Stamina", "Weight", "Melee"]
-        )
+        self._breeding_stat_focus.addItems(_BREEDING_FOCUS_OPTIONS)
         self._breeding_stat_focus.currentIndexChanged.connect(self._update_breeding_pairs)
         toolbar.addWidget(self._breeding_stat_focus)
 
@@ -457,32 +467,22 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self._detail_radar)
 
         self._detail_point_badges: dict[str, QtWidgets.QLabel] = {}
-        points_row = QtWidgets.QHBoxLayout()
-        points_row.setSpacing(8)
-        for label, key in (
-            ("H", "Health"),
-            ("S", "Stamina"),
-            ("W", "Weight"),
-            ("M", "MeleeDamageMultiplier"),
-        ):
+        points_grid = QtWidgets.QGridLayout()
+        points_grid.setHorizontalSpacing(8)
+        points_grid.setVerticalSpacing(8)
+        for index, (label, key, _title) in enumerate(_POINT_STAT_CONFIG):
             badge = self._make_point_badge(label)
             self._detail_point_badges[key] = badge
-            points_row.addWidget(badge)
-        points_row.addStretch(1)
-        layout.addLayout(points_row)
+            row = index // 4
+            col = index % 4
+            points_grid.addWidget(badge, row, col)
+        layout.addLayout(points_grid)
 
         self._detail_stat_values: dict[str, QtWidgets.QLabel] = {}
         stat_grid = QtWidgets.QGridLayout()
         stat_grid.setHorizontalSpacing(12)
         stat_grid.setVerticalSpacing(6)
-        for row, (label, key) in enumerate(
-            (
-                ("Health", "Health"),
-                ("Stamina", "Stamina"),
-                ("Weight", "Weight"),
-                ("Melee", "MeleeDamageMultiplier"),
-            )
-        ):
+        for row, (_short, key, label) in enumerate(_POINT_STAT_CONFIG):
             name_label = QtWidgets.QLabel(label)
             name_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
             value_label = QtWidgets.QLabel("-")
@@ -501,11 +501,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._detail_strengths = QtWidgets.QLabel("Strengths: -")
         self._detail_strengths.setStyleSheet("color: #a7f3d0;")
+        self._detail_strengths.setTextFormat(QtCore.Qt.RichText)
         self._detail_strengths.setWordWrap(True)
         layout.addWidget(self._detail_strengths)
 
         self._detail_weaknesses = QtWidgets.QLabel("Weaknesses: -")
         self._detail_weaknesses.setStyleSheet("color: #fecaca;")
+        self._detail_weaknesses.setTextFormat(QtCore.Qt.RichText)
         self._detail_weaknesses.setWordWrap(True)
         layout.addWidget(self._detail_weaknesses)
 
@@ -530,8 +532,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._pedigree_tree = QtWidgets.QWidget()
         tree_layout = QtWidgets.QGridLayout(self._pedigree_tree)
-        tree_layout.setHorizontalSpacing(24)
-        tree_layout.setVerticalSpacing(8)
+        tree_layout.setHorizontalSpacing(12)
+        tree_layout.setVerticalSpacing(0)
         tree_layout.setColumnStretch(0, 1)
         tree_layout.setColumnStretch(1, 1)
         tree_layout.setColumnStretch(2, 1)
@@ -546,6 +548,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._pedigree_mother_meta = self._pedigree_mother_box.findChild(QtWidgets.QLabel, "meta")
         self._pedigree_father_meta = self._pedigree_father_box.findChild(QtWidgets.QLabel, "meta")
         self._pedigree_subject_meta = self._pedigree_subject_box.findChild(QtWidgets.QLabel, "meta")
+        self._pedigree_mother_avatar = self._pedigree_mother_box.findChild(QtWidgets.QLabel, "avatar")
+        self._pedigree_father_avatar = self._pedigree_father_box.findChild(QtWidgets.QLabel, "avatar")
+        self._pedigree_subject_avatar = self._pedigree_subject_box.findChild(QtWidgets.QLabel, "avatar")
 
         tree_layout.addWidget(self._pedigree_mother_box, 0, 0, alignment=QtCore.Qt.AlignCenter)
         tree_layout.addWidget(self._pedigree_father_box, 0, 2, alignment=QtCore.Qt.AlignCenter)
@@ -884,12 +889,7 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             return
         entries = []
-        for label, key in (
-            ("Health", "Health"),
-            ("Stamina", "Stamina"),
-            ("Weight", "Weight"),
-            ("Melee", "MeleeDamageMultiplier"),
-        ):
+        for _short, key, label in _POINT_STAT_CONFIG:
             best_value = -1
             best_creature: Creature | None = None
             for creature in creatures:
@@ -1133,10 +1133,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 4,
                 f"{creature.mutations_maternal}/{creature.mutations_paternal}",
             )
-            self._set_table_item(row, 5, self._format_stat(creature.stats.get("Health")))
-            self._set_table_item(row, 6, self._format_stat(creature.stats.get("Stamina")))
-            self._set_table_item(row, 7, self._format_stat(creature.stats.get("Weight")))
-            self._set_table_item(row, 8, self._format_stat(creature.stats.get("MeleeDamageMultiplier")))
+            self._set_table_item(row, 5, self._format_stat(creature.stats.get("Health"), "Health"))
+            self._set_table_item(row, 6, self._format_stat(creature.stats.get("Stamina"), "Stamina"))
+            self._set_table_item(row, 7, self._format_stat(creature.stats.get("Weight"), "Weight"))
+            self._set_table_item(
+                row,
+                8,
+                self._format_stat(creature.stats.get("MeleeDamageMultiplier"), "MeleeDamageMultiplier"),
+            )
             self._set_table_item(row, 9, self._format_updated_at(creature.updated_at))
         self._creatures_table.resizeColumnsToContents()
         if sorting:
@@ -1256,8 +1260,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for creature in creatures:
             key = self._display_species(creature.species)
             grouped.setdefault(key, []).append(creature)
-        use_points = self._points_available(creatures)
-
+        use_points = True
         pairs: list[tuple[str, float, Creature, Creature]] = []
         missing_pairs: list[tuple[str, bool, bool]] = []
         for species_name, group in grouped.items():
@@ -1266,7 +1269,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if not males or not females:
                 missing_pairs.append((species_name, bool(males), bool(females)))
                 continue
-            group_pairs: list[tuple[float, Creature, Creature]] = []
+            best_pair: tuple[float, Creature, Creature] | None = None
             for male in males:
                 for female in females:
                     score, _, _ = self._score_pair(
@@ -1275,20 +1278,14 @@ class MainWindow(QtWidgets.QMainWindow):
                         focus,
                         use_points=use_points,
                     )
-                    group_pairs.append((score, male, female))
-            group_pairs.sort(key=lambda item: item[0], reverse=True)
-            if species == "All species":
-                best_score, best_male, best_female = group_pairs[0]
+                    if best_pair is None or score > best_pair[0]:
+                        best_pair = (score, male, female)
+            if best_pair:
+                best_score, best_male, best_female = best_pair
                 pairs.append((species_name, best_score, best_male, best_female))
-            else:
-                pairs.extend(
-                    (species_name, score, male, female)
-                    for score, male, female in group_pairs
-                )
 
         pairs.sort(key=lambda item: item[1], reverse=True)
-        top_pairs = pairs[:10] if species != "All species" else pairs
-        self._render_breeding_cards(top_pairs, focus, use_points, missing_pairs)
+        self._render_breeding_cards(pairs, focus, use_points, missing_pairs)
 
     def _score_pair(
         self,
@@ -1297,23 +1294,20 @@ class MainWindow(QtWidgets.QMainWindow):
         focus: str,
         use_points: bool = False,
     ) -> tuple[float, float, float]:
+        score_keys = [key for _short, key, _title in _POINT_STAT_CONFIG]
         if focus == "Overall":
             best_stats = [
                 max(
                     self._get_stat_value(male, key, use_points=use_points),
                     self._get_stat_value(female, key, use_points=use_points),
                 )
-                for key in ("Health", "Stamina", "Weight", "MeleeDamageMultiplier")
+                for key in score_keys
             ]
             score = sum(best_stats)
             return score, self._overall_score(male, use_points), self._overall_score(female, use_points)
 
-        key = {
-            "Health": "Health",
-            "Stamina": "Stamina",
-            "Weight": "Weight",
-            "Melee": "MeleeDamageMultiplier",
-        }.get(focus, "Health")
+        focus_to_key = {title: key for _short, key, title in _POINT_STAT_CONFIG}
+        key = focus_to_key.get(focus, "Health")
         male_stat = self._get_stat_value(male, key, use_points=use_points)
         female_stat = self._get_stat_value(female, key, use_points=use_points)
         score = max(male_stat, female_stat)
@@ -1322,7 +1316,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _overall_score(self, creature: Creature, use_points: bool = False) -> float:
         return sum(
             self._get_stat_value(creature, key, use_points=use_points)
-            for key in ("Health", "Stamina", "Weight", "MeleeDamageMultiplier")
+            for _short, key, _title in _POINT_STAT_CONFIG
         )
 
     def _species_max_stats(self, species: str, use_points: bool = False) -> dict[str, float]:
@@ -1331,28 +1325,40 @@ class MainWindow(QtWidgets.QMainWindow):
             for c in self._creature_cache
             if self._display_species(c.species) == self._display_species(species)
         ]
-        stat_keys = {
-            "Health",
-            "Stamina",
-            "Weight",
-            "MeleeDamageMultiplier",
-        }
-        for creature in candidates:
-            stat_keys.update(creature.stats.keys())
+        stat_keys = {key for _short, key, _title in _POINT_STAT_CONFIG}
+        if not use_points:
+            for creature in candidates:
+                stat_keys.update(creature.stats.keys())
 
         stats: dict[str, float] = {}
         for key in stat_keys:
             stats[key] = max(
-                (self._get_stat_value(c, key, use_points=use_points) for c in candidates),
+                (
+                    self._get_stat_value(
+                        c,
+                        key,
+                        use_points=use_points,
+                        points_only=use_points,
+                    )
+                    for c in candidates
+                ),
                 default=1.0,
             )
         return stats
 
-    def _get_stat_value(self, creature: Creature, key: str, use_points: bool = False) -> float:
+    def _get_stat_value(
+        self,
+        creature: Creature,
+        key: str,
+        use_points: bool = False,
+        points_only: bool = False,
+    ) -> float:
         if use_points:
             points_value = self._get_stat_points_value(creature, key)
             if points_value is not None:
                 return points_value
+            if points_only:
+                return 0.0
         value = creature.stats.get(key)
         if value is None:
             return 0.0
@@ -1373,7 +1379,7 @@ class MainWindow(QtWidgets.QMainWindow):
         line = QtWidgets.QFrame()
         if vertical:
             line.setFixedWidth(2)
-            line.setFixedHeight(24)
+            line.setFixedHeight(32)
         else:
             line.setFixedHeight(2)
         line.setStyleSheet("QFrame { background: #1f2937; }")
@@ -1381,23 +1387,31 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _pedigree_node(self, title: str, value: str, accent: str) -> QtWidgets.QFrame:
         node = QtWidgets.QFrame()
+        node.setMinimumWidth(220)
         node.setStyleSheet(
-            f"QFrame {{ background: #111827; border: 1px solid {accent}; border-radius: 10px; }}"
+            f"QFrame {{ background: rgba(11, 19, 36, 0.9); border: 1px solid {accent}; border-radius: 14px; }}"
         )
         layout = QtWidgets.QVBoxLayout(node)
-        layout.setSpacing(4)
+        layout.setSpacing(6)
+        layout.setContentsMargins(10, 10, 10, 10)
         label = QtWidgets.QLabel(title)
         label.setStyleSheet("color: #94a3b8; font-size: 11px; text-transform: uppercase;")
+        avatar = QtWidgets.QLabel()
+        avatar.setObjectName("avatar")
+        avatar.setFixedSize(72, 54)
+        avatar.setAlignment(QtCore.Qt.AlignCenter)
+        avatar.setStyleSheet("background: #0b1324; border-radius: 8px; color: #94a3b8;")
         value_label = QtWidgets.QLabel(value)
         value_label.setObjectName("value")
         value_label.setAlignment(QtCore.Qt.AlignCenter)
-        value_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
+        value_label.setStyleSheet("color: #f8fafc; font-weight: 700; font-size: 14px;")
         meta_label = QtWidgets.QLabel("")
         meta_label.setObjectName("meta")
         meta_label.setAlignment(QtCore.Qt.AlignCenter)
         meta_label.setWordWrap(True)
         meta_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
         layout.addWidget(label, alignment=QtCore.Qt.AlignCenter)
+        layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
         layout.addWidget(value_label)
         layout.addWidget(meta_label)
         return node
@@ -1418,43 +1432,39 @@ class MainWindow(QtWidgets.QMainWindow):
             layout.addWidget(empty, 0, 0)
             return
 
-        columns = 2
-        for index, (species_name, score, male, female) in enumerate(pairs):
-            card = QtWidgets.QFrame()
-            card.setStyleSheet(
+        row_index = 0
+        for species_name, score, male, female in pairs:
+            row_card = QtWidgets.QFrame()
+            row_card.setStyleSheet(
                 "QFrame { background: rgba(15, 23, 42, 0.7); border-radius: 16px; }"
             )
-            card.setSizePolicy(
-                QtWidgets.QSizePolicy.Preferred,
-                QtWidgets.QSizePolicy.Preferred,
-            )
-            card.setMinimumWidth(220)
-            card.setMaximumWidth(280)
-            card_layout = QtWidgets.QVBoxLayout(card)
-            card_layout.setSpacing(10)
-            card_layout.setContentsMargins(12, 12, 12, 12)
+            row_layout = QtWidgets.QVBoxLayout(row_card)
+            row_layout.setSpacing(10)
+            row_layout.setContentsMargins(12, 12, 12, 12)
 
+            header = QtWidgets.QHBoxLayout()
             species_label = QtWidgets.QLabel(species_name)
-            species_label.setStyleSheet("color: #cbd5f5; font-weight: 600;")
-            card_layout.addWidget(species_label)
-
-            max_stats = self._species_max_stats(male.species, use_points=use_points)
-            male_box = self._pair_info_box(male, max_stats, use_points)
-            female_box = self._pair_info_box(female, max_stats, use_points)
-            card_layout.addWidget(male_box)
-            card_layout.addWidget(female_box)
-
+            species_label.setStyleSheet("color: #cbd5f5; font-weight: 700; font-size: 14px;")
             suffix = "pts" if use_points else "raw"
             score_label = QtWidgets.QLabel(f"Score ({suffix}): {self._format_score(score)}")
             score_label.setStyleSheet("color: #93c5fd; font-weight: 600;")
-            card_layout.addWidget(score_label)
+            header.addWidget(species_label)
+            header.addStretch(1)
+            header.addWidget(score_label)
+            row_layout.addLayout(header)
 
-            row = index // columns
-            col = index % columns
-            layout.addWidget(card, row, col)
+            pair_layout = QtWidgets.QHBoxLayout()
+            pair_layout.setSpacing(12)
+            max_stats = self._species_max_stats(species_name, use_points=use_points)
+            male_box = self._pair_info_box(male, max_stats, use_points=use_points, points_only=True)
+            female_box = self._pair_info_box(female, max_stats, use_points=use_points, points_only=True)
+            pair_layout.addWidget(male_box, 1)
+            pair_layout.addWidget(female_box, 1)
+            row_layout.addLayout(pair_layout)
+            layout.addWidget(row_card, row_index, 0)
+            row_index += 1
 
-        start_index = len(pairs)
-        for offset, (species_name, has_male, has_female) in enumerate(missing_pairs):
+        for species_name, has_male, has_female in missing_pairs:
             info = QtWidgets.QFrame()
             info.setStyleSheet(
                 "QFrame { background: rgba(11, 19, 36, 0.45); border: 1px dashed #334155; border-radius: 14px; }"
@@ -1468,23 +1478,20 @@ class MainWindow(QtWidgets.QMainWindow):
                 needs.append("male")
             if not has_female:
                 needs.append("female")
-            details = QtWidgets.QLabel(
-                "No pair yet: add " + " and ".join(needs) + "."
-            )
+            details = QtWidgets.QLabel("No pair yet: add " + " and ".join(needs) + ".")
             details.setStyleSheet("color: #94a3b8;")
             details.setWordWrap(True)
             info_layout.addWidget(title)
             info_layout.addWidget(details)
-            index = start_index + offset
-            row = index // columns
-            col = index % columns
-            layout.addWidget(info, row, col)
+            layout.addWidget(info, row_index, 0)
+            row_index += 1
 
     def _pair_info_box(
         self,
         creature: Creature,
         max_stats: dict[str, float],
         use_points: bool = False,
+        points_only: bool = False,
     ) -> QtWidgets.QWidget:
         sex_lower = creature.sex.lower() if creature.sex else ""
         accent = "#94a3b8"
@@ -1506,64 +1513,28 @@ class MainWindow(QtWidgets.QMainWindow):
         name_label.setStyleSheet(f"color: {accent}; font-weight: 700; font-size: 15px;")
         layout.addWidget(name_label)
 
-        avatar = self._small_species_image(self._display_species(creature.species), size=96)
+        avatar = self._small_species_image(self._display_species(creature.species), size=128)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
 
-        stats_order = [
-            "Health",
-            "Stamina",
-            "Oxygen",
-            "Food",
-            "Water",
-            "Weight",
-            "MeleeDamageMultiplier",
-            "MovementSpeed",
-            "Torpidity",
-            "Fortitude",
-            "CraftingSkill",
-            "Temperature",
-        ]
         colors = {
             "Health": "#22c55e",
             "Stamina": "#38bdf8",
             "Oxygen": "#14b8a6",
             "Food": "#facc15",
-            "Water": "#06b6d4",
             "Weight": "#f59e0b",
             "MeleeDamageMultiplier": "#f97316",
             "MovementSpeed": "#a78bfa",
-            "Torpidity": "#8b5cf6",
-            "Fortitude": "#fb7185",
-            "CraftingSkill": "#10b981",
-            "Temperature": "#94a3b8",
         }
-        labels = {
-            "Health": "H",
-            "Stamina": "S",
-            "Oxygen": "O",
-            "Food": "F",
-            "Water": "Wa",
-            "Weight": "W",
-            "MeleeDamageMultiplier": "M",
-            "MovementSpeed": "Sp",
-            "Torpidity": "T",
-            "Fortitude": "Fo",
-            "CraftingSkill": "Cr",
-            "Temperature": "Te",
-        }
-        available_keys = [key for key in stats_order if key in creature.stats]
-        if not available_keys:
-            available_keys = ["Health", "Stamina", "Weight", "MeleeDamageMultiplier"]
-
-        for key in available_keys:
+        for short_label, key, _title in _POINT_STAT_CONFIG:
             layout.addWidget(
                 self._stat_bar_row(
-                    labels.get(key, key[:2]),
+                    short_label,
                     creature,
                     key,
                     max_stats.get(key, 1.0),
                     colors.get(key, "#64748b"),
                     use_points,
+                    points_only=points_only,
                 )
             )
         return box
@@ -1576,6 +1547,7 @@ class MainWindow(QtWidgets.QMainWindow):
         max_value: float,
         color: str,
         use_points: bool = False,
+        points_only: bool = False,
     ) -> QtWidgets.QWidget:
         row = QtWidgets.QWidget()
         row_layout = QtWidgets.QHBoxLayout(row)
@@ -1586,7 +1558,12 @@ class MainWindow(QtWidgets.QMainWindow):
         tag.setStyleSheet("color: #94a3b8; font-size: 10px;")
         bar = QtWidgets.QProgressBar()
         bar.setMaximum(100)
-        value = self._get_stat_value(creature, key, use_points=use_points)
+        value = self._get_stat_value(
+            creature,
+            key,
+            use_points=use_points,
+            points_only=points_only,
+        )
         ratio = 0.0 if max_value <= 0 else min(max(value / max_value, 0.0), 1.0)
         bar.setValue(int(ratio * 100))
         bar.setTextVisible(False)
@@ -1609,17 +1586,19 @@ class MainWindow(QtWidgets.QMainWindow):
         points_value = self._get_stat_points_value(creature, key) if use_points else None
         if points_value is not None:
             displayed_value = str(int(points_value))
+        elif points_only:
+            displayed_value = "-"
         else:
-            displayed_value = self._format_stat(creature.stats.get(key))
+            displayed_value = self._format_stat(creature.stats.get(key), key)
         value_label = QtWidgets.QLabel(displayed_value)
         value_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
         row_layout.addWidget(value_label)
         return row
 
     def _make_point_badge(self, label: str) -> QtWidgets.QLabel:
-        badge = QtWidgets.QLabel(f"{label} -")
+        badge = QtWidgets.QLabel(f"{label}-")
         badge.setAlignment(QtCore.Qt.AlignCenter)
-        badge.setFixedWidth(54)
+        badge.setMinimumWidth(64)
         badge.setStyleSheet(
             """
             QLabel {
@@ -1660,12 +1639,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return cache_dir / f"{safe}.png"
 
     def _update_point_badges(self, creature: Creature, species_group: list[Creature]) -> None:
-        labels = {
-            "Health": "H",
-            "Stamina": "S",
-            "Weight": "W",
-            "MeleeDamageMultiplier": "M",
-        }
+        labels = {key: short for short, key, _title in _POINT_STAT_CONFIG}
         points = self._get_stat_points(creature)
         max_points = {}
         for key in labels:
@@ -1680,18 +1654,19 @@ class MainWindow(QtWidgets.QMainWindow):
             label = labels.get(key, "?")
             value = points.get(key) if points else None
             raw_value = self._get_stat_value(creature, key, use_points=False)
+            raw_text = self._format_stat(raw_value, key)
             if value is None:
-                badge.setText(f"{label} -")
+                badge.setText(f"{label}-")
                 badge.setStyleSheet(self._point_badge_style("#111827", "#94a3b8"))
-                badge.setToolTip(f"Raw: {raw_value:.2f}\nPoints: -")
+                badge.setToolTip(f"Raw: {raw_text}\nPoints: -")
                 continue
             max_value = max_points.get(key, 0.0)
             ratio = 0.0 if max_value <= 0 else min(max(value / max_value, 0.0), 1.0)
             color = self._point_badge_color(ratio)
             text_color = "#0b1220" if ratio >= 0.6 else "#f8fafc"
-            badge.setText(f"{label} {int(value)}")
+            badge.setText(f"{label}-{int(value)}")
             badge.setStyleSheet(self._point_badge_style(color, text_color))
-            badge.setToolTip(f"Raw: {raw_value:.2f}\nPoints: {int(value)}")
+            badge.setToolTip(f"Raw: {raw_text}\nPoints: {int(value)}")
 
     def _point_badge_color(self, ratio: float) -> str:
         if ratio >= 0.85:
@@ -1834,14 +1809,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._pedigree_subject.setText("Select a creature")
             if self._pedigree_subject_meta:
                 self._pedigree_subject_meta.setText("")
+            self._set_pedigree_avatar(self._pedigree_subject_avatar, None)
             if self._pedigree_mother:
                 self._pedigree_mother.setText("Unknown")
             if self._pedigree_mother_meta:
                 self._pedigree_mother_meta.setText("")
+            self._set_pedigree_avatar(self._pedigree_mother_avatar, None)
             if self._pedigree_father:
                 self._pedigree_father.setText("Unknown")
             if self._pedigree_father_meta:
                 self._pedigree_father_meta.setText("")
+            self._set_pedigree_avatar(self._pedigree_father_avatar, None)
             return
         self._pedigree_tree.setVisible(True)
         self._pedigree_empty.setVisible(False)
@@ -1853,6 +1831,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._pedigree_subject_meta.setText(
                 f"{self._sex_icon(creature.sex)} {creature.sex} • L{creature.level} • {self._display_species(creature.species)}"
             )
+        self._set_pedigree_avatar(self._pedigree_subject_avatar, creature)
         mother = self._find_creature_by_id(creature.mother_id) or self._find_creature_by_external_id(
             creature.mother_external_id
         )
@@ -1868,6 +1847,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
             else:
                 self._pedigree_mother_meta.setText("")
+        self._set_pedigree_avatar(self._pedigree_mother_avatar, mother)
         if self._pedigree_father:
             self._pedigree_father.setText(father.name if father else "Unknown")
         if self._pedigree_father_meta:
@@ -1877,6 +1857,22 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
             else:
                 self._pedigree_father_meta.setText("")
+        self._set_pedigree_avatar(self._pedigree_father_avatar, father)
+
+    def _set_pedigree_avatar(self, label: QtWidgets.QLabel | None, creature: Creature | None) -> None:
+        if label is None:
+            return
+        label.setPixmap(QtGui.QPixmap())
+        if creature is None:
+            label.setText("?")
+            return
+        avatar = self._small_species_image(self._display_species(creature.species), size=72)
+        pixmap = avatar.pixmap()
+        if pixmap and not pixmap.isNull():
+            label.setPixmap(pixmap)
+            label.setText("")
+        else:
+            label.setText(self._display_species(creature.species)[:1].upper())
 
     def _set_table_item(self, row: int, col: int, value: str, external_id: str | None = None) -> None:
         item = QtWidgets.QTableWidgetItem(value)
@@ -1885,10 +1881,11 @@ class MainWindow(QtWidgets.QMainWindow):
             item.setData(QtCore.Qt.UserRole, external_id)
         self._creatures_table.setItem(row, col, item)
 
-    def _format_stat(self, value: float | None) -> str:
+    def _format_stat(self, value: float | None, key: str | None = None) -> str:
         if value is None:
             return "-"
-        return f"{value:.2f}"
+        precision = 3 if key in {"MeleeDamageMultiplier", "MovementSpeed"} else 2
+        return f"{value:.{precision}f}"
 
     def _format_updated_at(self, value: str | None) -> str:
         if not value:
@@ -1973,21 +1970,30 @@ class MainWindow(QtWidgets.QMainWindow):
 
         for key, label in self._detail_stat_values.items():
             raw_value = creature.stats.get(key)
-            label.setText(self._format_stat(raw_value))
+            label.setText(self._format_stat(raw_value, key))
             label.setToolTip("")
-
-        if len(species_group) == 1:
-            self._detail_strengths.setText("Strengths: Health, Stamina, Weight, Melee")
-            self._detail_weaknesses.setText("Weaknesses: -")
-            return
 
         strengths, weaknesses = self._compute_strengths_weaknesses(
             creature,
             species_group,
             use_points=use_points,
         )
-        self._detail_strengths.setText("Strengths: " + (", ".join(strengths) if strengths else "-"))
-        self._detail_weaknesses.setText("Weaknesses: " + (", ".join(weaknesses) if weaknesses else "-"))
+        self._detail_strengths.setText(
+            "Strengths: "
+            + (
+                self._render_stat_badges(strengths, "#22c55e")
+                if strengths
+                else "Add more of this species for comparison."
+            )
+        )
+        self._detail_weaknesses.setText(
+            "Weaknesses: "
+            + (
+                self._render_stat_badges(weaknesses, "#ef4444")
+                if weaknesses
+                else "Add more of this species for comparison."
+            )
+        )
 
     def _compute_strengths_weaknesses(
         self,
@@ -1997,30 +2003,40 @@ class MainWindow(QtWidgets.QMainWindow):
     ) -> tuple[list[str], list[str]]:
         strengths: list[str] = []
         weaknesses: list[str] = []
-        stat_map = {
-            "Health": "Health",
-            "Stamina": "Stamina",
-            "Weight": "Weight",
-            "Melee": "MeleeDamageMultiplier",
-        }
-        for label, key in stat_map.items():
+        stat_map = [(short, key) for short, key, _title in _POINT_STAT_CONFIG]
+
+        if len(species_group) <= 1:
+            return [short for short, _key in stat_map], []
+
+        for short, key in stat_map:
             values = [self._get_stat_value(c, key, use_points=use_points) for c in species_group]
-            percentile = self._stat_percentile(
-                self._get_stat_value(creature, key, use_points=use_points),
-                values,
-            )
-            if percentile >= 0.9:
-                strengths.append(f"{label} (top 10%)")
-            elif percentile <= 0.1:
-                weaknesses.append(f"{label} (bottom 10%)")
+            if not values:
+                continue
+            current = self._get_stat_value(creature, key, use_points=use_points)
+            max_value = max(values)
+            min_value = min(values)
+            if abs(current - max_value) < 1e-6:
+                strengths.append(short)
+            if abs(current - min_value) < 1e-6 and abs(max_value - min_value) > 1e-6:
+                weaknesses.append(short)
         return strengths, weaknesses
 
-    def _stat_percentile(self, value: float, values: list[float]) -> float:
-        if len(values) < 2:
-            return 0.0
-        total = len(values)
-        count = sum(1 for v in values if v <= value)
-        return count / total
+    def _render_stat_badges(self, labels: list[str], color: str) -> str:
+        badges = []
+        for label in labels:
+            badges.append(
+                "<span style=\""
+                f"background: {color};"
+                "color: #0b1220;"
+                "border: 1px solid rgba(15, 23, 42, 0.6);"
+                "border-radius: 999px;"
+                "padding: 2px 8px;"
+                "font-weight: 700;"
+                "margin-right: 6px;"
+                "\">◆ "
+                f"{label}</span>"
+            )
+        return "".join(badges)
 
     def _updated_cutoff(self, filter_label: str) -> QtCore.QDateTime | None:
         now = QtCore.QDateTime.currentDateTime()

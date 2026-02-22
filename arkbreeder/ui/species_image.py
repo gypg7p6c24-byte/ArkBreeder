@@ -9,6 +9,8 @@ from PySide6 import QtCore, QtGui, QtNetwork, QtWidgets
 
 from arkbreeder.config import user_data_dir
 
+_IMAGE_CACHE_VERSION = 2
+
 
 class SpeciesImageWidget(QtWidgets.QLabel):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
@@ -194,11 +196,15 @@ class SpeciesImageWidget(QtWidgets.QLabel):
             metadata = json.loads(meta_path.read_text(encoding="utf-8"))
         except Exception:
             return False
-        return isinstance(metadata, dict) and metadata.get("species") == species
+        return (
+            isinstance(metadata, dict)
+            and metadata.get("species") == species
+            and metadata.get("version") == _IMAGE_CACHE_VERSION
+        )
 
     def _write_cache_metadata(self, species: str) -> None:
         meta_path = self._cache_meta_path(species)
-        payload = {"species": species}
+        payload = {"species": species, "version": _IMAGE_CACHE_VERSION}
         meta_path.write_text(json.dumps(payload), encoding="utf-8")
 
     def _invalidate_cache(self, species: str) -> None:

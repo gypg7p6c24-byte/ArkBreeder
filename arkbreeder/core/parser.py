@@ -183,8 +183,16 @@ def _parse_int(value: str | None, default: int | None = None) -> int | None:
 def _parse_float(value: str | None) -> float | None:
     if value is None:
         return None
+    text = value.strip()
+    if "," in text and "." in text:
+        if text.rfind(",") > text.rfind("."):
+            text = text.replace(".", "").replace(",", ".")
+        else:
+            text = text.replace(",", "")
+    elif "," in text and "." not in text:
+        text = text.replace(",", ".")
     try:
-        return float(value)
+        return float(text)
     except (TypeError, ValueError):
         return None
 
@@ -238,7 +246,7 @@ def _normalize_stat_key(key: str) -> str | None:
     cleaned = key.strip()
     if not cleaned:
         return None
-    collapsed = cleaned.replace(" ", "").lower()
+    collapsed = "".join(ch for ch in cleaned.lower() if ch.isalnum())
     mapping = {
         "health": "Health",
         "stamina": "Stamina",
