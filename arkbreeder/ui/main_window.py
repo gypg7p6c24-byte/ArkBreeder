@@ -52,7 +52,15 @@ _POINT_STAT_CONFIG: list[tuple[str, str, str]] = [
     ("Sp", "MovementSpeed", "Speed"),
 ]
 
-_BREEDING_FOCUS_OPTIONS = ["Overall"] + [title for _short, _key, title in _POINT_STAT_CONFIG]
+_BREEDING_POINT_STAT_CONFIG: list[tuple[str, str, str]] = [
+    (short, key, title)
+    for short, key, title in _POINT_STAT_CONFIG
+    if key != "MovementSpeed"
+]
+
+_BREEDING_FOCUS_OPTIONS = ["Overall"] + [
+    title for _short, _key, title in _BREEDING_POINT_STAT_CONFIG
+]
 
 _FLYING_SPECIES = {
     "argentavis",
@@ -219,10 +227,22 @@ class MainWindow(QtWidgets.QMainWindow):
                 min-height: 30px;
                 border-radius: 5px;
             }
+            #contentArea QScrollBar::handle:vertical:hover {
+                background: #475569;
+            }
+            #contentArea QScrollBar::handle:vertical:pressed {
+                background: #60a5fa;
+            }
             #contentArea QScrollBar::handle:horizontal {
                 background: #334155;
                 min-width: 30px;
                 border-radius: 5px;
+            }
+            #contentArea QScrollBar::handle:horizontal:hover {
+                background: #475569;
+            }
+            #contentArea QScrollBar::handle:horizontal:pressed {
+                background: #60a5fa;
             }
             #contentArea QScrollBar::add-line:vertical,
             #contentArea QScrollBar::sub-line:vertical {
@@ -437,7 +457,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creatures_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self._creatures_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self._creatures_table.verticalHeader().setVisible(False)
-        self._creatures_table.horizontalHeader().setVisible(False)
+        header = self._creatures_table.horizontalHeader()
+        header.setVisible(True)
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self._creatures_table.setSortingEnabled(True)
         self._creatures_table.itemSelectionChanged.connect(self._on_creature_selected)
 
@@ -1296,7 +1319,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._format_stat(creature.stats.get("MeleeDamageMultiplier"), "MeleeDamageMultiplier"),
             )
             self._set_table_item(row, 9, self._format_updated_at(creature.updated_at))
-        self._creatures_table.resizeColumnsToContents()
         if sorting:
             self._creatures_table.setSortingEnabled(True)
         self._restore_creature_selection()
@@ -1405,6 +1427,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _update_breeding_pairs(self) -> None:
         species = self._breeding_species_filter.currentText()
         focus = self._breeding_stat_focus.currentText()
+        show_ranking = species != "All species"
         creatures = [
             c
             for c in self._creature_cache
@@ -1442,7 +1465,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
             )
 
-            limit = 1 if species == "All species" else min(12, len(all_pairs))
+            limit = 1 if not show_ranking else min(12, len(all_pairs))
             ranked_pairs = [
                 (rank + 1, score, male, female)
                 for rank, (score, male, female) in enumerate(all_pairs[:limit])
@@ -1451,11 +1474,11 @@ class MainWindow(QtWidgets.QMainWindow):
             rows.append((species_name, targets, ranked_pairs))
 
         rows.sort(key=lambda item: item[2][0][1] if item[2] else -1.0, reverse=True)
-        self._render_breeding_cards(rows, focus, use_points)
+        self._render_breeding_cards(rows, focus, use_points, show_ranking=show_ranking)
 
     def _species_target_points(self, group: list[Creature]) -> list[tuple[str, int]]:
         targets: list[tuple[str, int]] = []
-        for short, key, _title in _POINT_STAT_CONFIG:
+        for short, key, _title in _BREEDING_POINT_STAT_CONFIG:
             values = [
                 int(value)
                 for creature in group
@@ -1473,7 +1496,7 @@ class MainWindow(QtWidgets.QMainWindow):
         focus: str,
         use_points: bool = False,
     ) -> tuple[float, float, float]:
-        score_keys = [key for _short, key, _title in _POINT_STAT_CONFIG]
+        score_keys = [key for _short, key, _title in _BREEDING_POINT_STAT_CONFIG]
         if focus == "Overall":
             best_stats = [
                 max(
@@ -1485,7 +1508,7 @@ class MainWindow(QtWidgets.QMainWindow):
             score = sum(best_stats)
             return score, self._overall_score(male, use_points), self._overall_score(female, use_points)
 
-        focus_to_key = {title: key for _short, key, title in _POINT_STAT_CONFIG}
+        focus_to_key = {title: key for _short, key, title in _BREEDING_POINT_STAT_CONFIG}
         key = focus_to_key.get(focus, "Health")
         male_stat = self._get_stat_value(male, key, use_points=use_points)
         female_stat = self._get_stat_value(female, key, use_points=use_points)
@@ -1608,6 +1631,7 @@ class MainWindow(QtWidgets.QMainWindow):
         rows: list[tuple[str, list[tuple[str, int]], list[tuple[int, float, Creature, Creature]]]],
         focus: str,
         use_points: bool,
+        show_ranking: bool = True,
     ) -> None:
         layout = self._breeding_cards_layout
         self._clear_layout(layout)
@@ -1627,7 +1651,7 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             row_layout = QtWidgets.QVBoxLayout(row_card)
             row_layout.setSpacing(2)
-            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setContentsMargins(0, 0, 0, 8)
 
             header = QtWidgets.QHBoxLayout()
             header.setContentsMargins(0, 0, 0, 0)
@@ -1656,26 +1680,19 @@ class MainWindow(QtWidgets.QMainWindow):
                 row_layout.addLayout(target_row)
 
             max_stats = self._species_max_stats(species_name, use_points=use_points)
-            for rank, score, male, female in ranked_pairs:
+            for rank, _score, male, female in ranked_pairs:
                 pair_layout = QtWidgets.QHBoxLayout()
                 pair_layout.setSpacing(2)
                 pair_layout.setContentsMargins(0, 0, 0, 0)
-                rank_label = QtWidgets.QLabel(f"#{rank}")
-                rank_label.setAlignment(QtCore.Qt.AlignCenter)
-                rank_label.setFixedWidth(28)
-                rank_label.setStyleSheet(
-                    "color: #facc15; font-size: 11px; font-weight: 700;"
-                    "background: #0f172a; border: 1px solid #1f2937; border-radius: 7px;"
-                )
-                pair_layout.addWidget(rank_label)
-                score_label = QtWidgets.QLabel(f"{int(round(score))} pts")
-                score_label.setAlignment(QtCore.Qt.AlignCenter)
-                score_label.setFixedWidth(58)
-                score_label.setStyleSheet(
-                    "color: #93c5fd; font-size: 10px; font-weight: 700;"
-                    "background: #0f172a; border: 1px solid #1f2937; border-radius: 7px;"
-                )
-                pair_layout.addWidget(score_label)
+                if show_ranking:
+                    rank_label = QtWidgets.QLabel(f"#{rank}")
+                    rank_label.setAlignment(QtCore.Qt.AlignCenter)
+                    rank_label.setFixedWidth(28)
+                    rank_label.setStyleSheet(
+                        "color: #facc15; font-size: 11px; font-weight: 700;"
+                        "background: #0f172a; border: 1px solid #1f2937; border-radius: 7px;"
+                    )
+                    pair_layout.addWidget(rank_label)
                 male_box = self._pair_info_box(male, max_stats, use_points=use_points, points_only=True)
                 female_box = self._pair_info_box(female, max_stats, use_points=use_points, points_only=True)
                 pair_layout.addWidget(male_box)
@@ -1700,8 +1717,8 @@ class MainWindow(QtWidgets.QMainWindow):
             accent = "#f472b6"
         box = QtWidgets.QFrame()
         box.setObjectName("pairCard")
-        box.setMinimumWidth(186)
-        box.setMaximumWidth(198)
+        box.setMinimumWidth(168)
+        box.setMaximumWidth(184)
         box.setStyleSheet(
             "#pairCard {"
             "background: rgba(11, 19, 36, 0.85);"
@@ -1730,7 +1747,7 @@ class MainWindow(QtWidgets.QMainWindow):
             "MeleeDamageMultiplier": "#f97316",
             "MovementSpeed": "#a78bfa",
         }
-        for short_label, key, _title in _POINT_STAT_CONFIG:
+        for short_label, key, _title in _BREEDING_POINT_STAT_CONFIG:
             layout.addWidget(
                 self._stat_bar_row(
                     short_label,
@@ -1773,6 +1790,7 @@ class MainWindow(QtWidgets.QMainWindow):
             use_points=use_points,
             points_only=points_only,
         )
+        is_top_value = max_value > 0 and value >= (max_value - 0.001)
         ratio = 0.0 if max_value <= 0 else min(max(value / max_value, 0.0), 1.0)
         bar.setValue(int(ratio * 100))
         bar.setTextVisible(False)
@@ -1800,10 +1818,20 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             displayed_value = self._format_stat(creature.stats.get(key), key, creature=creature)
         value_label = QtWidgets.QLabel(displayed_value)
-        value_label.setStyleSheet(
-            "color: #cbd5f5; font-size: 11px; font-weight: 700;"
-            "background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; padding: 1px 4px;"
-        )
+        if is_top_value:
+            tag.setStyleSheet(
+                "color: #dcfce7; font-size: 11px; font-weight: 700;"
+                "background: #14532d; border: 1px solid #22c55e; border-radius: 6px;"
+            )
+            value_label.setStyleSheet(
+                "color: #dcfce7; font-size: 11px; font-weight: 700;"
+                "background: #14532d; border: 1px solid #22c55e; border-radius: 6px; padding: 1px 4px;"
+            )
+        else:
+            value_label.setStyleSheet(
+                "color: #cbd5f5; font-size: 11px; font-weight: 700;"
+                "background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; padding: 1px 4px;"
+            )
         value_label.setMinimumWidth(34)
         value_label.setAlignment(QtCore.Qt.AlignCenter)
         row_layout.addWidget(value_label)
@@ -1867,6 +1895,15 @@ class MainWindow(QtWidgets.QMainWindow):
     def _update_point_badges(self, creature: Creature, species_group: list[Creature]) -> None:
         labels = {key: short for short, key, _title in _POINT_STAT_CONFIG}
         points = self._get_stat_points(creature)
+        max_points_by_key: dict[str, int] = {}
+        for _short, key, _title in _POINT_STAT_CONFIG:
+            values = [
+                int(value)
+                for candidate in species_group
+                if (value := self._get_stat_points_value(candidate, key)) is not None
+            ]
+            if values:
+                max_points_by_key[key] = max(values)
         for key, badge in self._detail_point_badges.items():
             label = labels.get(key, "?")
             icon = self._point_icon(label)
@@ -1879,7 +1916,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 badge.setToolTip(f"Raw: {raw_text}\nPoints: -")
                 continue
             badge.setText(f"{icon} {int(value)}")
-            badge.setStyleSheet(self._point_badge_style("#111827", "#e5e7eb"))
+            max_value = max_points_by_key.get(key)
+            if max_value is not None and int(value) >= max_value:
+                badge.setStyleSheet(self._point_badge_style("#14532d", "#dcfce7", "#22c55e"))
+            else:
+                badge.setStyleSheet(self._point_badge_style("#111827", "#e5e7eb"))
             badge.setToolTip(f"Raw: {raw_text}\nPoints: {int(value)}")
 
     def _point_badge_color(self, ratio: float) -> str:
@@ -1893,12 +1934,17 @@ class MainWindow(QtWidgets.QMainWindow):
             return "#f97316"
         return "#ef4444"
 
-    def _point_badge_style(self, background: str, text_color: str) -> str:
+    def _point_badge_style(
+        self,
+        background: str,
+        text_color: str,
+        border_color: str = "#1f2937",
+    ) -> str:
         return (
             "QLabel {"
             f"background: {background};"
             f"color: {text_color};"
-            "border: 1px solid #1f2937;"
+            f"border: 1px solid {border_color};"
             "border-radius: 10px;"
             "padding: 6px 8px;"
             "font-weight: 600;"
