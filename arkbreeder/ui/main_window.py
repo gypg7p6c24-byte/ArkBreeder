@@ -1053,6 +1053,60 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         return badge
 
+    def _update_point_badges(self, creature: Creature, species_group: list[Creature]) -> None:
+        labels = {
+            "Health": "H",
+            "Stamina": "S",
+            "Weight": "W",
+            "MeleeDamageMultiplier": "M",
+        }
+        points = self._get_stat_points(creature)
+        max_points = {}
+        for key in labels:
+            max_points[key] = max(
+                (
+                    self._get_stat_points_value(c, key) or 0.0
+                    for c in species_group
+                ),
+                default=0.0,
+            )
+        for key, badge in self._detail_point_badges.items():
+            label = labels.get(key, "?")
+            value = points.get(key) if points else None
+            if value is None:
+                badge.setText(f"{label} -")
+                badge.setStyleSheet(self._point_badge_style("#111827", "#94a3b8"))
+                continue
+            max_value = max_points.get(key, 0.0)
+            ratio = 0.0 if max_value <= 0 else min(max(value / max_value, 0.0), 1.0)
+            color = self._point_badge_color(ratio)
+            text_color = "#0b1220" if ratio >= 0.6 else "#f8fafc"
+            badge.setText(f"{label} {int(value)}")
+            badge.setStyleSheet(self._point_badge_style(color, text_color))
+
+    def _point_badge_color(self, ratio: float) -> str:
+        if ratio >= 0.85:
+            return "#22c55e"
+        if ratio >= 0.65:
+            return "#84cc16"
+        if ratio >= 0.45:
+            return "#facc15"
+        if ratio >= 0.25:
+            return "#f97316"
+        return "#ef4444"
+
+    def _point_badge_style(self, background: str, text_color: str) -> str:
+        return (
+            "QLabel {"
+            f"background: {background};"
+            f"color: {text_color};"
+            "border: 1px solid #1f2937;"
+            "border-radius: 10px;"
+            "padding: 6px 8px;"
+            "font-weight: 600;"
+            "}"
+        )
+
     def _sex_icon(self, sex: str | None) -> str:
         if not sex:
             return "•"
@@ -1251,20 +1305,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self._detail_image.set_species(creature.species)
 
         species_group = [c for c in self._creature_cache if c.species == creature.species]
-        if len(species_group) < 2:
-            self._detail_strengths.setText("Strengths: Add more of this species")
-            self._detail_weaknesses.setText("Weaknesses: Add more of this species")
-            return
+        use_points = self._points_available(species_group)
+        self._update_point_badges(creature, species_group)
         stats_keys = ["Health", "Stamina", "Weight", "MeleeDamageMultiplier"]
         max_values = {
-            key: max((self._get_stat_value(c, key) for c in species_group), default=0.0)
+            key: max(
+                (self._get_stat_value(c, key, use_points=use_points) for c in species_group),
+                default=0.0,
+            )
             for key in stats_keys
         }
         values = {
-            "Health": self._get_stat_value(creature, "Health"),
-            "Stamina": self._get_stat_value(creature, "Stamina"),
-            "Weight": self._get_stat_value(creature, "Weight"),
-            "Melee": self._get_stat_value(creature, "MeleeDamageMultiplier"),
+            "Health": self._get_stat_value(creature, "Health", use_points=use_points),
+            "Stamina": self._get_stat_value(creature, "Stamina", use_points=use_points),
+            "Weight": self._get_stat_value(creature, "Weight", use_points=use_points),
+            "Melee": self._get_stat_value(creature, "MeleeDamageMultiplier", use_points=use_points),
         }
         radar_max = {
             "Health": max_values.get("Health", 1.0),
@@ -1274,7 +1329,16 @@ class MainWindow(QtWidgets.QMainWindow):
         }
         self._detail_radar.set_values(values, radar_max)
 
-        strengths, weaknesses = self._compute_strengths_weaknesses(creature, species_group)
+        if len(species_group) < 2:
+            self._detail_strengths.setText("Strengths: Add more of this species")
+            self._detail_weaknesses.setText("Weaknesses: Add more of this species")
+            return
+
+        strengths, weaknesses = self._compute_strengths_weaknesses(
+            creature,
+            species_group,
+            use_points=use_points,
+        )
         self._detail_strengths.setText("Strengths: " + (", ".join(strengths) if strengths else "-"))
         self._detail_weaknesses.setText("Weaknesses: " + (", ".join(weaknesses) if weaknesses else "-"))
 
@@ -1282,6 +1346,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self,
         creature: Creature,
         species_group: list[Creature],
+        use_points: bool = False,
     ) -> tuple[list[str], list[str]]:
         if len(species_group) < 5:
             return [], []
@@ -1294,8 +1359,11 @@ class MainWindow(QtWidgets.QMainWindow):
             "Melee": "MeleeDamageMultiplier",
         }
         for label, key in stat_map.items():
-            values = [self._get_stat_value(c, key) for c in species_group]
-            percentile = self._stat_percentile(self._get_stat_value(creature, key), values)
+            values = [self._get_stat_value(c, key, use_points=use_points) for c in species_group]
+            percentile = self._stat_percentile(
+                self._get_stat_value(creature, key, use_points=use_points),
+                values,
+            )
             if percentile >= 0.9:
                 strengths.append(f"{label} (top 10%)")
             elif percentile <= 0.1:
