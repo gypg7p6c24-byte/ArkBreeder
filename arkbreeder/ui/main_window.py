@@ -458,10 +458,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creatures_table.setAlternatingRowColors(False)
         self._creatures_table.setStyleSheet(
             """
-            QTableWidget { background: transparent; border: none; gridline-color: transparent; }
+            QTableWidget {
+                background: transparent;
+                border: 1px solid #334155;
+                border-radius: 10px;
+                gridline-color: transparent;
+            }
             QTableWidget::item { padding: 6px; border-bottom: 1px solid rgba(148, 163, 184, 0.18); }
             QTableWidget::item:selected { background: #1f2937; color: #f8fafc; }
-            QHeaderView::section { background: transparent; border: none; color: #cbd5f5; padding: 4px 6px; }
+            QHeaderView::section {
+                background: rgba(30, 41, 59, 0.75);
+                border: none;
+                border-bottom: 1px solid #334155;
+                color: #dbeafe;
+                padding: 6px 8px;
+                font-weight: 700;
+            }
             """
         )
         self._creatures_table.setFrameShape(QtWidgets.QFrame.NoFrame)
@@ -636,13 +648,13 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self._points_info)
 
         self._detail_strengths = QtWidgets.QLabel("Strengths: -")
-        self._detail_strengths.setStyleSheet("color: #67e8f9; font-size: 15px; font-weight: 600;")
+        self._detail_strengths.setStyleSheet("color: #67e8f9; font-size: 16px; font-weight: 700;")
         self._detail_strengths.setTextFormat(QtCore.Qt.RichText)
         self._detail_strengths.setWordWrap(True)
         layout.addWidget(self._detail_strengths)
 
         self._detail_weaknesses = QtWidgets.QLabel("Weaknesses: -")
-        self._detail_weaknesses.setStyleSheet("color: #fecaca; font-size: 15px; font-weight: 600;")
+        self._detail_weaknesses.setStyleSheet("color: #fecaca; font-size: 16px; font-weight: 700;")
         self._detail_weaknesses.setTextFormat(QtCore.Qt.RichText)
         self._detail_weaknesses.setWordWrap(True)
         layout.addWidget(self._detail_weaknesses)
@@ -1734,13 +1746,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 QtWidgets.QSizePolicy.Maximum,
             )
             row_layout = QtWidgets.QVBoxLayout(row_card)
-            row_layout.setSpacing(2)
-            row_layout.setContentsMargins(0, 0, 0, 8)
+            row_layout.setSpacing(6)
+            row_layout.setContentsMargins(0, 0, 0, 12)
 
             header = QtWidgets.QHBoxLayout()
             header.setContentsMargins(0, 0, 0, 0)
             species_label = QtWidgets.QLabel(species_name)
-            species_label.setStyleSheet("color: #cbd5f5; font-weight: 700; font-size: 13px;")
+            species_label.setStyleSheet("color: #cbd5f5; font-weight: 800; font-size: 16px;")
             header.addWidget(species_label)
             header.addStretch(1)
             row_layout.addLayout(header)
@@ -1748,9 +1760,9 @@ class MainWindow(QtWidgets.QMainWindow):
             if targets:
                 target_row = QtWidgets.QHBoxLayout()
                 target_row.setContentsMargins(0, 0, 0, 0)
-                target_row.setSpacing(4)
-                target_label = QtWidgets.QLabel("Target:")
-                target_label.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 600;")
+                target_row.setSpacing(6)
+                target_label = QtWidgets.QLabel("🎯 Target")
+                target_label.setStyleSheet("color: #94a3b8; font-size: 12px; font-weight: 700;")
                 target_row.addWidget(target_label)
                 for short, value in targets:
                     chip = QtWidgets.QLabel(f"{self._point_icon(short)} {value}")
@@ -1801,7 +1813,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             for rank, _score, male, female in ranked_pairs:
                 pair_layout = QtWidgets.QHBoxLayout()
-                pair_layout.setSpacing(2)
+                pair_layout.setSpacing(10)
                 pair_layout.setContentsMargins(0, 0, 0, 0)
                 if show_ranking:
                     pair_layout.addWidget(self._rank_badge(rank))
@@ -1868,7 +1880,14 @@ class MainWindow(QtWidgets.QMainWindow):
         box.setMinimumWidth(168)
         box.setMaximumWidth(184)
         border_width = 2 if highlighted else 1
-        box_bg = "rgba(11, 19, 36, 0.85)" if not highlighted else "rgba(11, 19, 36, 0.92)"
+        if not highlighted:
+            box_bg = "rgba(11, 19, 36, 0.85)"
+        elif sex_lower == "male":
+            box_bg = "rgba(96, 165, 250, 0.14)"
+        elif sex_lower == "female":
+            box_bg = "rgba(244, 114, 182, 0.14)"
+        else:
+            box_bg = "rgba(11, 19, 36, 0.92)"
         box.setStyleSheet(
             "#pairCard {"
             f"background: {box_bg};"
@@ -2039,13 +2058,13 @@ class MainWindow(QtWidgets.QMainWindow):
             use_points=use_points,
         )
 
-        chain_title = QtWidgets.QLabel("Breeding plan chain")
-        chain_title.setStyleSheet("color: #93c5fd; font-size: 11px; font-weight: 700;")
+        chain_title = QtWidgets.QLabel("Breeding plan")
+        chain_title.setStyleSheet("color: #93c5fd; font-size: 13px; font-weight: 800;")
         parent_layout.addWidget(chain_title)
 
         chain_layout = QtWidgets.QHBoxLayout()
         chain_layout.setContentsMargins(0, 0, 0, 0)
-        chain_layout.setSpacing(4)
+        chain_layout.setSpacing(12)
         start_male = ranked_pairs[0][2]
         start_female = ranked_pairs[0][3]
         chain_layout.addWidget(
@@ -2082,7 +2101,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     "Next target",
                     "Need extra donor",
                     f"Missing: {', '.join(pending)}",
-                    "#f59e0b",
+                    "#22c55e",
                 )
             )
         else:
@@ -2091,7 +2110,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     "Target reached",
                     "Current chain hits max targets",
                     "Ready for stabilisation",
-                    "#67e8f9",
+                    "#22c55e",
                 )
             )
 
@@ -2206,7 +2225,7 @@ class MainWindow(QtWidgets.QMainWindow):
         card.setMinimumWidth(190)
         card.setMaximumWidth(260)
         card.setStyleSheet(
-            f"QFrame {{ background: rgba(11, 19, 36, 0.82); border: 1px solid {border_color}; border-radius: 10px; }}"
+            f"QFrame {{ background: rgba(11, 19, 36, 0.86); border: 2px solid {border_color}; border-radius: 12px; }}"
         )
         layout = QtWidgets.QVBoxLayout(card)
         layout.setContentsMargins(8, 5, 8, 5)
@@ -2227,31 +2246,19 @@ class MainWindow(QtWidgets.QMainWindow):
     def _rank_badge(self, rank: int) -> QtWidgets.QLabel:
         label = QtWidgets.QLabel()
         label.setAlignment(QtCore.Qt.AlignCenter)
-        label.setFixedWidth(48)
+        label.setFixedWidth(40)
         if rank == 1:
-            label.setText("🥇 1st")
-            label.setStyleSheet(
-                "color: #111827; font-size: 10px; font-weight: 800;"
-                "background: #facc15; border: 1px solid #fde68a; border-radius: 8px;"
-            )
+            label.setText("🥇")
+            label.setStyleSheet("color: #facc15; font-size: 15px;")
         elif rank == 2:
-            label.setText("🥈 2nd")
-            label.setStyleSheet(
-                "color: #0f172a; font-size: 10px; font-weight: 800;"
-                "background: #cbd5e1; border: 1px solid #e2e8f0; border-radius: 8px;"
-            )
+            label.setText("🥈")
+            label.setStyleSheet("color: #cbd5e1; font-size: 15px;")
         elif rank == 3:
-            label.setText("🥉 3rd")
-            label.setStyleSheet(
-                "color: #f8fafc; font-size: 10px; font-weight: 800;"
-                "background: #b45309; border: 1px solid #d97706; border-radius: 8px;"
-            )
+            label.setText("🥉")
+            label.setStyleSheet("color: #f59e0b; font-size: 15px;")
         else:
-            label.setText(f"🪵 {rank}")
-            label.setStyleSheet(
-                "color: #f8fafc; font-size: 10px; font-weight: 700;"
-                "background: #6b4f3b; border: 1px solid #8a6b52; border-radius: 8px;"
-            )
+            label.setText(f"#{rank}")
+            label.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 700;")
         return label
 
     def _stat_bar_row(
@@ -2795,10 +2802,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self._update_creature_detail(creature)
 
     def _update_creature_detail(self, creature: Creature) -> None:
-        self._apply_detail_panel_accent(creature.sex)
+        rank, ranked_count = self._species_sex_rank(creature)
+        is_top_candidate = rank == 1 and ranked_count >= 2
+        self._apply_detail_panel_accent(creature.sex, spotlight=is_top_candidate)
         if hasattr(self, "_detail_delete_btn"):
             self._detail_delete_btn.setEnabled(creature.id is not None)
-        self._detail_title.setText(creature.name or "Unknown")
+        title = creature.name or "Unknown"
+        if is_top_candidate:
+            title += " ♛"
+        self._detail_title.setText(title)
         subtitle = f"{self._display_species(creature.species)} • {creature.sex} • L{creature.level}"
         self._detail_subtitle.setText(subtitle)
         self._detail_rank_note.setText(self._build_detail_rank_note(creature))
@@ -2867,6 +2879,14 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
     def _build_detail_rank_note(self, creature: Creature) -> str:
+        rank, ranked_count = self._species_sex_rank(creature)
+        if rank is None or ranked_count < 2:
+            return ""
+        if rank == 1:
+            return f"Top {creature.sex} candidate in species"
+        return f"Rank #{rank} {creature.sex} candidate in species"
+
+    def _species_sex_rank(self, creature: Creature) -> tuple[int | None, int]:
         species_group = [
             c
             for c in self._creature_cache
@@ -2874,15 +2894,13 @@ class MainWindow(QtWidgets.QMainWindow):
             and (c.sex or "").lower() == (creature.sex or "").lower()
         ]
         if not species_group:
-            return ""
+            return None, 0
         use_points = self._points_available(species_group)
         ranked = sorted(
             species_group,
             key=lambda c: self._breeding_creature_score(c, use_points=use_points),
             reverse=True,
         )
-        if len(ranked) < 2:
-            return ""
         for index, candidate in enumerate(ranked, start=1):
             same_external = (
                 candidate.external_id is not None
@@ -2891,10 +2909,8 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             same_id = candidate.id is not None and creature.id is not None and candidate.id == creature.id
             if same_external or same_id:
-                if index == 1:
-                    return f"Top {creature.sex} candidate in species"
-                return f"Rank #{index} {creature.sex} candidate in species"
-        return ""
+                return index, len(ranked)
+        return None, len(ranked)
 
     def _delete_selected_creature(self) -> None:
         creature = self._selected_creature
@@ -2925,7 +2941,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.refresh_data()
         self.show_toast("Creature deleted.", "success")
 
-    def _apply_detail_panel_accent(self, sex: str | None) -> None:
+    def _apply_detail_panel_accent(self, sex: str | None, spotlight: bool = False) -> None:
         if not hasattr(self, "_detail_panel"):
             return
         accent = "rgba(148, 163, 184, 0.25)"
@@ -2939,13 +2955,15 @@ class MainWindow(QtWidgets.QMainWindow):
             glow = QtGui.QColor(244, 114, 182, 120)
         self._detail_panel.setStyleSheet(
             "#detailPanel {"
-            f"background: rgba(15, 23, 42, 0.44); border: 2px solid {accent};"
+            f"background: rgba(15, 23, 42, {'0.52' if spotlight else '0.44'}); border: 2px solid {accent};"
             "border-radius: 16px;"
             "}"
         )
         effect = QtWidgets.QGraphicsDropShadowEffect(self._detail_panel)
-        effect.setBlurRadius(18)
+        effect.setBlurRadius(26 if spotlight else 18)
         effect.setOffset(0, 0)
+        if spotlight:
+            glow.setAlpha(220)
         effect.setColor(glow)
         self._detail_panel.setGraphicsEffect(effect)
 
@@ -2979,7 +2997,7 @@ class MainWindow(QtWidgets.QMainWindow):
         badges = []
         for label in labels:
             icon_path = self._stat_badge_icon_path(label, color)
-            badges.append(f"<img src=\"{icon_path.as_posix()}\" width=\"24\" height=\"24\" />")
+            badges.append(f"<img src=\"{icon_path.as_posix()}\" width=\"20\" height=\"20\" />")
         return "&nbsp;".join(badges)
 
     def _stat_badge_icon_path(self, label: str, color: str) -> Path:
