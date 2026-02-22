@@ -209,14 +209,28 @@ class MainWindow(QtWidgets.QMainWindow):
                 width: 10px;
                 margin: 2px;
             }
+            #contentArea QScrollBar:horizontal {
+                background: #0f172a;
+                height: 10px;
+                margin: 2px;
+            }
             #contentArea QScrollBar::handle:vertical {
                 background: #334155;
                 min-height: 30px;
                 border-radius: 5px;
             }
+            #contentArea QScrollBar::handle:horizontal {
+                background: #334155;
+                min-width: 30px;
+                border-radius: 5px;
+            }
             #contentArea QScrollBar::add-line:vertical,
             #contentArea QScrollBar::sub-line:vertical {
                 height: 0px;
+            }
+            #contentArea QScrollBar::add-line:horizontal,
+            #contentArea QScrollBar::sub-line:horizontal {
+                width: 0px;
             }
             #contentArea QComboBox QAbstractItemView {
                 background: #0f172a;
@@ -244,42 +258,39 @@ class MainWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(widget)
         layout.setSpacing(8)
 
-        hero = QtWidgets.QFrame()
-        hero.setStyleSheet('''
-        QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }
-        ''')
+        hero = QtWidgets.QWidget()
         hero_layout = QtWidgets.QVBoxLayout(hero)
-        hero_layout.setContentsMargins(12, 8, 12, 8)
+        hero_layout.setContentsMargins(6, 0, 6, 2)
         hero_title = QtWidgets.QLabel("Welcome to ARK Breeder")
-        hero_title.setStyleSheet("font-size: 18px; font-weight: 600; color: #f8fafc;")
+        hero_title.setStyleSheet("font-size: 17px; font-weight: 600; color: #f8fafc;")
         hero_layout.addWidget(hero_title)
 
         charts = QtWidgets.QHBoxLayout()
         charts.setSpacing(8)
 
         left = QtWidgets.QFrame()
-        left.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }")
+        left.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.52); border-radius: 16px; }")
         left_layout = QtWidgets.QVBoxLayout(left)
-        left_layout.setContentsMargins(8, 8, 8, 8)
-        left_layout.setSpacing(4)
+        left_layout.setContentsMargins(10, 6, 10, 6)
+        left_layout.setSpacing(2)
         left_title = QtWidgets.QLabel("Species distribution")
-        left_title.setStyleSheet("color: #e2e8f0; font-weight: 600;")
+        left_title.setStyleSheet("color: #e2e8f0; font-weight: 600; font-size: 14px;")
         left_layout.addWidget(left_title)
         self._species_donut = DonutChartWidget()
         self._species_donut.setMinimumSize(110, 110)
         self._species_donut.setMaximumSize(130, 130)
-        left_layout.addWidget(self._species_donut, 1)
+        left_layout.addWidget(self._species_donut, 1, alignment=QtCore.Qt.AlignCenter)
         self._species_legend = QtWidgets.QVBoxLayout()
-        self._species_legend.setSpacing(2)
+        self._species_legend.setSpacing(1)
         left_layout.addLayout(self._species_legend)
 
         right = QtWidgets.QFrame()
-        right.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }")
+        right.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.52); border-radius: 16px; }")
         right_layout = QtWidgets.QVBoxLayout(right)
-        right_layout.setContentsMargins(8, 8, 8, 8)
+        right_layout.setContentsMargins(10, 6, 10, 6)
         right_layout.setSpacing(4)
         right_title = QtWidgets.QLabel("Average level by species")
-        right_title.setStyleSheet("color: #e2e8f0; font-weight: 600;")
+        right_title.setStyleSheet("color: #e2e8f0; font-weight: 600; font-size: 14px;")
         right_layout.addWidget(right_title)
         self._levels_bar = BarChartWidget()
         right_layout.addWidget(self._levels_bar, 1)
@@ -294,9 +305,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._gender_donut = DonutChartWidget()
         self._gender_donut.setMinimumSize(110, 110)
         self._gender_donut.setMaximumSize(130, 130)
-        self._dashboard_gender_layout.addWidget(self._gender_donut, 1)
+        self._dashboard_gender_layout.addWidget(self._gender_donut, 0, alignment=QtCore.Qt.AlignCenter)
         self._gender_legend = QtWidgets.QVBoxLayout()
-        self._gender_legend.setSpacing(2)
+        self._gender_legend.setSpacing(1)
         self._dashboard_gender_layout.addLayout(self._gender_legend)
 
         mutation_panel, self._dashboard_mutation_layout = self._dashboard_panel("Mutation pressure")
@@ -312,6 +323,9 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(hero)
         layout.addLayout(charts)
         layout.addLayout(extras)
+        layout.setStretch(0, 0)
+        layout.setStretch(1, 5)
+        layout.setStretch(2, 4)
         return widget
 
     def _build_card(
@@ -337,15 +351,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _dashboard_panel(self, title: str) -> tuple[QtWidgets.QFrame, QtWidgets.QVBoxLayout]:
         panel = QtWidgets.QFrame()
-        panel.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }")
+        panel.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.52); border-radius: 16px; }")
         layout = QtWidgets.QVBoxLayout(panel)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(4)
+        layout.setContentsMargins(10, 6, 10, 6)
+        layout.setSpacing(3)
         title_label = QtWidgets.QLabel(title)
-        title_label.setStyleSheet("color: #e2e8f0; font-weight: 600;")
+        title_label.setStyleSheet("color: #e2e8f0; font-weight: 600; font-size: 14px;")
         layout.addWidget(title_label)
         content = QtWidgets.QVBoxLayout()
-        content.setSpacing(4)
+        content.setSpacing(3)
         layout.addLayout(content)
         return panel, content
 
@@ -405,8 +419,10 @@ class MainWindow(QtWidgets.QMainWindow):
             QTableWidget { background: transparent; border: none; gridline-color: transparent; }
             QTableWidget::item { padding: 6px; border-bottom: 1px solid rgba(148, 163, 184, 0.18); }
             QTableWidget::item:selected { background: #1f2937; color: #f8fafc; }
+            QHeaderView::section { background: transparent; border: none; color: #cbd5f5; padding: 4px 6px; }
             """
         )
+        self._creatures_table.setFrameShape(QtWidgets.QFrame.NoFrame)
         self._creatures_table.setShowGrid(False)
         self._creatures_table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self._creatures_table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
@@ -473,12 +489,16 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QSizePolicy.Expanding,
         )
         self._breeding_cards_layout = QtWidgets.QGridLayout(self._breeding_cards_container)
-        self._breeding_cards_layout.setSpacing(16)
-        self._breeding_cards_layout.setContentsMargins(4, 4, 4, 4)
+        self._breeding_cards_layout.setSpacing(10)
+        self._breeding_cards_layout.setContentsMargins(2, 2, 2, 2)
 
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll.setStyleSheet(
+            "QScrollArea { background: transparent; border: none; }"
+            "QScrollArea > QWidget > QWidget { background: transparent; }"
+        )
         scroll.setWidget(self._breeding_cards_container)
         scroll.setSizePolicy(
             QtWidgets.QSizePolicy.Expanding,
@@ -493,7 +513,7 @@ class MainWindow(QtWidgets.QMainWindow):
         panel.setStyleSheet(
             """
             QFrame {
-                background: rgba(15, 23, 42, 0.45);
+                background: rgba(15, 23, 42, 0.62);
                 border-radius: 16px;
             }
             """
@@ -530,18 +550,23 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addLayout(points_grid)
 
         self._detail_stat_values: dict[str, QtWidgets.QLabel] = {}
-        stat_grid = QtWidgets.QGridLayout()
-        stat_grid.setHorizontalSpacing(12)
-        stat_grid.setVerticalSpacing(6)
-        for row, (_short, key, label) in enumerate(_POINT_STAT_CONFIG):
-            name_label = QtWidgets.QLabel(label)
+        stat_rows = QtWidgets.QVBoxLayout()
+        stat_rows.setSpacing(4)
+        for _short, key, label in _POINT_STAT_CONFIG:
+            row_widget = QtWidgets.QWidget()
+            row_layout = QtWidgets.QHBoxLayout(row_widget)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(6)
+            name_label = QtWidgets.QLabel(f"{label}:")
             name_label.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 600;")
             value_label = QtWidgets.QLabel("-")
             value_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
             self._detail_stat_values[key] = value_label
-            stat_grid.addWidget(name_label, row, 0)
-            stat_grid.addWidget(value_label, row, 1)
-        layout.addLayout(stat_grid)
+            row_layout.addWidget(name_label)
+            row_layout.addWidget(value_label)
+            row_layout.addStretch(1)
+            stat_rows.addWidget(row_widget)
+        layout.addLayout(stat_rows)
 
         self._points_info = QtWidgets.QLabel(
             "Stat points unavailable — import values.json in Settings."
@@ -891,12 +916,9 @@ class MainWindow(QtWidgets.QMainWindow):
         for label, value, color in series:
             row = QtWidgets.QHBoxLayout()
             row.setContentsMargins(0, 0, 0, 0)
-            row.setSpacing(4)
-            dot = QtWidgets.QFrame()
-            dot.setFixedSize(8, 8)
-            dot.setStyleSheet(
-                f"QFrame {{ background: {color}; border-radius: 5px; }}"
-            )
+            row.setSpacing(3)
+            dot = QtWidgets.QLabel("●")
+            dot.setStyleSheet(f"color: {color}; font-size: 10px;")
             name = QtWidgets.QLabel(label)
             name.setStyleSheet("color: #cbd5f5; font-size: 11px;")
             count = QtWidgets.QLabel(str(int(value)))
@@ -1560,10 +1582,11 @@ class MainWindow(QtWidgets.QMainWindow):
         for species_name, score, male, female in pairs:
             row_card = QtWidgets.QWidget()
             row_layout = QtWidgets.QVBoxLayout(row_card)
-            row_layout.setSpacing(4)
+            row_layout.setSpacing(2)
             row_layout.setContentsMargins(0, 0, 0, 0)
 
             header = QtWidgets.QHBoxLayout()
+            header.setContentsMargins(0, 0, 0, 0)
             species_label = QtWidgets.QLabel(species_name)
             species_label.setStyleSheet("color: #cbd5f5; font-weight: 700; font-size: 13px;")
             header.addWidget(species_label)
@@ -1571,7 +1594,8 @@ class MainWindow(QtWidgets.QMainWindow):
             row_layout.addLayout(header)
 
             pair_layout = QtWidgets.QHBoxLayout()
-            pair_layout.setSpacing(6)
+            pair_layout.setSpacing(4)
+            pair_layout.setContentsMargins(0, 0, 0, 0)
             max_stats = self._species_max_stats(species_name, use_points=use_points)
             male_box = self._pair_info_box(male, max_stats, use_points=use_points, points_only=True)
             female_box = self._pair_info_box(female, max_stats, use_points=use_points, points_only=True)
@@ -1596,8 +1620,8 @@ class MainWindow(QtWidgets.QMainWindow):
         elif sex_lower == "female":
             accent = "#f472b6"
         box = QtWidgets.QFrame()
-        box.setMinimumWidth(220)
-        box.setMaximumWidth(260)
+        box.setMinimumWidth(216)
+        box.setMaximumWidth(246)
         box.setStyleSheet(
             "QFrame {"
             "background: rgba(11, 19, 36, 0.85);"
@@ -1606,13 +1630,13 @@ class MainWindow(QtWidgets.QMainWindow):
             "}"
         )
         layout = QtWidgets.QVBoxLayout(box)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(3)
+        layout.setContentsMargins(7, 7, 7, 7)
+        layout.setSpacing(2)
         name_label = QtWidgets.QLabel(f"{self._sex_icon(creature.sex)} {creature.name}")
         name_label.setStyleSheet(f"color: {accent}; font-weight: 700; font-size: 14px;")
         layout.addWidget(name_label)
 
-        avatar = self._small_species_image(self._display_species(creature.species), size=108)
+        avatar = self._small_species_image(self._display_species(creature.species), size=100)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
 
         colors = {
@@ -1651,11 +1675,14 @@ class MainWindow(QtWidgets.QMainWindow):
         row = QtWidgets.QWidget()
         row_layout = QtWidgets.QHBoxLayout(row)
         row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.setSpacing(6)
+        row_layout.setSpacing(4)
         tag = QtWidgets.QLabel(self._point_icon(label))
         tag.setAlignment(QtCore.Qt.AlignCenter)
-        tag.setFixedWidth(24)
-        tag.setStyleSheet("color: #e2e8f0; font-size: 12px; font-weight: 700;")
+        tag.setFixedWidth(20)
+        tag.setStyleSheet(
+            "color: #e2e8f0; font-size: 11px; font-weight: 700;"
+            "background: #0f172a; border: 1px solid #1f2937; border-radius: 6px;"
+        )
         bar = QtWidgets.QProgressBar()
         bar.setMaximum(100)
         value = self._get_stat_value(
@@ -1667,7 +1694,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ratio = 0.0 if max_value <= 0 else min(max(value / max_value, 0.0), 1.0)
         bar.setValue(int(ratio * 100))
         bar.setTextVisible(False)
-        bar.setFixedHeight(8)
+        bar.setFixedHeight(7)
         bar.setStyleSheet(
             f"""
             QProgressBar {{
@@ -1692,7 +1719,7 @@ class MainWindow(QtWidgets.QMainWindow):
             displayed_value = self._format_stat(creature.stats.get(key), key, creature=creature)
         value_label = QtWidgets.QLabel(displayed_value)
         value_label.setStyleSheet("color: #cbd5f5; font-size: 11px; font-weight: 700;")
-        value_label.setMinimumWidth(38)
+        value_label.setMinimumWidth(34)
         value_label.setAlignment(QtCore.Qt.AlignCenter)
         row_layout.addWidget(value_label)
         return row
@@ -2137,17 +2164,45 @@ class MainWindow(QtWidgets.QMainWindow):
     def _render_stat_badges(self, labels: list[str], color: str) -> str:
         badges = []
         for label in labels:
-            glyph = f"{label}\u20df"
-            badges.append(
-                "<span style=\""
-                f"color: {color};"
-                "padding: 1px 4px;"
-                "font-weight: 700;"
-                "font-size: 12px;"
-                "line-height: 16px;"
-                f"\">{glyph}</span>"
-            )
+            icon_path = self._stat_badge_icon_path(label, color)
+            badges.append(f"<img src=\"{icon_path.as_posix()}\" width=\"16\" height=\"16\" />")
         return "&nbsp;".join(badges)
+
+    def _stat_badge_icon_path(self, label: str, color: str) -> Path:
+        safe_label = re.sub(r"[^a-zA-Z0-9_-]+", "_", label).lower() or "x"
+        safe_color = re.sub(r"[^a-zA-Z0-9]+", "", color).lower() or "default"
+        cache_dir = user_data_dir() / "cache" / "badges"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        target = cache_dir / f"{safe_label}_{safe_color}.png"
+        if target.exists():
+            return target
+
+        pixmap = QtGui.QPixmap(24, 24)
+        pixmap.fill(QtCore.Qt.transparent)
+        painter = QtGui.QPainter(pixmap)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtCore.Qt.NoPen)
+        fill = QtGui.QColor(color)
+        painter.setBrush(fill)
+        diamond = QtGui.QPolygonF(
+            [
+                QtCore.QPointF(12, 2),
+                QtCore.QPointF(22, 12),
+                QtCore.QPointF(12, 22),
+                QtCore.QPointF(2, 12),
+            ]
+        )
+        painter.drawPolygon(diamond)
+        text_color = QtGui.QColor("#0b1220")
+        painter.setPen(text_color)
+        font = painter.font()
+        font.setBold(True)
+        font.setPointSize(9)
+        painter.setFont(font)
+        painter.drawText(QtCore.QRectF(0, 0, 24, 24), QtCore.Qt.AlignCenter, label[:1].upper())
+        painter.end()
+        pixmap.save(str(target))
+        return target
 
     def _updated_cutoff(self, filter_label: str) -> QtCore.QDateTime | None:
         now = QtCore.QDateTime.currentDateTime()
