@@ -129,3 +129,30 @@ def list_creatures(conn, species: Optional[str] = None) -> list[Creature]:
     else:
         rows = conn.execute("SELECT * FROM creatures ORDER BY id DESC").fetchall()
     return [creature_from_row(row) for row in rows]
+
+
+def delete_creature(conn, creature: Creature) -> bool:
+    if creature.id is None:
+        return False
+    conn.execute(
+        "UPDATE creatures SET mother_id = NULL WHERE mother_id = ?",
+        (creature.id,),
+    )
+    conn.execute(
+        "UPDATE creatures SET father_id = NULL WHERE father_id = ?",
+        (creature.id,),
+    )
+    if creature.external_id:
+        conn.execute(
+            "UPDATE creatures SET mother_external_id = NULL WHERE mother_external_id = ?",
+            (creature.external_id,),
+        )
+        conn.execute(
+            "UPDATE creatures SET father_external_id = NULL WHERE father_external_id = ?",
+            (creature.external_id,),
+        )
+    cursor = conn.execute(
+        "DELETE FROM creatures WHERE id = ?",
+        (creature.id,),
+    )
+    return cursor.rowcount > 0

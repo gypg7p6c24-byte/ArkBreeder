@@ -12,7 +12,7 @@ from arkbreeder.core.server_settings import parse_ini_file
 from arkbreeder.core.species_values import SpeciesValuesStore
 from arkbreeder.core.stats import StatMultipliers, compute_wild_levels, extract_stat_multipliers
 from arkbreeder.storage.models import Creature
-from arkbreeder.storage.repository import list_creatures
+from arkbreeder.storage.repository import delete_creature, list_creatures
 from arkbreeder.storage.settings import (
     get_server_settings,
     get_setting,
@@ -441,14 +441,12 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.addStretch(1)
         left_layout.addLayout(toolbar)
 
-        self._creatures_table = QtWidgets.QTableWidget(0, 10)
+        self._creatures_table = QtWidgets.QTableWidget(0, 8)
         self._creatures_table.setHorizontalHeaderLabels(
             [
                 "Name",
                 "Species",
-                "Sex",
                 "Level",
-                "Mutations (M/F)",
                 "Health",
                 "Stamina",
                 "Weight",
@@ -585,6 +583,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self._detail_subtitle.setWordWrap(True)
         layout.addWidget(self._detail_subtitle)
 
+        self._detail_rank_note = QtWidgets.QLabel("")
+        self._detail_rank_note.setStyleSheet("color: #93c5fd; font-size: 12px; font-weight: 600;")
+        self._detail_rank_note.setWordWrap(True)
+        layout.addWidget(self._detail_rank_note)
+
         self._detail_image = SpeciesImageWidget()
         self._detail_image.setStyleSheet("border: none;")
         layout.addWidget(self._detail_image, alignment=QtCore.Qt.AlignCenter)
@@ -598,6 +601,7 @@ class MainWindow(QtWidgets.QMainWindow):
         points_row = QtWidgets.QHBoxLayout()
         points_row.setContentsMargins(0, 0, 0, 0)
         points_row.setSpacing(6)
+        points_row.addStretch(1)
         for label, key, _title in _DETAIL_POINT_STAT_CONFIG:
             badge = self._make_point_badge(label)
             self._detail_point_badges[key] = badge
@@ -642,6 +646,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self._detail_weaknesses.setTextFormat(QtCore.Qt.RichText)
         self._detail_weaknesses.setWordWrap(True)
         layout.addWidget(self._detail_weaknesses)
+
+        self._detail_delete_btn = QtWidgets.QPushButton("Delete creature")
+        self._detail_delete_btn.setStyleSheet(
+            "QPushButton { background: #7f1d1d; border: 1px solid #991b1b; color: #fee2e2; }"
+            "QPushButton:hover { background: #991b1b; }"
+        )
+        self._detail_delete_btn.setEnabled(False)
+        self._detail_delete_btn.clicked.connect(self._delete_selected_creature)
+        layout.addWidget(self._detail_delete_btn, alignment=QtCore.Qt.AlignRight)
 
         layout.addStretch(1)
         return panel
@@ -1374,22 +1387,16 @@ class MainWindow(QtWidgets.QMainWindow):
         for row, creature in enumerate(creature_list):
             self._set_table_item(row, 0, creature.name, creature.external_id)
             self._set_table_item(row, 1, self._display_species(creature.species))
-            self._set_table_item(row, 2, creature.sex)
-            self._set_table_item(row, 3, str(creature.level))
+            self._set_table_item(row, 2, str(creature.level))
+            self._set_table_item(row, 3, self._format_stat(creature.stats.get("Health"), "Health"))
+            self._set_table_item(row, 4, self._format_stat(creature.stats.get("Stamina"), "Stamina"))
+            self._set_table_item(row, 5, self._format_stat(creature.stats.get("Weight"), "Weight"))
             self._set_table_item(
                 row,
-                4,
-                f"{creature.mutations_maternal}/{creature.mutations_paternal}",
-            )
-            self._set_table_item(row, 5, self._format_stat(creature.stats.get("Health"), "Health"))
-            self._set_table_item(row, 6, self._format_stat(creature.stats.get("Stamina"), "Stamina"))
-            self._set_table_item(row, 7, self._format_stat(creature.stats.get("Weight"), "Weight"))
-            self._set_table_item(
-                row,
-                8,
+                6,
                 self._format_stat(creature.stats.get("MeleeDamageMultiplier"), "MeleeDamageMultiplier"),
             )
-            self._set_table_item(row, 9, self._format_updated_at(creature.updated_at))
+            self._set_table_item(row, 7, self._format_updated_at(creature.updated_at))
         if sorting:
             self._creatures_table.setSortingEnabled(True)
         self._restore_creature_selection()
@@ -1797,14 +1804,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 pair_layout.setSpacing(2)
                 pair_layout.setContentsMargins(0, 0, 0, 0)
                 if show_ranking:
-                    rank_label = QtWidgets.QLabel(f"#{rank}")
-                    rank_label.setAlignment(QtCore.Qt.AlignCenter)
-                    rank_label.setFixedWidth(28)
-                    rank_label.setStyleSheet(
-                        "color: #facc15; font-size: 11px; font-weight: 700;"
-                        "background: #0f172a; border: 1px solid #1f2937; border-radius: 7px;"
-                    )
-                    pair_layout.addWidget(rank_label)
+                    pair_layout.addWidget(self._rank_badge(rank))
                 male_key = male.external_id or f"male:{male.id}"
                 female_key = female.external_id or f"female:{female.id}"
                 male_box = self._pair_info_box(
@@ -1881,7 +1881,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.setSpacing(2)
         title_text = f"{self._sex_icon(creature.sex)} {creature.name}"
         if targets and self._is_target_reached(self._creature_breeding_points(creature, use_points=use_points), targets):
-            title_text += " 👑"
+            title_text += " ♛"
         name_label = QtWidgets.QLabel(title_text)
         name_label.setStyleSheet(
             f"color: {accent}; font-weight: 700; font-size: 13px; background: transparent; border: none;"
@@ -1890,9 +1890,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if highlighted:
             glow = QtWidgets.QGraphicsDropShadowEffect(box)
-            glow.setBlurRadius(16)
+            glow.setBlurRadius(24)
             glow.setOffset(0, 0)
-            glow.setColor(QtGui.QColor(accent))
+            color = QtGui.QColor(accent)
+            color.setAlpha(220)
+            glow.setColor(color)
             box.setGraphicsEffect(glow)
 
         avatar = self._small_species_image(self._display_species(creature.species), size=100)
@@ -1947,7 +1949,7 @@ class MainWindow(QtWidgets.QMainWindow):
         is_perfect = self._is_target_reached(child_points, targets)
         expected_title = "♂/♀ Expected"
         if is_perfect:
-            expected_title = "♂/♀ Expected 👑"
+            expected_title = "♂/♀ Expected ♛"
         name_label = QtWidgets.QLabel(expected_title)
         name_label.setStyleSheet(
             "color: #cbd5f5; font-weight: 700; font-size: 13px; background: transparent; border: none;"
@@ -2031,7 +2033,7 @@ class MainWindow(QtWidgets.QMainWindow):
     ) -> None:
         if not ranked_pairs:
             return
-        base_points, steps, pending = self._build_breeding_plan_steps(
+        _base_points, steps, pending = self._build_breeding_plan_steps(
             ranked_pairs,
             targets,
             use_points=use_points,
@@ -2044,33 +2046,34 @@ class MainWindow(QtWidgets.QMainWindow):
         chain_layout = QtWidgets.QHBoxLayout()
         chain_layout.setContentsMargins(0, 0, 0, 0)
         chain_layout.setSpacing(4)
-        covered = self._covered_shorts(base_points, targets)
         start_male = ranked_pairs[0][2]
         start_female = ranked_pairs[0][3]
         chain_layout.addWidget(
             self._plan_card(
-                "Start",
+                "Step 1",
                 f"{self._sex_icon(start_male.sex)} {start_male.name} + {self._sex_icon(start_female.sex)} {start_female.name}",
-                f"Covers: {', '.join(covered) if covered else '-'}",
-                "#334155",
+                "Create child C1",
+                "#22c55e",
             )
         )
 
+        current_child = "C1"
         for index, step in enumerate(steps, start=1):
             chain_layout.addWidget(self._plan_arrow_label())
             gained = ", ".join(step["gains"]) if step["gains"] else "-"
             chain_layout.addWidget(
                 self._plan_card(
-                    f"Step {index}",
+                    f"Step {index + 1}",
                     (
                         f"Use donor #{step['donor_rank']}: "
                         f"{self._sex_icon('male')} {step['donor_male']} + "
                         f"{self._sex_icon('female')} {step['donor_female']}"
                     ),
-                    f"Gain: {gained}",
-                    "#475569",
+                    f"Breed {current_child} + donor child → gain {gained}",
+                    "#22c55e",
                 )
             )
+            current_child = f"C{index + 1}"
 
         chain_layout.addWidget(self._plan_arrow_label())
         if pending:
@@ -2191,17 +2194,6 @@ class MainWindow(QtWidgets.QMainWindow):
         ]
         return base_points, steps, pending_shorts
 
-    def _covered_shorts(self, points: dict[str, float], targets: list[tuple[str, int]]) -> list[str]:
-        short_to_key = {short: key for short, key, _title in _BREEDING_POINT_STAT_CONFIG}
-        covered: list[str] = []
-        for short, target in targets:
-            key = short_to_key.get(short)
-            if not key:
-                continue
-            if points.get(key, 0.0) + 0.001 >= float(target):
-                covered.append(short)
-        return covered
-
     def _plan_arrow_label(self) -> QtWidgets.QLabel:
         arrow = QtWidgets.QLabel("→")
         arrow.setAlignment(QtCore.Qt.AlignCenter)
@@ -2231,6 +2223,36 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(subtitle_label)
         layout.addWidget(detail_label)
         return card
+
+    def _rank_badge(self, rank: int) -> QtWidgets.QLabel:
+        label = QtWidgets.QLabel()
+        label.setAlignment(QtCore.Qt.AlignCenter)
+        label.setFixedWidth(48)
+        if rank == 1:
+            label.setText("🥇 1st")
+            label.setStyleSheet(
+                "color: #111827; font-size: 10px; font-weight: 800;"
+                "background: #facc15; border: 1px solid #fde68a; border-radius: 8px;"
+            )
+        elif rank == 2:
+            label.setText("🥈 2nd")
+            label.setStyleSheet(
+                "color: #0f172a; font-size: 10px; font-weight: 800;"
+                "background: #cbd5e1; border: 1px solid #e2e8f0; border-radius: 8px;"
+            )
+        elif rank == 3:
+            label.setText("🥉 3rd")
+            label.setStyleSheet(
+                "color: #f8fafc; font-size: 10px; font-weight: 800;"
+                "background: #b45309; border: 1px solid #d97706; border-radius: 8px;"
+            )
+        else:
+            label.setText(f"🪵 {rank}")
+            label.setStyleSheet(
+                "color: #f8fafc; font-size: 10px; font-weight: 700;"
+                "background: #6b4f3b; border: 1px solid #8a6b52; border-radius: 8px;"
+            )
+        return label
 
     def _stat_bar_row(
         self,
@@ -2749,8 +2771,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self._selected_creature = None
             self._detail_title.setText("Select a creature")
             self._detail_subtitle.setText("")
+            self._detail_rank_note.setText("")
             self._detail_strengths.setText("Strengths: -")
             self._detail_weaknesses.setText("Weaknesses: -")
+            if hasattr(self, "_detail_delete_btn"):
+                self._detail_delete_btn.setEnabled(False)
             self._apply_detail_panel_accent(None)
             return
         row = rows[0].row()
@@ -2771,9 +2796,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _update_creature_detail(self, creature: Creature) -> None:
         self._apply_detail_panel_accent(creature.sex)
+        if hasattr(self, "_detail_delete_btn"):
+            self._detail_delete_btn.setEnabled(creature.id is not None)
         self._detail_title.setText(creature.name or "Unknown")
         subtitle = f"{self._display_species(creature.species)} • {creature.sex} • L{creature.level}"
         self._detail_subtitle.setText(subtitle)
+        self._detail_rank_note.setText(self._build_detail_rank_note(creature))
         self._detail_image.set_species(self._display_species(creature.species))
 
         species_group = [
@@ -2837,6 +2865,65 @@ class MainWindow(QtWidgets.QMainWindow):
                 else "No clear weaknesses."
             )
         )
+
+    def _build_detail_rank_note(self, creature: Creature) -> str:
+        species_group = [
+            c
+            for c in self._creature_cache
+            if self._display_species(c.species) == self._display_species(creature.species)
+            and (c.sex or "").lower() == (creature.sex or "").lower()
+        ]
+        if not species_group:
+            return ""
+        use_points = self._points_available(species_group)
+        ranked = sorted(
+            species_group,
+            key=lambda c: self._breeding_creature_score(c, use_points=use_points),
+            reverse=True,
+        )
+        if len(ranked) < 2:
+            return ""
+        for index, candidate in enumerate(ranked, start=1):
+            same_external = (
+                candidate.external_id is not None
+                and creature.external_id is not None
+                and candidate.external_id == creature.external_id
+            )
+            same_id = candidate.id is not None and creature.id is not None and candidate.id == creature.id
+            if same_external or same_id:
+                if index == 1:
+                    return f"Top {creature.sex} candidate in species"
+                return f"Rank #{index} {creature.sex} candidate in species"
+        return ""
+
+    def _delete_selected_creature(self) -> None:
+        creature = self._selected_creature
+        if creature is None or creature.id is None:
+            return
+
+        ask_confirm = get_setting(self._conn, "confirm_delete_creature") != "0"
+        if ask_confirm:
+            dialog = QtWidgets.QMessageBox(self)
+            dialog.setIcon(QtWidgets.QMessageBox.Warning)
+            dialog.setWindowTitle("Delete creature")
+            dialog.setText(f"Delete '{creature.name}'?")
+            dialog.setInformativeText("This action removes the creature from local data.")
+            dialog.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            checkbox = QtWidgets.QCheckBox("Don't ask me again")
+            dialog.setCheckBox(checkbox)
+            result = dialog.exec()
+            if checkbox.isChecked():
+                set_setting(self._conn, "confirm_delete_creature", "0")
+            if result != QtWidgets.QMessageBox.Yes:
+                return
+
+        removed = delete_creature(self._conn, creature)
+        if not removed:
+            self.show_toast("Failed to delete creature.", "error")
+            return
+        self._selected_creature = None
+        self.refresh_data()
+        self.show_toast("Creature deleted.", "success")
 
     def _apply_detail_panel_accent(self, sex: str | None) -> None:
         if not hasattr(self, "_detail_panel"):
