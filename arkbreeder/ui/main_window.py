@@ -1405,22 +1405,17 @@ class MainWindow(QtWidgets.QMainWindow):
             accent = "#f472b6"
         box = QtWidgets.QFrame()
         box.setStyleSheet(
-            "QFrame { background: rgba(11, 19, 36, 0.85); border-radius: 12px; }"
+            f"QFrame {{ background: rgba(11, 19, 36, 0.85); border-radius: 14px; }}"
         )
         layout = QtWidgets.QVBoxLayout(box)
         layout.setSpacing(6)
-        header_row = QtWidgets.QHBoxLayout()
-        avatar = self._small_species_image(self._display_species(creature.species))
-        header_row.addWidget(avatar)
         name_label = QtWidgets.QLabel(f"{self._sex_icon(creature.sex)} {creature.name}")
-        name_label.setStyleSheet("color: #f8fafc; font-weight: 600; font-size: 13px;")
-        header_row.addWidget(name_label)
-        header_row.addStretch(1)
-        layout.addLayout(header_row)
-        stat_suffix = "pts" if use_points else "raw"
-        stat_label = QtWidgets.QLabel(f"Stat ({stat_suffix}): {self._format_score(focus_stat)}")
-        stat_label.setStyleSheet(f"color: {accent}; font-weight: 600;")
-        layout.addWidget(stat_label)
+        name_label.setStyleSheet(f"color: {accent}; font-weight: 700; font-size: 14px;")
+        layout.addWidget(name_label)
+
+        avatar = self._small_species_image(self._display_species(creature.species), size=64)
+        layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
+        # Removed explicit stat row label to reduce clutter.
         layout.addWidget(
             self._stat_bar_row(
                 "H",
@@ -1520,9 +1515,9 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         return badge
 
-    def _small_species_image(self, species: str) -> QtWidgets.QLabel:
+    def _small_species_image(self, species: str, size: int = 48) -> QtWidgets.QLabel:
         label = QtWidgets.QLabel()
-        label.setFixedSize(48, 36)
+        label.setFixedSize(size, int(size * 0.75))
         label.setAlignment(QtCore.Qt.AlignCenter)
         label.setStyleSheet("background: #0b1324; border-radius: 8px; color: #94a3b8;")
         cache_path = self._species_cache_path(species)
