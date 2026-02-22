@@ -115,7 +115,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, conn, export_dir: Path) -> None:
         super().__init__()
         self.setWindowTitle("ARK Breeder")
-        self.setMinimumSize(1120, 720)
+        self.setMinimumSize(1240, 760)
         self._conn = conn
         self._export_dir = export_dir
         self._import_service = None
@@ -561,11 +561,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _build_creature_detail_panel(self) -> QtWidgets.QWidget:
         panel = QtWidgets.QFrame()
+        self._detail_panel = panel
+        panel.setObjectName("detailPanel")
         panel.setMinimumWidth(360)
         panel.setStyleSheet(
             """
-            QFrame {
+            #detailPanel {
                 background: rgba(15, 23, 42, 0.44);
+                border: 1px solid rgba(148, 163, 184, 0.25);
                 border-radius: 16px;
             }
             """
@@ -629,7 +632,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self._points_info)
 
         self._detail_strengths = QtWidgets.QLabel("Strengths: -")
-        self._detail_strengths.setStyleSheet("color: #a7f3d0; font-size: 15px; font-weight: 600;")
+        self._detail_strengths.setStyleSheet("color: #67e8f9; font-size: 15px; font-weight: 600;")
         self._detail_strengths.setTextFormat(QtCore.Qt.RichText)
         self._detail_strengths.setWordWrap(True)
         layout.addWidget(self._detail_strengths)
@@ -993,7 +996,7 @@ class MainWindow(QtWidgets.QMainWindow):
             dot = QtWidgets.QLabel("●")
             dot.setStyleSheet(f"color: {color}; font-size: 10px;")
             text = QtWidgets.QLabel(f"{label}: {int(value)}")
-            text.setStyleSheet("color: #cbd5f5; font-size: 11px;")
+            text.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 600;")
             row.addWidget(dot)
             row.addWidget(text)
             row.addStretch(1)
@@ -1589,6 +1592,12 @@ class MainWindow(QtWidgets.QMainWindow):
             for _short, key, _title in _POINT_STAT_CONFIG
         )
 
+    def _breeding_creature_score(self, creature: Creature, use_points: bool = False) -> float:
+        return sum(
+            self._get_stat_value(creature, key, use_points=use_points, points_only=use_points)
+            for _short, key, _title in _BREEDING_POINT_STAT_CONFIG
+        )
+
     def _species_max_stats(self, species: str, use_points: bool = False) -> dict[str, float]:
         candidates = [
             c
@@ -1756,6 +1765,33 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
 
             max_stats = self._species_max_stats(species_name, use_points=use_points)
+            male_candidates: dict[str, Creature] = {}
+            female_candidates: dict[str, Creature] = {}
+            for _rank, _score, male, female in ranked_pairs:
+                male_key = male.external_id or f"male:{male.id}"
+                female_key = female.external_id or f"female:{female.id}"
+                male_candidates[male_key] = male
+                female_candidates[female_key] = female
+
+            best_male_key = None
+            if male_candidates:
+                best_male_key = max(
+                    male_candidates.keys(),
+                    key=lambda item: self._breeding_creature_score(
+                        male_candidates[item],
+                        use_points=use_points,
+                    ),
+                )
+            best_female_key = None
+            if female_candidates:
+                best_female_key = max(
+                    female_candidates.keys(),
+                    key=lambda item: self._breeding_creature_score(
+                        female_candidates[item],
+                        use_points=use_points,
+                    ),
+                )
+
             for rank, _score, male, female in ranked_pairs:
                 pair_layout = QtWidgets.QHBoxLayout()
                 pair_layout.setSpacing(2)
@@ -1769,12 +1805,29 @@ class MainWindow(QtWidgets.QMainWindow):
                         "background: #0f172a; border: 1px solid #1f2937; border-radius: 7px;"
                     )
                     pair_layout.addWidget(rank_label)
-                male_box = self._pair_info_box(male, max_stats, use_points=use_points, points_only=True)
-                female_box = self._pair_info_box(female, max_stats, use_points=use_points, points_only=True)
+                male_key = male.external_id or f"male:{male.id}"
+                female_key = female.external_id or f"female:{female.id}"
+                male_box = self._pair_info_box(
+                    male,
+                    max_stats,
+                    use_points=use_points,
+                    points_only=True,
+                    targets=targets,
+                    highlighted=(best_male_key == male_key),
+                )
+                female_box = self._pair_info_box(
+                    female,
+                    max_stats,
+                    use_points=use_points,
+                    points_only=True,
+                    targets=targets,
+                    highlighted=(best_female_key == female_key),
+                )
                 child_box = self._pair_child_box(
                     male,
                     female,
                     max_stats,
+                    targets,
                     use_points=use_points,
                 )
                 pair_layout.addWidget(male_box)
@@ -1801,6 +1854,8 @@ class MainWindow(QtWidgets.QMainWindow):
         max_stats: dict[str, float],
         use_points: bool = False,
         points_only: bool = False,
+        targets: list[tuple[str, int]] | None = None,
+        highlighted: bool = False,
     ) -> QtWidgets.QWidget:
         sex_lower = creature.sex.lower() if creature.sex else ""
         accent = "#94a3b8"
@@ -1812,21 +1867,33 @@ class MainWindow(QtWidgets.QMainWindow):
         box.setObjectName("pairCard")
         box.setMinimumWidth(168)
         box.setMaximumWidth(184)
+        border_width = 2 if highlighted else 1
+        box_bg = "rgba(11, 19, 36, 0.85)" if not highlighted else "rgba(11, 19, 36, 0.92)"
         box.setStyleSheet(
             "#pairCard {"
-            "background: rgba(11, 19, 36, 0.85);"
-            f"border: 1px solid {accent};"
+            f"background: {box_bg};"
+            f"border: {border_width}px solid {accent};"
             "border-radius: 14px;"
             "}"
         )
         layout = QtWidgets.QVBoxLayout(box)
         layout.setContentsMargins(7, 7, 7, 7)
         layout.setSpacing(2)
-        name_label = QtWidgets.QLabel(f"{self._sex_icon(creature.sex)} {creature.name}")
+        title_text = f"{self._sex_icon(creature.sex)} {creature.name}"
+        if targets and self._is_target_reached(self._creature_breeding_points(creature, use_points=use_points), targets):
+            title_text += " 👑"
+        name_label = QtWidgets.QLabel(title_text)
         name_label.setStyleSheet(
             f"color: {accent}; font-weight: 700; font-size: 13px; background: transparent; border: none;"
         )
         layout.addWidget(name_label)
+
+        if highlighted:
+            glow = QtWidgets.QGraphicsDropShadowEffect(box)
+            glow.setBlurRadius(16)
+            glow.setOffset(0, 0)
+            glow.setColor(QtGui.QColor(accent))
+            box.setGraphicsEffect(glow)
 
         avatar = self._small_species_image(self._display_species(creature.species), size=100)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
@@ -1859,6 +1926,7 @@ class MainWindow(QtWidgets.QMainWindow):
         male: Creature,
         female: Creature,
         max_stats: dict[str, float],
+        targets: list[tuple[str, int]],
         use_points: bool = False,
     ) -> QtWidgets.QWidget:
         box = QtWidgets.QFrame()
@@ -1875,7 +1943,12 @@ class MainWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(box)
         layout.setContentsMargins(7, 7, 7, 7)
         layout.setSpacing(2)
-        name_label = QtWidgets.QLabel("◌ Expected")
+        child_points = self._expected_child_points(male, female, use_points=use_points)
+        is_perfect = self._is_target_reached(child_points, targets)
+        expected_title = "♂/♀ Expected"
+        if is_perfect:
+            expected_title = "♂/♀ Expected 👑"
+        name_label = QtWidgets.QLabel(expected_title)
         name_label.setStyleSheet(
             "color: #cbd5f5; font-weight: 700; font-size: 13px; background: transparent; border: none;"
         )
@@ -1884,7 +1957,20 @@ class MainWindow(QtWidgets.QMainWindow):
         avatar = self._small_species_image(species_label, size=100)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
 
-        child_points = self._expected_child_points(male, female, use_points=use_points)
+        if is_perfect:
+            box.setStyleSheet(
+                "#pairCardChild {"
+                "background: rgba(11, 19, 36, 0.92);"
+                "border: 2px solid #67e8f9;"
+                "border-radius: 14px;"
+                "}"
+            )
+            glow = QtWidgets.QGraphicsDropShadowEffect(box)
+            glow.setBlurRadius(18)
+            glow.setOffset(0, 0)
+            glow.setColor(QtGui.QColor("#67e8f9"))
+            box.setGraphicsEffect(glow)
+
         colors = {
             "Health": "#22c55e",
             "Stamina": "#38bdf8",
@@ -1918,6 +2004,24 @@ class MainWindow(QtWidgets.QMainWindow):
             result[key] = max(float(male_value), float(female_value))
         return result
 
+    def _creature_breeding_points(self, creature: Creature, use_points: bool = False) -> dict[str, float]:
+        return {
+            key: float(self._get_stat_value(creature, key, use_points=use_points, points_only=use_points))
+            for _short, key, _title in _BREEDING_POINT_STAT_CONFIG
+        }
+
+    def _is_target_reached(self, points: dict[str, float], targets: list[tuple[str, int]]) -> bool:
+        if not targets:
+            return False
+        short_to_key = {short: key for short, key, _title in _BREEDING_POINT_STAT_CONFIG}
+        for short, target in targets:
+            key = short_to_key.get(short)
+            if not key:
+                continue
+            if points.get(key, 0.0) + 0.001 < float(target):
+                return False
+        return True
+
     def _render_breeding_plan_chain(
         self,
         parent_layout: QtWidgets.QVBoxLayout,
@@ -1941,10 +2045,12 @@ class MainWindow(QtWidgets.QMainWindow):
         chain_layout.setContentsMargins(0, 0, 0, 0)
         chain_layout.setSpacing(4)
         covered = self._covered_shorts(base_points, targets)
+        start_male = ranked_pairs[0][2]
+        start_female = ranked_pairs[0][3]
         chain_layout.addWidget(
             self._plan_card(
                 "Start",
-                "Expected from #1",
+                f"{self._sex_icon(start_male.sex)} {start_male.name} + {self._sex_icon(start_female.sex)} {start_female.name}",
                 f"Covers: {', '.join(covered) if covered else '-'}",
                 "#334155",
             )
@@ -1956,7 +2062,11 @@ class MainWindow(QtWidgets.QMainWindow):
             chain_layout.addWidget(
                 self._plan_card(
                     f"Step {index}",
-                    f"Breed with donor #{step['donor_rank']}",
+                    (
+                        f"Use donor #{step['donor_rank']}: "
+                        f"{self._sex_icon('male')} {step['donor_male']} + "
+                        f"{self._sex_icon('female')} {step['donor_female']}"
+                    ),
                     f"Gain: {gained}",
                     "#475569",
                 )
@@ -2052,6 +2162,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 if best_choice is None or score_tuple > best_choice["score"]:  # type: ignore[operator]
                     best_choice = {
                         "rank": rank,
+                        "male_name": male.name,
+                        "female_name": female.name,
                         "points": candidate,
                         "gains": [key_to_short[key] for key in gained_keys if key in key_to_short],
                         "score": score_tuple,
@@ -2065,6 +2177,8 @@ class MainWindow(QtWidgets.QMainWindow):
             steps.append(
                 {
                     "donor_rank": int(best_choice["rank"]),
+                    "donor_male": str(best_choice["male_name"]),
+                    "donor_female": str(best_choice["female_name"]),
                     "gains": list(best_choice["gains"]),  # type: ignore[arg-type]
                     "points": dict(current_points),
                 }
@@ -2097,6 +2211,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _plan_card(self, title: str, subtitle: str, detail: str, border_color: str) -> QtWidgets.QFrame:
         card = QtWidgets.QFrame()
+        card.setMinimumWidth(190)
+        card.setMaximumWidth(260)
         card.setStyleSheet(
             f"QFrame {{ background: rgba(11, 19, 36, 0.82); border: 1px solid {border_color}; border-radius: 10px; }}"
         )
@@ -2107,8 +2223,10 @@ class MainWindow(QtWidgets.QMainWindow):
         title_label.setStyleSheet("color: #e2e8f0; font-size: 11px; font-weight: 700;")
         subtitle_label = QtWidgets.QLabel(subtitle)
         subtitle_label.setStyleSheet("color: #cbd5f5; font-size: 10px;")
+        subtitle_label.setWordWrap(True)
         detail_label = QtWidgets.QLabel(detail)
         detail_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
+        detail_label.setWordWrap(True)
         layout.addWidget(title_label)
         layout.addWidget(subtitle_label)
         layout.addWidget(detail_label)
@@ -2633,6 +2751,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._detail_subtitle.setText("")
             self._detail_strengths.setText("Strengths: -")
             self._detail_weaknesses.setText("Weaknesses: -")
+            self._apply_detail_panel_accent(None)
             return
         row = rows[0].row()
         item = self._creatures_table.item(row, 0)
@@ -2651,6 +2770,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._update_creature_detail(creature)
 
     def _update_creature_detail(self, creature: Creature) -> None:
+        self._apply_detail_panel_accent(creature.sex)
         self._detail_title.setText(creature.name or "Unknown")
         subtitle = f"{self._display_species(creature.species)} • {creature.sex} • L{creature.level}"
         self._detail_subtitle.setText(subtitle)
@@ -2704,7 +2824,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._detail_strengths.setText(
             "Strengths: "
             + (
-                self._render_stat_badges(strengths, "#22c55e")
+                self._render_stat_badges(strengths, "#67e8f9")
                 if strengths
                 else "No standout strengths."
             )
@@ -2717,6 +2837,30 @@ class MainWindow(QtWidgets.QMainWindow):
                 else "No clear weaknesses."
             )
         )
+
+    def _apply_detail_panel_accent(self, sex: str | None) -> None:
+        if not hasattr(self, "_detail_panel"):
+            return
+        accent = "rgba(148, 163, 184, 0.25)"
+        glow = QtGui.QColor(148, 163, 184, 90)
+        lowered = (sex or "").lower()
+        if lowered == "male":
+            accent = "#60a5fa"
+            glow = QtGui.QColor(96, 165, 250, 120)
+        elif lowered == "female":
+            accent = "#f472b6"
+            glow = QtGui.QColor(244, 114, 182, 120)
+        self._detail_panel.setStyleSheet(
+            "#detailPanel {"
+            f"background: rgba(15, 23, 42, 0.44); border: 2px solid {accent};"
+            "border-radius: 16px;"
+            "}"
+        )
+        effect = QtWidgets.QGraphicsDropShadowEffect(self._detail_panel)
+        effect.setBlurRadius(18)
+        effect.setOffset(0, 0)
+        effect.setColor(glow)
+        self._detail_panel.setGraphicsEffect(effect)
 
     def _compute_strengths_weaknesses(
         self,
