@@ -56,7 +56,7 @@ class StatMultipliers:
     tamed_add: Dict[int, float] = field(default_factory=dict)
     tamed_affinity: Dict[int, float] = field(default_factory=dict)
     imprinting: float = 1.0
-    max_wild_level: int = 255
+    max_wild_level: int | None = None
 
 
 def extract_stat_multipliers(server_settings: dict | None) -> StatMultipliers:
@@ -124,9 +124,16 @@ def compute_wild_levels(
     if species_values is None:
         return {}
     multipliers = multipliers or StatMultipliers()
-    max_wild = max_wild_level or multipliers.max_wild_level
-    if character_level is not None and character_level > 1:
-        max_wild = min(max_wild, character_level - 1)
+    if max_wild_level is not None:
+        max_wild = max_wild_level
+    elif multipliers.max_wild_level is not None:
+        max_wild = multipliers.max_wild_level
+    elif character_level is not None and character_level > 1:
+        # Servers can run creatures well above official limits.
+        # Without an explicit cap, use the creature level budget as upper bound.
+        max_wild = character_level - 1
+    else:
+        max_wild = 255
 
     torpor_level = _estimate_torpor_wild_level(
         stats=stats,
