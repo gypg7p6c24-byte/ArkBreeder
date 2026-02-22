@@ -58,6 +58,12 @@ _BREEDING_POINT_STAT_CONFIG: list[tuple[str, str, str]] = [
     if key != "MovementSpeed"
 ]
 
+_DETAIL_POINT_STAT_CONFIG: list[tuple[str, str, str]] = [
+    (short, key, title)
+    for short, key, title in _POINT_STAT_CONFIG
+    if key != "MovementSpeed"
+]
+
 _BREEDING_FOCUS_OPTIONS = ["Overall"] + [
     title for _short, _key, title in _BREEDING_POINT_STAT_CONFIG
 ]
@@ -586,16 +592,15 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self._detail_radar)
 
         self._detail_point_badges: dict[str, QtWidgets.QLabel] = {}
-        points_grid = QtWidgets.QGridLayout()
-        points_grid.setHorizontalSpacing(8)
-        points_grid.setVerticalSpacing(8)
-        for index, (label, key, _title) in enumerate(_POINT_STAT_CONFIG):
+        points_row = QtWidgets.QHBoxLayout()
+        points_row.setContentsMargins(0, 0, 0, 0)
+        points_row.setSpacing(6)
+        for label, key, _title in _DETAIL_POINT_STAT_CONFIG:
             badge = self._make_point_badge(label)
             self._detail_point_badges[key] = badge
-            row = index // 4
-            col = index % 4
-            points_grid.addWidget(badge, row, col)
-        layout.addLayout(points_grid)
+            points_row.addWidget(badge)
+        points_row.addStretch(1)
+        layout.addLayout(points_row)
 
         self._detail_stat_values: dict[str, QtWidgets.QLabel] = {}
         stat_rows = QtWidgets.QVBoxLayout()
@@ -1743,12 +1748,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 row_layout.addLayout(target_row)
 
             if show_ranking:
-                hint = self._next_plan_hint(ranked_pairs, targets, use_points=use_points)
-                if hint:
-                    hint_label = QtWidgets.QLabel(hint)
-                    hint_label.setStyleSheet("color: #93c5fd; font-size: 11px;")
-                    hint_label.setWordWrap(True)
-                    row_layout.addWidget(hint_label)
+                self._render_breeding_plan_chain(
+                    row_layout,
+                    ranked_pairs,
+                    targets,
+                    use_points=use_points,
+                )
 
             max_stats = self._species_max_stats(species_name, use_points=use_points)
             for rank, _score, male, female in ranked_pairs:
@@ -1913,51 +1918,201 @@ class MainWindow(QtWidgets.QMainWindow):
             result[key] = max(float(male_value), float(female_value))
         return result
 
-    def _next_plan_hint(
+    def _render_breeding_plan_chain(
+        self,
+        parent_layout: QtWidgets.QVBoxLayout,
+        ranked_pairs: list[tuple[int, float, Creature, Creature]],
+        targets: list[tuple[str, int]],
+        use_points: bool = False,
+    ) -> None:
+        if not ranked_pairs:
+            return
+        base_points, steps, pending = self._build_breeding_plan_steps(
+            ranked_pairs,
+            targets,
+            use_points=use_points,
+        )
+
+        chain_title = QtWidgets.QLabel("Breeding plan chain")
+        chain_title.setStyleSheet("color: #93c5fd; font-size: 11px; font-weight: 700;")
+        parent_layout.addWidget(chain_title)
+
+        chain_layout = QtWidgets.QHBoxLayout()
+        chain_layout.setContentsMargins(0, 0, 0, 0)
+        chain_layout.setSpacing(4)
+        covered = self._covered_shorts(base_points, targets)
+        chain_layout.addWidget(
+            self._plan_card(
+                "Start",
+                "Expected from #1",
+                f"Covers: {', '.join(covered) if covered else '-'}",
+                "#334155",
+            )
+        )
+
+        for index, step in enumerate(steps, start=1):
+            chain_layout.addWidget(self._plan_arrow_label())
+            gained = ", ".join(step["gains"]) if step["gains"] else "-"
+            chain_layout.addWidget(
+                self._plan_card(
+                    f"Step {index}",
+                    f"Breed with donor #{step['donor_rank']}",
+                    f"Gain: {gained}",
+                    "#475569",
+                )
+            )
+
+        chain_layout.addWidget(self._plan_arrow_label())
+        if pending:
+            chain_layout.addWidget(
+                self._plan_card(
+                    "Next target",
+                    "Need extra donor",
+                    f"Missing: {', '.join(pending)}",
+                    "#f59e0b",
+                )
+            )
+        else:
+            chain_layout.addWidget(
+                self._plan_card(
+                    "Target reached",
+                    "Current chain hits max targets",
+                    "Ready for stabilisation",
+                    "#67e8f9",
+                )
+            )
+
+        chain_layout.addStretch(1)
+        chain_widget = QtWidgets.QWidget()
+        chain_widget.setLayout(chain_layout)
+        parent_layout.addWidget(chain_widget)
+
+    def _build_breeding_plan_steps(
         self,
         ranked_pairs: list[tuple[int, float, Creature, Creature]],
         targets: list[tuple[str, int]],
         use_points: bool = False,
-    ) -> str | None:
-        if len(ranked_pairs) <= 1 or not targets:
-            return None
+    ) -> tuple[dict[str, float], list[dict[str, object]], list[str]]:
         first_male = ranked_pairs[0][2]
         first_female = ranked_pairs[0][3]
-        expected = self._expected_child_points(first_male, first_female, use_points=use_points)
-        short_to_key = {short: key for short, key, _title in _BREEDING_POINT_STAT_CONFIG}
-        pending = [
-            (short, short_to_key[short], target)
-            for short, target in targets
-            if short in short_to_key and expected.get(short_to_key[short], 0.0) + 0.001 < float(target)
-        ]
-        if not pending:
-            return "Plan: #1 already matches all current target stats."
+        base_points = self._expected_child_points(first_male, first_female, use_points=use_points)
+        current_points = dict(base_points)
+        target_by_key = {
+            key: float(value)
+            for short, value in targets
+            for s, key, _title in _BREEDING_POINT_STAT_CONFIG
+            if short == s
+        }
+        key_to_short = {key: short for short, key, _title in _BREEDING_POINT_STAT_CONFIG}
 
-        best_rank = None
-        best_gain = 0.0
-        best_stats: list[str] = []
-        for rank, _score, male, female in ranked_pairs[1:]:
-            gained_stats: list[str] = []
-            gain_total = 0.0
-            for short, key, _target in pending:
-                donor = max(
-                    self._get_stat_value(male, key, use_points=use_points, points_only=use_points),
-                    self._get_stat_value(female, key, use_points=use_points, points_only=use_points),
+        steps: list[dict[str, object]] = []
+        used_donors: set[int] = set()
+        max_iterations = max(0, min(10, len(ranked_pairs) - 1))
+        for _ in range(max_iterations):
+            pending_keys = [
+                key
+                for key, target in target_by_key.items()
+                if current_points.get(key, 0.0) + 0.001 < target
+            ]
+            if not pending_keys:
+                break
+
+            best_choice: dict[str, object] | None = None
+            for rank, _score, male, female in ranked_pairs[1:]:
+                if rank in used_donors:
+                    continue
+                donor_points = self._expected_child_points(male, female, use_points=use_points)
+                candidate = dict(current_points)
+                for key in target_by_key:
+                    candidate[key] = max(candidate.get(key, 0.0), donor_points.get(key, 0.0))
+
+                gained_keys = [
+                    key
+                    for key in target_by_key
+                    if candidate.get(key, 0.0) > current_points.get(key, 0.0) + 0.001
+                ]
+                if not gained_keys:
+                    continue
+
+                target_gain = sum(
+                    max(
+                        0.0,
+                        min(candidate.get(key, 0.0), target_by_key[key])
+                        - min(current_points.get(key, 0.0), target_by_key[key]),
+                    )
+                    for key in pending_keys
                 )
-                delta = donor - expected.get(key, 0.0)
-                if delta > 0:
-                    gain_total += delta
-                    gained_stats.append(short)
-            if gain_total > best_gain:
-                best_gain = gain_total
-                best_rank = rank
-                best_stats = gained_stats
+                total_gain = sum(
+                    max(0.0, candidate.get(key, 0.0) - current_points.get(key, 0.0))
+                    for key in target_by_key
+                )
+                if target_gain <= 0:
+                    continue
+                score_tuple = (target_gain, total_gain, -rank)
+                if best_choice is None or score_tuple > best_choice["score"]:  # type: ignore[operator]
+                    best_choice = {
+                        "rank": rank,
+                        "points": candidate,
+                        "gains": [key_to_short[key] for key in gained_keys if key in key_to_short],
+                        "score": score_tuple,
+                    }
 
-        if best_rank is None or not best_stats:
-            pending_labels = ", ".join(short for short, _key, _target in pending)
-            return f"Plan: keep #1 and look for donor lines improving {pending_labels}."
-        boosted = ", ".join(best_stats)
-        return f"Plan: breed Expected #1 with donor from #{best_rank} to push {boosted}."
+            if best_choice is None:
+                break
+
+            used_donors.add(int(best_choice["rank"]))
+            current_points = dict(best_choice["points"])  # type: ignore[arg-type]
+            steps.append(
+                {
+                    "donor_rank": int(best_choice["rank"]),
+                    "gains": list(best_choice["gains"]),  # type: ignore[arg-type]
+                    "points": dict(current_points),
+                }
+            )
+
+        pending_shorts = [
+            short
+            for short, key, _title in _BREEDING_POINT_STAT_CONFIG
+            if key in target_by_key and current_points.get(key, 0.0) + 0.001 < target_by_key[key]
+        ]
+        return base_points, steps, pending_shorts
+
+    def _covered_shorts(self, points: dict[str, float], targets: list[tuple[str, int]]) -> list[str]:
+        short_to_key = {short: key for short, key, _title in _BREEDING_POINT_STAT_CONFIG}
+        covered: list[str] = []
+        for short, target in targets:
+            key = short_to_key.get(short)
+            if not key:
+                continue
+            if points.get(key, 0.0) + 0.001 >= float(target):
+                covered.append(short)
+        return covered
+
+    def _plan_arrow_label(self) -> QtWidgets.QLabel:
+        arrow = QtWidgets.QLabel("→")
+        arrow.setAlignment(QtCore.Qt.AlignCenter)
+        arrow.setFixedWidth(16)
+        arrow.setStyleSheet("color: #93c5fd; font-size: 16px; font-weight: 700;")
+        return arrow
+
+    def _plan_card(self, title: str, subtitle: str, detail: str, border_color: str) -> QtWidgets.QFrame:
+        card = QtWidgets.QFrame()
+        card.setStyleSheet(
+            f"QFrame {{ background: rgba(11, 19, 36, 0.82); border: 1px solid {border_color}; border-radius: 10px; }}"
+        )
+        layout = QtWidgets.QVBoxLayout(card)
+        layout.setContentsMargins(8, 5, 8, 5)
+        layout.setSpacing(2)
+        title_label = QtWidgets.QLabel(title)
+        title_label.setStyleSheet("color: #e2e8f0; font-size: 11px; font-weight: 700;")
+        subtitle_label = QtWidgets.QLabel(subtitle)
+        subtitle_label.setStyleSheet("color: #cbd5f5; font-size: 10px;")
+        detail_label = QtWidgets.QLabel(detail)
+        detail_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
+        layout.addWidget(title_label)
+        layout.addWidget(subtitle_label)
+        layout.addWidget(detail_label)
+        return card
 
     def _stat_bar_row(
         self,
@@ -2106,14 +2261,15 @@ class MainWindow(QtWidgets.QMainWindow):
     def _make_point_badge(self, label: str) -> QtWidgets.QLabel:
         badge = QtWidgets.QLabel(self._point_icon(label))
         badge.setAlignment(QtCore.Qt.AlignCenter)
-        badge.setMinimumWidth(76)
+        badge.setMinimumWidth(56)
         badge.setStyleSheet(
             """
             QLabel {
                 background: #111827;
                 border: 1px solid #1f2937;
-                border-radius: 10px;
-                padding: 6px 8px;
+                border-radius: 8px;
+                padding: 4px 6px;
+                font-size: 12px;
                 font-weight: 600;
             }
             """
@@ -2159,10 +2315,10 @@ class MainWindow(QtWidgets.QMainWindow):
         return cache_dir / f"{safe}.png"
 
     def _update_point_badges(self, creature: Creature, species_group: list[Creature]) -> None:
-        labels = {key: short for short, key, _title in _POINT_STAT_CONFIG}
+        labels = {key: short for short, key, _title in _DETAIL_POINT_STAT_CONFIG}
         points = self._get_stat_points(creature)
         max_points_by_key: dict[str, int] = {}
-        for _short, key, _title in _POINT_STAT_CONFIG:
+        for _short, key, _title in _DETAIL_POINT_STAT_CONFIG:
             values = [
                 int(value)
                 for candidate in species_group
@@ -2570,7 +2726,7 @@ class MainWindow(QtWidgets.QMainWindow):
     ) -> tuple[list[str], list[str]]:
         strengths: list[str] = []
         weaknesses: list[str] = []
-        stat_map = [(short, key) for short, key, _title in _POINT_STAT_CONFIG]
+        stat_map = [(short, key) for short, key, _title in _DETAIL_POINT_STAT_CONFIG]
 
         if len(species_group) <= 1:
             return [short for short, _key in stat_map], []
