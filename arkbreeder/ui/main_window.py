@@ -1068,6 +1068,7 @@ class MainWindow(QtWidgets.QMainWindow):
             values,
             self._stat_multipliers,
             creature.imprinting_quality,
+            character_level=creature.level,
         )
 
     def _resolve_species_values(self, creature: Creature):
@@ -1706,7 +1707,12 @@ class MainWindow(QtWidgets.QMainWindow):
             counts.setStyleSheet("color: #94a3b8;")
             card_layout.addWidget(title)
             card_layout.addStretch(1)
-            card_layout.addWidget(self._mutation_bar(creature.mutations_maternal, creature.mutations_paternal))
+            card_layout.addWidget(
+                self._build_mutation_bar(
+                    creature.mutations_maternal,
+                    creature.mutations_paternal,
+                )
+            )
             card_layout.addWidget(counts)
             layout.insertWidget(layout.count() - 1, card)
 
@@ -1726,7 +1732,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 return creature
         return None
 
-    def _mutation_bar(self, maternal: int, paternal: int) -> QtWidgets.QWidget:
+    def _build_mutation_bar(self, maternal: int, paternal: int) -> QtWidgets.QWidget:
         if maternal + paternal == 0:
             maternal = 1
             paternal = 0
