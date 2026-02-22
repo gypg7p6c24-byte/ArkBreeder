@@ -1889,7 +1889,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if value is None:
             return "-"
         if key == "MeleeDamageMultiplier":
-            return f"{value * 100:.1f}%"
+            return f"{(value + 1.0) * 100:.1f}%"
         if key == "MovementSpeed":
             return f"{(value + 1.0) * 100:.1f}%"
         precision = 3 if key in {"MeleeDamageMultiplier", "MovementSpeed"} else 2
