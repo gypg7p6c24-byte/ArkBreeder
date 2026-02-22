@@ -120,6 +120,7 @@ def compute_wild_levels(
     imprinting_quality: float | None = None,
     max_wild_level: int | None = None,
     character_level: int | None = None,
+    taming_effectiveness_hint: float | None = None,
 ) -> Dict[str, int]:
     if species_values is None:
         return {}
@@ -141,6 +142,7 @@ def compute_wild_levels(
         multipliers=multipliers,
         imprinting_quality=imprinting_quality,
         max_wild=max_wild,
+        taming_effectiveness_hint=taming_effectiveness_hint,
     )
     if torpor_level is not None:
         constrained = _estimate_with_level_budget(
@@ -151,6 +153,7 @@ def compute_wild_levels(
             max_wild=max_wild,
             level_wild_sum=torpor_level,
             character_level=character_level,
+            taming_effectiveness_hint=taming_effectiveness_hint,
         )
         if constrained:
             return constrained
@@ -176,6 +179,7 @@ def compute_wild_levels(
             stat_imprint_mult,
             imprinting_quality,
             max_wild,
+            taming_effectiveness_hint=taming_effectiveness_hint,
         )
         if level is not None:
             results[key] = level
@@ -188,6 +192,7 @@ def _estimate_torpor_wild_level(
     multipliers: StatMultipliers,
     imprinting_quality: float | None,
     max_wild: int,
+    taming_effectiveness_hint: float | None = None,
 ) -> int | None:
     if "Torpidity" not in stats:
         return None
@@ -207,6 +212,7 @@ def _estimate_torpor_wild_level(
         ),
         imprinting_quality=imprinting_quality,
         max_wild_level=max_wild,
+        taming_effectiveness_hint=taming_effectiveness_hint,
     )
 
 
@@ -218,6 +224,7 @@ def _estimate_with_level_budget(
     max_wild: int,
     level_wild_sum: int,
     character_level: int | None,
+    taming_effectiveness_hint: float | None = None,
 ) -> Dict[str, int]:
     if level_wild_sum <= 0:
         return {}
@@ -251,6 +258,7 @@ def _estimate_with_level_budget(
                 stat_imprint_mult=stat_imprint_mult,
                 imprinting_quality=imprinting_quality,
                 max_dom_levels=max_dom_levels,
+                taming_effectiveness_hint=taming_effectiveness_hint,
             )
             per_level_cost.append(error)
         keys.append(key)
@@ -321,6 +329,7 @@ def _estimate_with_level_budget(
             stat_imprint_mult=stat_imprint_mult,
             imprinting_quality=imprinting_quality,
             max_wild_level=min(max_wild, level_wild_sum),
+            taming_effectiveness_hint=taming_effectiveness_hint,
         )
         if level is not None:
             results[key] = level
@@ -337,17 +346,22 @@ def _fit_stat_error_for_wild_level(
     stat_imprint_mult: float,
     imprinting_quality: float | None,
     max_dom_levels: int,
+    taming_effectiveness_hint: float | None = None,
 ) -> float:
     if target_value <= 0:
         return 0.0
 
-    te_candidates = [0.0]
-    if raw.taming_mult > 0:
-        te_candidates = [step / 20 for step in range(0, 21)]
+    if taming_effectiveness_hint is not None:
+        te_candidates = [max(0.0, min(1.0, float(taming_effectiveness_hint)))]
+    else:
+        te_candidates = [0.0]
+        if raw.taming_mult > 0:
+            te_candidates = [step / 20 for step in range(0, 21)]
 
     dom_mult = multipliers.tamed.get(index, 1.0)
     inc_tamed = raw.inc_tamed * dom_mult
     best_error = float("inf")
+    additive_dom_stat = index in PERCENTAGE_DISPLAY_STATS
 
     for taming_effectiveness in te_candidates:
         base_value, _ = _expected_stat_value(
@@ -365,9 +379,15 @@ def _fit_stat_error_for_wild_level(
 
         predicted = base_value
         if inc_tamed > 0:
-            dom_estimated = int(round((target_value / base_value - 1.0) / inc_tamed))
+            if additive_dom_stat:
+                dom_estimated = int(round((target_value - base_value) / inc_tamed))
+            else:
+                dom_estimated = int(round((target_value / base_value - 1.0) / inc_tamed))
             dom_clamped = max(0, min(max_dom_levels, dom_estimated))
-            predicted = base_value * (1.0 + dom_clamped * inc_tamed)
+            if additive_dom_stat:
+                predicted = base_value + dom_clamped * inc_tamed
+            else:
+                predicted = base_value * (1.0 + dom_clamped * inc_tamed)
 
         error = abs(predicted - target_value)
         if error < best_error:
@@ -385,6 +405,7 @@ def estimate_wild_level(
     stat_imprint_mult: float,
     imprinting_quality: float | None,
     max_wild_level: int,
+    taming_effectiveness_hint: float | None = None,
 ) -> int | None:
     if stat_value is None or math.isnan(stat_value):
         return None
@@ -401,6 +422,7 @@ def estimate_wild_level(
             stat_imprint_mult=stat_imprint_mult,
             imprinting_quality=imprinting_quality,
             target_value=stat_value,
+            taming_effectiveness_hint=taming_effectiveness_hint,
         )
         error = abs(expected - stat_value)
         if error < best_error:
@@ -420,7 +442,22 @@ def _expected_stat_value_best_te(
     stat_imprint_mult: float,
     imprinting_quality: float | None,
     target_value: float,
+    taming_effectiveness_hint: float | None = None,
 ) -> tuple[float, float]:
+    if taming_effectiveness_hint is not None:
+        te_fixed = max(0.0, min(1.0, float(taming_effectiveness_hint)))
+        value_fixed, _ = _expected_stat_value(
+            wild_levels=wild_levels,
+            raw=raw,
+            index=index,
+            multipliers=multipliers,
+            tbhm=tbhm,
+            stat_imprint_mult=stat_imprint_mult,
+            imprinting_quality=imprinting_quality,
+            taming_effectiveness=te_fixed,
+        )
+        return value_fixed, te_fixed
+
     value_te0, tm_scaled = _expected_stat_value(
         wild_levels=wild_levels,
         raw=raw,

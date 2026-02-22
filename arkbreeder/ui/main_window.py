@@ -1078,22 +1078,65 @@ class MainWindow(QtWidgets.QMainWindow):
             points = self._compute_points_for_creature(creature)
             if creature.external_id and points:
                 self._stat_points[creature.external_id] = points
+        self._apply_lineage_point_consistency()
         logger.debug(
             "Computed stat points for %d/%d creatures.",
             len(self._stat_points),
             len(self._creature_cache),
         )
 
+    def _apply_lineage_point_consistency(self) -> None:
+        tracked_keys = {key for _short, key, _title in _POINT_STAT_CONFIG}
+        for creature in self._creature_cache:
+            if not creature.external_id:
+                continue
+            child_points = self._stat_points.get(creature.external_id)
+            if not child_points:
+                continue
+            if not creature.mother_external_id or not creature.father_external_id:
+                continue
+            mother_points = self._stat_points.get(creature.mother_external_id)
+            father_points = self._stat_points.get(creature.father_external_id)
+            if not mother_points or not father_points:
+                continue
+            # If no mutation counters are present, a child stat should match one parent stat.
+            if creature.mutations_maternal != 0 or creature.mutations_paternal != 0:
+                continue
+
+            for key in tracked_keys:
+                parent_values = []
+                mv = mother_points.get(key)
+                fv = father_points.get(key)
+                if mv is not None:
+                    parent_values.append(int(mv))
+                if fv is not None:
+                    parent_values.append(int(fv))
+                if not parent_values:
+                    continue
+                current = child_points.get(key)
+                if current is None:
+                    child_points[key] = parent_values[0]
+                    continue
+                child_points[key] = min(parent_values, key=lambda value: abs(int(current) - value))
+
     def _compute_points_for_creature(self, creature: Creature) -> dict[str, int]:
         values = self._resolve_species_values(creature)
         if values is None:
             return {}
+        te_hint: float | None = None
+        # Bred creatures have fixed tame effectiveness behavior in ARK formulas.
+        if (
+            creature.imprinting_quality is not None
+            and creature.imprinting_quality > 0
+        ) or creature.mother_external_id or creature.father_external_id:
+            te_hint = 1.0
         return compute_wild_levels(
             creature.stats,
             values,
             self._stat_multipliers,
             creature.imprinting_quality,
             character_level=creature.level,
+            taming_effectiveness_hint=te_hint,
         )
 
     def _resolve_species_values(self, creature: Creature):
