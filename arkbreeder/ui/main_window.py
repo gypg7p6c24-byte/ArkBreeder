@@ -450,6 +450,10 @@ class MainWindow(QtWidgets.QMainWindow):
         right.setFrameShape(QtWidgets.QFrame.NoFrame)
         right.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         right.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        right.setStyleSheet(
+            "QScrollArea { background: transparent; border: none; }"
+            "QScrollArea > QWidget > QWidget { background: transparent; }"
+        )
         right.setWidget(right_panel)
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
@@ -588,13 +592,13 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self._points_info)
 
         self._detail_strengths = QtWidgets.QLabel("Strengths: -")
-        self._detail_strengths.setStyleSheet("color: #a7f3d0; font-size: 14px; font-weight: 600;")
+        self._detail_strengths.setStyleSheet("color: #a7f3d0; font-size: 15px; font-weight: 600;")
         self._detail_strengths.setTextFormat(QtCore.Qt.RichText)
         self._detail_strengths.setWordWrap(True)
         layout.addWidget(self._detail_strengths)
 
         self._detail_weaknesses = QtWidgets.QLabel("Weaknesses: -")
-        self._detail_weaknesses.setStyleSheet("color: #fecaca; font-size: 14px; font-weight: 600;")
+        self._detail_weaknesses.setStyleSheet("color: #fecaca; font-size: 15px; font-weight: 600;")
         self._detail_weaknesses.setTextFormat(QtCore.Qt.RichText)
         self._detail_weaknesses.setWordWrap(True)
         layout.addWidget(self._detail_weaknesses)
@@ -1607,7 +1611,7 @@ class MainWindow(QtWidgets.QMainWindow):
             row_layout.addLayout(header)
 
             pair_layout = QtWidgets.QHBoxLayout()
-            pair_layout.setSpacing(4)
+            pair_layout.setSpacing(2)
             pair_layout.setContentsMargins(0, 0, 0, 0)
             max_stats = self._species_max_stats(species_name, use_points=use_points)
             male_box = self._pair_info_box(male, max_stats, use_points=use_points, points_only=True)
@@ -1633,10 +1637,11 @@ class MainWindow(QtWidgets.QMainWindow):
         elif sex_lower == "female":
             accent = "#f472b6"
         box = QtWidgets.QFrame()
-        box.setMinimumWidth(198)
-        box.setMaximumWidth(226)
+        box.setObjectName("pairCard")
+        box.setMinimumWidth(186)
+        box.setMaximumWidth(210)
         box.setStyleSheet(
-            "QFrame {"
+            "#pairCard {"
             "background: rgba(11, 19, 36, 0.85);"
             f"border: 1px solid {accent};"
             "border-radius: 14px;"
@@ -1646,7 +1651,9 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.setContentsMargins(7, 7, 7, 7)
         layout.setSpacing(2)
         name_label = QtWidgets.QLabel(f"{self._sex_icon(creature.sex)} {creature.name}")
-        name_label.setStyleSheet(f"color: {accent}; font-weight: 700; font-size: 14px;")
+        name_label.setStyleSheet(
+            f"color: {accent}; font-weight: 700; font-size: 13px; background: transparent; border: none;"
+        )
         layout.addWidget(name_label)
 
         avatar = self._small_species_image(self._display_species(creature.species), size=100)
@@ -2032,6 +2039,8 @@ class MainWindow(QtWidgets.QMainWindow):
         key: str | None = None,
         creature: Creature | None = None,
     ) -> str:
+        if key == "MovementSpeed" and value is None:
+            return "100.0%"
         if value is None:
             return "-"
         if key == "MeleeDamageMultiplier":
@@ -2190,11 +2199,11 @@ class MainWindow(QtWidgets.QMainWindow):
         safe_color = re.sub(r"[^a-zA-Z0-9]+", "", color).lower() or "default"
         cache_dir = user_data_dir() / "cache" / "badges"
         cache_dir.mkdir(parents=True, exist_ok=True)
-        target = cache_dir / f"{safe_label}_{safe_color}_v2.png"
+        target = cache_dir / f"{safe_label}_{safe_color}_v3.png"
         if target.exists():
             return target
 
-        pixmap = QtGui.QPixmap(32, 32)
+        pixmap = QtGui.QPixmap(96, 96)
         pixmap.fill(QtCore.Qt.transparent)
         painter = QtGui.QPainter(pixmap)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
@@ -2203,10 +2212,10 @@ class MainWindow(QtWidgets.QMainWindow):
         painter.setBrush(fill)
         diamond = QtGui.QPolygonF(
             [
-                QtCore.QPointF(16, 2),
-                QtCore.QPointF(30, 16),
-                QtCore.QPointF(16, 30),
-                QtCore.QPointF(2, 16),
+                QtCore.QPointF(48, 6),
+                QtCore.QPointF(90, 48),
+                QtCore.QPointF(48, 90),
+                QtCore.QPointF(6, 48),
             ]
         )
         painter.drawPolygon(diamond)
@@ -2214,9 +2223,9 @@ class MainWindow(QtWidgets.QMainWindow):
         painter.setPen(text_color)
         font = painter.font()
         font.setBold(True)
-        font.setPointSize(12)
+        font.setPointSize(34)
         painter.setFont(font)
-        painter.drawText(QtCore.QRectF(0, 0, 32, 32), QtCore.Qt.AlignCenter, label[:1].upper())
+        painter.drawText(QtCore.QRectF(0, 0, 96, 96), QtCore.Qt.AlignCenter, label[:1].upper())
         painter.end()
         pixmap.save(str(target))
         return target
