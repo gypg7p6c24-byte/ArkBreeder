@@ -35,7 +35,7 @@ def add_creature(conn, creature: Creature) -> Creature:
             imprinting_quality, mutations_maternal, mutations_paternal, mother_id, father_id,
             mother_external_id, father_external_id, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ''',
         (
             creature.external_id,
