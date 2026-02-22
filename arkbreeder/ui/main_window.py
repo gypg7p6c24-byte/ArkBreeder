@@ -17,11 +17,23 @@ from arkbreeder.storage.settings import (
     set_server_settings,
     set_setting,
 )
+from arkbreeder.ui.dashboard_charts import BarChartWidget, DonutChartWidget
 from arkbreeder.ui.radar_chart import RadarChart
 from arkbreeder.ui.species_image import SpeciesImageWidget
 from arkbreeder.ui.toast import ToastNotification
 
 logger = logging.getLogger(__name__)
+
+_DASHBOARD_COLORS = [
+    "#38bdf8",
+    "#f472b6",
+    "#facc15",
+    "#34d399",
+    "#fb923c",
+    "#a78bfa",
+    "#60a5fa",
+    "#f97316",
+]
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -63,8 +75,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._nav.setFixedWidth(180)
         self._nav.setSpacing(6)
         self._nav.setStyleSheet('''
-        QListWidget { background: #111827; color: #e5e7eb; border: none; }
-        QListWidget::item { padding: 10px 12px; border-radius: 8px; }
+        QListWidget { background: #0b1220; color: #e5e7eb; border: none; }
+        QListWidget::item { padding: 10px 12px; margin: 4px 8px; border-radius: 12px; }
+        QListWidget::item:hover { background: #0f172a; }
         QListWidget::item:selected { background: #1f2937; color: #ffffff; }
         ''')
 
@@ -143,7 +156,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         hero = QtWidgets.QFrame()
         hero.setStyleSheet('''
-        QFrame { background: #0f172a; border: 1px solid #1f2937; border-radius: 12px; }
+        QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }
         ''')
         hero_layout = QtWidgets.QVBoxLayout(hero)
         hero_title = QtWidgets.QLabel("Welcome to ARK Breeder")
@@ -177,8 +190,38 @@ class MainWindow(QtWidgets.QMainWindow):
         cards.addWidget(self._build_card("Species", self._species_count, "Tracked species"))
         cards.addWidget(self._build_card("Mutations", self._mutations_count, "Recorded mutations"))
 
+        charts = QtWidgets.QHBoxLayout()
+        charts.setSpacing(16)
+
+        left = QtWidgets.QFrame()
+        left.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }")
+        left_layout = QtWidgets.QVBoxLayout(left)
+        left_layout.setSpacing(8)
+        left_title = QtWidgets.QLabel("Species distribution")
+        left_title.setStyleSheet("color: #e2e8f0; font-weight: 600;")
+        left_layout.addWidget(left_title)
+        self._species_donut = DonutChartWidget()
+        left_layout.addWidget(self._species_donut, 1)
+        self._species_legend = QtWidgets.QVBoxLayout()
+        self._species_legend.setSpacing(6)
+        left_layout.addLayout(self._species_legend)
+
+        right = QtWidgets.QFrame()
+        right.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }")
+        right_layout = QtWidgets.QVBoxLayout(right)
+        right_layout.setSpacing(8)
+        right_title = QtWidgets.QLabel("Average level by species")
+        right_title.setStyleSheet("color: #e2e8f0; font-weight: 600;")
+        right_layout.addWidget(right_title)
+        self._levels_bar = BarChartWidget()
+        right_layout.addWidget(self._levels_bar, 1)
+
+        charts.addWidget(left, 1)
+        charts.addWidget(right, 1)
+
         layout.addWidget(hero)
         layout.addLayout(cards)
+        layout.addLayout(charts)
         layout.addStretch(1)
         return widget
 
@@ -190,7 +233,7 @@ class MainWindow(QtWidgets.QMainWindow):
     ) -> QtWidgets.QWidget:
         card = QtWidgets.QFrame()
         card.setStyleSheet('''
-        QFrame { background: #111827; border: 1px solid #1f2937; border-radius: 12px; }
+        QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 14px; }
         ''')
         layout = QtWidgets.QVBoxLayout(card)
         title_label = QtWidgets.QLabel(title)
@@ -614,6 +657,68 @@ class MainWindow(QtWidgets.QMainWindow):
             creature.mutations_maternal + creature.mutations_paternal for creature in creature_list
         )
         self._mutations_count.setText(str(mutations_total))
+
+        if not hasattr(self, "_species_donut"):
+            return
+
+        species_counts: dict[str, int] = {}
+        for creature in creature_list:
+            if not creature.species:
+                continue
+            species_counts[creature.species] = species_counts.get(creature.species, 0) + 1
+
+        sorted_counts = sorted(species_counts.items(), key=lambda item: item[1], reverse=True)
+        top_counts = sorted_counts[:6]
+        if len(sorted_counts) > 6:
+            other_total = sum(count for _, count in sorted_counts[6:])
+            top_counts.append(("Other", other_total))
+
+        donut_series = [
+            (label, float(count), _DASHBOARD_COLORS[idx % len(_DASHBOARD_COLORS)])
+            for idx, (label, count) in enumerate(top_counts)
+        ]
+        self._species_donut.set_series(donut_series)
+        self._update_species_legend(donut_series)
+
+        average_levels = []
+        for label, count in species_counts.items():
+            total_level = sum(
+                creature.level for creature in creature_list if creature.species == label
+            )
+            average_levels.append((label, total_level / max(count, 1)))
+        average_levels.sort(key=lambda item: item[1], reverse=True)
+        bar_series = [
+            (label, value, _DASHBOARD_COLORS[idx % len(_DASHBOARD_COLORS)])
+            for idx, (label, value) in enumerate(average_levels[:6])
+        ]
+        self._levels_bar.set_series(bar_series)
+
+    def _update_species_legend(self, series: list[tuple[str, float, str]]) -> None:
+        if not hasattr(self, "_species_legend"):
+            return
+        while self._species_legend.count():
+            item = self._species_legend.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        for label, value, color in series:
+            row = QtWidgets.QHBoxLayout()
+            dot = QtWidgets.QFrame()
+            dot.setFixedSize(10, 10)
+            dot.setStyleSheet(
+                f"QFrame {{ background: {color}; border-radius: 5px; }}"
+            )
+            name = QtWidgets.QLabel(label)
+            name.setStyleSheet("color: #cbd5f5;")
+            count = QtWidgets.QLabel(str(int(value)))
+            count.setStyleSheet("color: #94a3b8;")
+            row.addWidget(dot)
+            row.addWidget(name)
+            row.addStretch(1)
+            row.addWidget(count)
+            container = QtWidgets.QWidget()
+            container.setLayout(row)
+            self._species_legend.addWidget(container)
 
     def _update_points_info_labels(self) -> None:
         has_values = self._values_store.count() > 0
