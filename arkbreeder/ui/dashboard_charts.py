@@ -27,7 +27,7 @@ class DonutChartWidget(QtWidgets.QWidget):
             "#60a5fa",
             "#f97316",
         ]
-        self.setMinimumHeight(200)
+        self.setMinimumHeight(150)
 
     def set_series(self, series: Iterable[Tuple[str, float, str | None]]) -> None:
         normalized: List[ChartSlice] = []
@@ -93,7 +93,7 @@ class BarChartWidget(QtWidgets.QWidget):
             "#f97316",
             "#facc15",
         ]
-        self.setMinimumHeight(200)
+        self.setMinimumHeight(150)
 
     def set_series(self, series: Iterable[Tuple[str, float, str | None]]) -> None:
         normalized: List[ChartSlice] = []
@@ -139,8 +139,8 @@ class BarChartWidget(QtWidgets.QWidget):
         bar_width = max(10, bar_right - bar_left)
 
         for idx, slice_ in enumerate(self._series):
-            top = rect.top() + idx * row_height + row_height * 0.2
-            bar_height = row_height * 0.6
+            bar_height = min(18.0, max(6.0, row_height * 0.45))
+            top = rect.top() + idx * row_height + (row_height - bar_height) / 2
             label_rect = QtCore.QRectF(rect.left(), top, label_width + 6, bar_height)
             value_rect = QtCore.QRectF(bar_right + 6, top, value_width, bar_height)
 

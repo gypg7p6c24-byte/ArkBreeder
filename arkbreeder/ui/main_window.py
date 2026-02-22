@@ -156,6 +156,27 @@ class MainWindow(QtWidgets.QMainWindow):
             #contentArea QPushButton:pressed {
                 background: #1b2536;
             }
+            #contentArea QLineEdit, #contentArea QComboBox {
+                background: #1e293b;
+                color: #e5e7eb;
+                border: 1px solid #334155;
+                padding: 6px 10px;
+                border-radius: 6px;
+                min-height: 18px;
+            }
+            #contentArea QLineEdit:focus, #contentArea QComboBox:focus {
+                border: 1px solid #475569;
+            }
+            #contentArea QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            #contentArea QComboBox QAbstractItemView {
+                background: #0f172a;
+                color: #e5e7eb;
+                border: 1px solid #1f2937;
+                selection-background-color: #1f2937;
+            }
             #contentArea QTableWidget {
                 background: #0f172a;
                 gridline-color: #1f2937;
@@ -174,65 +195,41 @@ class MainWindow(QtWidgets.QMainWindow):
     def _build_dashboard_page(self) -> QtWidgets.QWidget:
         widget = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(widget)
-        layout.setSpacing(16)
+        layout.setSpacing(10)
 
         hero = QtWidgets.QFrame()
         hero.setStyleSheet('''
         QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }
         ''')
         hero_layout = QtWidgets.QVBoxLayout(hero)
+        hero_layout.setContentsMargins(12, 10, 12, 10)
         hero_title = QtWidgets.QLabel("Welcome to ARK Breeder")
         hero_title.setStyleSheet("font-size: 18px; font-weight: 600; color: #f8fafc;")
-        hero_sub = QtWidgets.QLabel(
-            "Start by importing creature export files. The app will parse stats, mutations, and lineage."
-        )
-        hero_sub.setWordWrap(True)
-        hero_sub.setStyleSheet("color: #cbd5f5;")
-        self._export_dir_label = QtWidgets.QLabel(str(self._export_dir))
-        self._export_dir_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
-        self._last_import_label = QtWidgets.QLabel("Last import: --")
-        self._last_import_label.setStyleSheet("color: #94a3b8; font-size: 12px;")
         hero_layout.addWidget(hero_title)
-        hero_layout.addWidget(hero_sub)
-        hero_layout.addWidget(self._export_dir_label)
-        hero_layout.addWidget(self._last_import_label)
-
-        actions = QtWidgets.QHBoxLayout()
-        open_btn = QtWidgets.QPushButton("Open export folder")
-        open_btn.clicked.connect(self._open_export_folder)
-        actions.addWidget(open_btn)
-        actions.addStretch(1)
-        hero_layout.addLayout(actions)
-
-        cards = QtWidgets.QHBoxLayout()
-        self._creatures_count = QtWidgets.QLabel("0")
-        self._species_count = QtWidgets.QLabel("0")
-        self._mutations_count = QtWidgets.QLabel("0")
-        cards.addWidget(self._build_card("Creatures", self._creatures_count, "Imported creatures"))
-        cards.addWidget(self._build_card("Species", self._species_count, "Tracked species"))
-        cards.addWidget(self._build_card("Mutations", self._mutations_count, "Recorded mutations"))
 
         charts = QtWidgets.QHBoxLayout()
-        charts.setSpacing(16)
+        charts.setSpacing(10)
 
         left = QtWidgets.QFrame()
         left.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }")
         left_layout = QtWidgets.QVBoxLayout(left)
-        left_layout.setSpacing(8)
+        left_layout.setContentsMargins(10, 10, 10, 10)
+        left_layout.setSpacing(6)
         left_title = QtWidgets.QLabel("Species distribution")
         left_title.setStyleSheet("color: #e2e8f0; font-weight: 600;")
         left_layout.addWidget(left_title)
         self._species_donut = DonutChartWidget()
-        self._species_donut.setMinimumSize(180, 180)
+        self._species_donut.setMinimumSize(140, 140)
         left_layout.addWidget(self._species_donut, 1)
         self._species_legend = QtWidgets.QVBoxLayout()
-        self._species_legend.setSpacing(6)
+        self._species_legend.setSpacing(4)
         left_layout.addLayout(self._species_legend)
 
         right = QtWidgets.QFrame()
         right.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }")
         right_layout = QtWidgets.QVBoxLayout(right)
-        right_layout.setSpacing(8)
+        right_layout.setContentsMargins(10, 10, 10, 10)
+        right_layout.setSpacing(6)
         right_title = QtWidgets.QLabel("Average level by species")
         right_title.setStyleSheet("color: #e2e8f0; font-weight: 600;")
         right_layout.addWidget(right_title)
@@ -243,14 +240,14 @@ class MainWindow(QtWidgets.QMainWindow):
         charts.addWidget(right, 1)
 
         extras = QtWidgets.QHBoxLayout()
-        extras.setSpacing(16)
+        extras.setSpacing(10)
 
         gender_panel, self._dashboard_gender_layout = self._dashboard_panel("Gender split")
         self._gender_donut = DonutChartWidget()
-        self._gender_donut.setMinimumSize(180, 180)
+        self._gender_donut.setMinimumSize(140, 140)
         self._dashboard_gender_layout.addWidget(self._gender_donut, 1)
         self._gender_legend = QtWidgets.QVBoxLayout()
-        self._gender_legend.setSpacing(6)
+        self._gender_legend.setSpacing(4)
         self._dashboard_gender_layout.addLayout(self._gender_legend)
 
         mutation_panel, self._dashboard_mutation_layout = self._dashboard_panel("Mutation pressure")
@@ -263,19 +260,9 @@ class MainWindow(QtWidgets.QMainWindow):
         extras.addWidget(mutation_panel, 1)
         extras.addWidget(points_panel, 1)
 
-        insights = QtWidgets.QHBoxLayout()
-        insights.setSpacing(16)
-        pairs_panel, self._dashboard_pairs_layout = self._dashboard_panel("Top breeding pairs")
-        attention_panel, self._dashboard_attention_layout = self._dashboard_panel("Needs attention")
-        insights.addWidget(pairs_panel, 1)
-        insights.addWidget(attention_panel, 1)
-
         layout.addWidget(hero)
-        layout.addLayout(cards)
         layout.addLayout(charts)
         layout.addLayout(extras)
-        layout.addLayout(insights)
-        layout.addStretch(1)
         return widget
 
     def _build_card(
@@ -303,12 +290,13 @@ class MainWindow(QtWidgets.QMainWindow):
         panel = QtWidgets.QFrame()
         panel.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }")
         layout = QtWidgets.QVBoxLayout(panel)
-        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
         title_label = QtWidgets.QLabel(title)
         title_label.setStyleSheet("color: #e2e8f0; font-weight: 600;")
         layout.addWidget(title_label)
         content = QtWidgets.QVBoxLayout()
-        content.setSpacing(8)
+        content.setSpacing(6)
         layout.addLayout(content)
         return panel, content
 
@@ -322,8 +310,10 @@ class MainWindow(QtWidgets.QMainWindow):
         left_layout.setSpacing(12)
 
         toolbar = QtWidgets.QHBoxLayout()
+        toolbar.setSpacing(8)
         self._creature_search = QtWidgets.QLineEdit()
         self._creature_search.setPlaceholderText("Search name or species")
+        self._creature_search.setMinimumWidth(260)
         self._creature_search.textChanged.connect(self._apply_creature_filters)
         toolbar.addWidget(self._creature_search)
 
@@ -395,6 +385,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.setSpacing(12)
 
         toolbar = QtWidgets.QHBoxLayout()
+        toolbar.setSpacing(8)
         self._breeding_species_filter = QtWidgets.QComboBox()
         self._breeding_species_filter.currentIndexChanged.connect(self._update_breeding_pairs)
         toolbar.addWidget(self._breeding_species_filter)
@@ -520,6 +511,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.setSpacing(12)
 
         toolbar = QtWidgets.QHBoxLayout()
+        toolbar.setSpacing(8)
         self._pedigree_species_filter = QtWidgets.QComboBox()
         self._pedigree_species_filter.currentIndexChanged.connect(self._update_pedigree_view)
         toolbar.addWidget(self._pedigree_species_filter)
@@ -629,6 +621,22 @@ class MainWindow(QtWidgets.QMainWindow):
         widget = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(widget)
         layout.setSpacing(12)
+
+        export_header = QtWidgets.QLabel("Export watch folder")
+        export_header.setStyleSheet("font-size: 16px; font-weight: 600;")
+        layout.addWidget(export_header)
+
+        self._settings_export_path = QtWidgets.QLabel(str(self._export_dir))
+        self._settings_export_path.setWordWrap(True)
+        self._settings_export_path.setStyleSheet("color: #94a3b8;")
+        layout.addWidget(self._settings_export_path)
+
+        export_actions = QtWidgets.QHBoxLayout()
+        self._settings_open_export_btn = QtWidgets.QPushButton("Open export folder")
+        self._settings_open_export_btn.clicked.connect(self._open_export_folder)
+        export_actions.addWidget(self._settings_open_export_btn)
+        export_actions.addStretch(1)
+        layout.addLayout(export_actions)
 
         header = QtWidgets.QLabel("Server settings")
         header.setStyleSheet("font-size: 16px; font-weight: 600;")
@@ -751,17 +759,20 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _update_dashboard(self, creatures: Iterable[Creature]) -> None:
         creature_list = list(creatures)
-        self._creatures_count.setText(str(len(creature_list)))
         species = {
             self._display_species(creature.species)
             for creature in creature_list
             if creature.species
         }
-        self._species_count.setText(str(len(species)))
         mutations_total = sum(
             creature.mutations_maternal + creature.mutations_paternal for creature in creature_list
         )
-        self._mutations_count.setText(str(mutations_total))
+        if hasattr(self, "_creatures_count"):
+            self._creatures_count.setText(str(len(creature_list)))
+        if hasattr(self, "_species_count"):
+            self._species_count.setText(str(len(species)))
+        if hasattr(self, "_mutations_count"):
+            self._mutations_count.setText(str(mutations_total))
 
         if not hasattr(self, "_species_donut"):
             return
@@ -1262,12 +1273,10 @@ class MainWindow(QtWidgets.QMainWindow):
             grouped.setdefault(key, []).append(creature)
         use_points = True
         pairs: list[tuple[str, float, Creature, Creature]] = []
-        missing_pairs: list[tuple[str, bool, bool]] = []
         for species_name, group in grouped.items():
             males = [c for c in group if c.sex.lower() == "male"]
             females = [c for c in group if c.sex.lower() == "female"]
             if not males or not females:
-                missing_pairs.append((species_name, bool(males), bool(females)))
                 continue
             best_pair: tuple[float, Creature, Creature] | None = None
             for male in males:
@@ -1285,7 +1294,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 pairs.append((species_name, best_score, best_male, best_female))
 
         pairs.sort(key=lambda item: item[1], reverse=True)
-        self._render_breeding_cards(pairs, focus, use_points, missing_pairs)
+        self._render_breeding_cards(pairs, focus, use_points)
 
     def _score_pair(
         self,
@@ -1378,16 +1387,17 @@ class MainWindow(QtWidgets.QMainWindow):
     def _line(self, vertical: bool) -> QtWidgets.QFrame:
         line = QtWidgets.QFrame()
         if vertical:
-            line.setFixedWidth(2)
-            line.setFixedHeight(32)
+            line.setFixedWidth(3)
+            line.setFixedHeight(40)
         else:
-            line.setFixedHeight(2)
-        line.setStyleSheet("QFrame { background: #1f2937; }")
+            line.setFixedHeight(3)
+        line.setStyleSheet("QFrame { background: #334155; border-radius: 1px; }")
         return line
 
     def _pedigree_node(self, title: str, value: str, accent: str) -> QtWidgets.QFrame:
         node = QtWidgets.QFrame()
-        node.setMinimumWidth(220)
+        node.setMinimumWidth(180)
+        node.setMaximumWidth(240)
         node.setStyleSheet(
             f"QFrame {{ background: rgba(11, 19, 36, 0.9); border: 1px solid {accent}; border-radius: 14px; }}"
         )
@@ -1398,7 +1408,7 @@ class MainWindow(QtWidgets.QMainWindow):
         label.setStyleSheet("color: #94a3b8; font-size: 11px; text-transform: uppercase;")
         avatar = QtWidgets.QLabel()
         avatar.setObjectName("avatar")
-        avatar.setFixedSize(72, 54)
+        avatar.setFixedSize(60, 44)
         avatar.setAlignment(QtCore.Qt.AlignCenter)
         avatar.setStyleSheet("background: #0b1324; border-radius: 8px; color: #94a3b8;")
         value_label = QtWidgets.QLabel(value)
@@ -1421,12 +1431,11 @@ class MainWindow(QtWidgets.QMainWindow):
         pairs: list[tuple[str, float, Creature, Creature]],
         focus: str,
         use_points: bool,
-        missing_pairs: list[tuple[str, bool, bool]],
     ) -> None:
         layout = self._breeding_cards_layout
         self._clear_layout(layout)
 
-        if not pairs and not missing_pairs:
+        if not pairs:
             empty = QtWidgets.QLabel("No breeding pairs found for this filter.")
             empty.setStyleSheet("color: #94a3b8;")
             layout.addWidget(empty, 0, 0)
@@ -1439,8 +1448,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 "QFrame { background: rgba(15, 23, 42, 0.7); border-radius: 16px; }"
             )
             row_layout = QtWidgets.QVBoxLayout(row_card)
-            row_layout.setSpacing(10)
-            row_layout.setContentsMargins(12, 12, 12, 12)
+            row_layout.setSpacing(8)
+            row_layout.setContentsMargins(10, 10, 10, 10)
 
             header = QtWidgets.QHBoxLayout()
             species_label = QtWidgets.QLabel(species_name)
@@ -1454,36 +1463,16 @@ class MainWindow(QtWidgets.QMainWindow):
             row_layout.addLayout(header)
 
             pair_layout = QtWidgets.QHBoxLayout()
-            pair_layout.setSpacing(12)
+            pair_layout.setSpacing(10)
             max_stats = self._species_max_stats(species_name, use_points=use_points)
             male_box = self._pair_info_box(male, max_stats, use_points=use_points, points_only=True)
             female_box = self._pair_info_box(female, max_stats, use_points=use_points, points_only=True)
-            pair_layout.addWidget(male_box, 1)
-            pair_layout.addWidget(female_box, 1)
+            pair_layout.addStretch(1)
+            pair_layout.addWidget(male_box)
+            pair_layout.addWidget(female_box)
+            pair_layout.addStretch(1)
             row_layout.addLayout(pair_layout)
             layout.addWidget(row_card, row_index, 0)
-            row_index += 1
-
-        for species_name, has_male, has_female in missing_pairs:
-            info = QtWidgets.QFrame()
-            info.setStyleSheet(
-                "QFrame { background: rgba(11, 19, 36, 0.45); border: 1px dashed #334155; border-radius: 14px; }"
-            )
-            info_layout = QtWidgets.QVBoxLayout(info)
-            info_layout.setContentsMargins(12, 12, 12, 12)
-            title = QtWidgets.QLabel(species_name)
-            title.setStyleSheet("color: #cbd5f5; font-weight: 600;")
-            needs = []
-            if not has_male:
-                needs.append("male")
-            if not has_female:
-                needs.append("female")
-            details = QtWidgets.QLabel("No pair yet: add " + " and ".join(needs) + ".")
-            details.setStyleSheet("color: #94a3b8;")
-            details.setWordWrap(True)
-            info_layout.addWidget(title)
-            info_layout.addWidget(details)
-            layout.addWidget(info, row_index, 0)
             row_index += 1
 
     def _pair_info_box(
@@ -1500,6 +1489,8 @@ class MainWindow(QtWidgets.QMainWindow):
         elif sex_lower == "female":
             accent = "#f472b6"
         box = QtWidgets.QFrame()
+        box.setMinimumWidth(260)
+        box.setMaximumWidth(340)
         box.setStyleSheet(
             "QFrame {"
             "background: rgba(11, 19, 36, 0.85);"
@@ -1513,7 +1504,7 @@ class MainWindow(QtWidgets.QMainWindow):
         name_label.setStyleSheet(f"color: {accent}; font-weight: 700; font-size: 15px;")
         layout.addWidget(name_label)
 
-        avatar = self._small_species_image(self._display_species(creature.species), size=128)
+        avatar = self._small_species_image(self._display_species(creature.species), size=96)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
 
         colors = {
@@ -1555,7 +1546,7 @@ class MainWindow(QtWidgets.QMainWindow):
         row_layout.setSpacing(6)
         tag = QtWidgets.QLabel(self._point_icon(label))
         tag.setFixedWidth(30)
-        tag.setStyleSheet("color: #94a3b8; font-size: 10px;")
+        tag.setStyleSheet(f"color: {color}; font-size: 11px; font-weight: 700;")
         bar = QtWidgets.QProgressBar()
         bar.setMaximum(100)
         value = self._get_stat_value(
@@ -1596,7 +1587,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return row
 
     def _make_point_badge(self, label: str) -> QtWidgets.QLabel:
-        badge = QtWidgets.QLabel(f"{self._point_icon(label)}-")
+        badge = QtWidgets.QLabel(self._point_icon(label))
         badge.setAlignment(QtCore.Qt.AlignCenter)
         badge.setMinimumWidth(76)
         badge.setStyleSheet(
@@ -1615,12 +1606,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def _point_icon(self, code: str) -> str:
         icons = {
             "H": "✚",
-            "S": "➤",
+            "S": "⚗",
             "O": "O₂",
             "F": "🍖",
-            "W": "⚒T",
+            "W": "⚒",
             "M": "✊",
-            "Sp": "↻",
+            "Sp": "⇄",
         }
         return icons.get(code, code)
 
@@ -1669,7 +1660,7 @@ class MainWindow(QtWidgets.QMainWindow):
             raw_value = self._get_stat_value(creature, key, use_points=False)
             raw_text = self._format_stat(raw_value, key)
             if value is None:
-                badge.setText(f"{icon}-")
+                badge.setText(icon)
                 badge.setStyleSheet(self._point_badge_style("#111827", "#94a3b8"))
                 badge.setToolTip(f"Raw: {raw_text}\nPoints: -")
                 continue
@@ -1677,7 +1668,7 @@ class MainWindow(QtWidgets.QMainWindow):
             ratio = 0.0 if max_value <= 0 else min(max(value / max_value, 0.0), 1.0)
             color = self._point_badge_color(ratio)
             text_color = "#0b1220" if ratio >= 0.6 else "#f8fafc"
-            badge.setText(f"{icon}-{int(value)}")
+            badge.setText(f"{icon} {int(value)}")
             badge.setStyleSheet(self._point_badge_style(color, text_color))
             badge.setToolTip(f"Raw: {raw_text}\nPoints: {int(value)}")
 
@@ -1879,7 +1870,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if creature is None:
             label.setText("?")
             return
-        avatar = self._small_species_image(self._display_species(creature.species), size=72)
+        avatar = self._small_species_image(self._display_species(creature.species), size=60)
         pixmap = avatar.pixmap()
         if pixmap and not pixmap.isNull():
             label.setPixmap(pixmap)
@@ -1897,6 +1888,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def _format_stat(self, value: float | None, key: str | None = None) -> str:
         if value is None:
             return "-"
+        if key == "MeleeDamageMultiplier":
+            return f"{value * 100:.1f}%"
+        if key == "MovementSpeed":
+            return f"{(value + 1.0) * 100:.1f}%"
         precision = 3 if key in {"MeleeDamageMultiplier", "MovementSpeed"} else 2
         return f"{value:.{precision}f}"
 
@@ -2039,14 +2034,11 @@ class MainWindow(QtWidgets.QMainWindow):
         for label in labels:
             badges.append(
                 "<span style=\""
-                f"background: {color};"
-                "color: #0b1220;"
-                "border: 1px solid rgba(15, 23, 42, 0.6);"
-                "border-radius: 999px;"
-                "padding: 2px 8px;"
+                f"color: {color};"
+                "padding: 1px 6px;"
                 "font-weight: 700;"
                 "margin-right: 6px;"
-                "\">◆ "
+                "\">⬥"
                 f"{label}</span>"
             )
         return "".join(badges)
@@ -2062,8 +2054,9 @@ class MainWindow(QtWidgets.QMainWindow):
         return None
 
     def _update_last_import_label(self) -> None:
-        stamp = QtCore.QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
-        self._last_import_label.setText(f"Last import: {stamp}")
+        if hasattr(self, "_last_import_label"):
+            stamp = QtCore.QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+            self._last_import_label.setText(f"Last import: {stamp}")
 
     def _load_server_settings(self) -> None:
         self._server_settings = get_server_settings(self._conn)
