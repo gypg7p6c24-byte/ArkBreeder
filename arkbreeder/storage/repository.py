@@ -10,11 +10,13 @@ def creature_from_row(row) -> Creature:
     return Creature(
         id=row["id"],
         external_id=row["external_id"],
+        blueprint=row["blueprint"] if "blueprint" in row.keys() else None,
         name=row["name"],
         species=row["species"],
         sex=row["sex"],
         level=row["level"],
         stats=json.loads(row["stats_json"]) if row["stats_json"] else {},
+        imprinting_quality=row["imprinting_quality"] if "imprinting_quality" in row.keys() else None,
         mutations_maternal=row["mutations_maternal"],
         mutations_paternal=row["mutations_paternal"],
         mother_id=row["mother_id"],
@@ -29,19 +31,21 @@ def add_creature(conn, creature: Creature) -> Creature:
     cursor = conn.execute(
         '''
         INSERT INTO creatures (
-            external_id, name, species, sex, level, stats_json,
-            mutations_maternal, mutations_paternal, mother_id, father_id,
+            external_id, blueprint, name, species, sex, level, stats_json,
+            imprinting_quality, mutations_maternal, mutations_paternal, mother_id, father_id,
             mother_external_id, father_external_id, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ''',
         (
             creature.external_id,
+            creature.blueprint,
             creature.name,
             creature.species,
             creature.sex,
             creature.level,
             json.dumps(creature.stats),
+            creature.imprinting_quality,
             creature.mutations_maternal,
             creature.mutations_paternal,
             creature.mother_id,
@@ -58,11 +62,13 @@ def update_creature(conn, creature: Creature) -> Creature:
         '''
         UPDATE creatures SET
             external_id = ?,
+            blueprint = ?,
             name = ?,
             species = ?,
             sex = ?,
             level = ?,
             stats_json = ?,
+            imprinting_quality = ?,
             mutations_maternal = ?,
             mutations_paternal = ?,
             mother_id = ?,
@@ -74,11 +80,13 @@ def update_creature(conn, creature: Creature) -> Creature:
         ''',
         (
             creature.external_id,
+            creature.blueprint,
             creature.name,
             creature.species,
             creature.sex,
             creature.level,
             json.dumps(creature.stats),
+            creature.imprinting_quality,
             creature.mutations_maternal,
             creature.mutations_paternal,
             creature.mother_id,

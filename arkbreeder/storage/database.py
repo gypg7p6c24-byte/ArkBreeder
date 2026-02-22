@@ -10,11 +10,13 @@ SCHEMA = '''
 CREATE TABLE IF NOT EXISTS creatures (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     external_id TEXT,
+    blueprint TEXT,
     name TEXT NOT NULL,
     species TEXT NOT NULL,
     sex TEXT NOT NULL,
     level INTEGER NOT NULL,
     stats_json TEXT NOT NULL,
+    imprinting_quality REAL,
     mutations_maternal INTEGER NOT NULL DEFAULT 0,
     mutations_paternal INTEGER NOT NULL DEFAULT 0,
     mother_id INTEGER,
@@ -45,7 +47,9 @@ def get_connection(path: Path | None = None) -> sqlite3.Connection:
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
     _ensure_column(conn, "creatures", "external_id", "TEXT")
+    _ensure_column(conn, "creatures", "blueprint", "TEXT")
     _ensure_column(conn, "creatures", "updated_at", "TEXT")
+    _ensure_column(conn, "creatures", "imprinting_quality", "REAL")
     _ensure_column(conn, "creatures", "mother_external_id", "TEXT")
     _ensure_column(conn, "creatures", "father_external_id", "TEXT")
     conn.execute(

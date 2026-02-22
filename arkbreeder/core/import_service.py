@@ -126,11 +126,13 @@ class ExportImportService:
         return Creature(
             id=None,
             external_id=parsed.external_id,
+            blueprint=parsed.blueprint,
             name=parsed.name,
             species=parsed.species,
             sex=parsed.sex,
             level=parsed.level,
             stats=parsed.stats,
+            imprinting_quality=parsed.imprinting_quality,
             mutations_maternal=parsed.mutations_maternal or 0,
             mutations_paternal=parsed.mutations_paternal or 0,
             mother_external_id=parsed.mother_external_id,

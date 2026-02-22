@@ -17,6 +17,8 @@ class ParsedCreature:
     mutations_paternal: int | None
     mother_external_id: str | None
     father_external_id: str | None
+    blueprint: str | None
+    imprinting_quality: float | None
     raw_text: str
 
 
@@ -31,9 +33,11 @@ def parse_creature_file(path: Path) -> ParsedCreature:
     stat_section = _get_section(sections, "Max Character Status Values")
 
     name = dino_data.get("TamedName") or "Unknown"
-    species = _extract_species(dino_data.get("DinoClass", "")) or "Unknown"
+    dino_class = dino_data.get("DinoClass", "")
+    species = _extract_species(dino_class) or "Unknown"
     sex = _parse_sex(dino_data.get("bIsFemale"))
     level = _parse_int(dino_data.get("CharacterLevel"), default=0)
+    imprinting_quality = _parse_float(dino_data.get("DinoImprintingQuality"))
 
     dino_id_1 = dino_data.get("DinoID1")
     dino_id_2 = dino_data.get("DinoID2")
@@ -73,6 +77,8 @@ def parse_creature_file(path: Path) -> ParsedCreature:
         mutations_paternal=mutations_paternal,
         mother_external_id=mother_external_id,
         father_external_id=father_external_id,
+        blueprint=dino_class or None,
+        imprinting_quality=imprinting_quality,
         raw_text=text,
     )
 

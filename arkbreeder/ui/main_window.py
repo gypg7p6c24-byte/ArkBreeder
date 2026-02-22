@@ -7,9 +7,16 @@ from typing import Iterable
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from arkbreeder.core.server_settings import parse_ini_file
+from arkbreeder.core.species_values import SpeciesValuesStore
+from arkbreeder.core.stats import StatMultipliers, compute_wild_levels, extract_stat_multipliers
 from arkbreeder.storage.models import Creature
 from arkbreeder.storage.repository import list_creatures
-from arkbreeder.storage.settings import get_server_settings, set_server_settings
+from arkbreeder.storage.settings import (
+    get_server_settings,
+    get_setting,
+    set_server_settings,
+    set_setting,
+)
 from arkbreeder.ui.radar_chart import RadarChart
 from arkbreeder.ui.species_image import SpeciesImageWidget
 from arkbreeder.ui.toast import ToastNotification
@@ -26,6 +33,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._import_service = None
         self._toasts: list[ToastNotification] = []
         self._server_settings: dict | None = None
+        self._values_store = SpeciesValuesStore()
+        self._values_path: str | None = None
+        self._stat_multipliers = StatMultipliers()
+        self._stat_points: dict[str, dict[str, int]] = {}
         self._creature_cache: list[Creature] = []
         self._creature_rows: list[Creature] = []
         self._selected_creature: Creature | None = None
@@ -38,8 +49,9 @@ class MainWindow(QtWidgets.QMainWindow):
             "Settings",
         ]
         self._build_ui()
-        self.refresh_data()
         self._load_server_settings()
+        self._load_species_values()
+        self.refresh_data()
 
     def _build_ui(self) -> None:
         central = QtWidgets.QWidget()
@@ -338,6 +350,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self._detail_radar = RadarChart(["Health", "Stamina", "Weight", "Melee"])
         layout.addWidget(self._detail_radar)
 
+        self._detail_point_badges: dict[str, QtWidgets.QLabel] = {}
+        points_row = QtWidgets.QHBoxLayout()
+        points_row.setSpacing(8)
+        for label, key in (
+            ("H", "Health"),
+            ("S", "Stamina"),
+            ("W", "Weight"),
+            ("M", "MeleeDamageMultiplier"),
+        ):
+            badge = self._make_point_badge(label)
+            self._detail_point_badges[key] = badge
+            points_row.addWidget(badge)
+        points_row.addStretch(1)
+        layout.addLayout(points_row)
+
         self._detail_strengths = QtWidgets.QLabel("Strengths: -")
         self._detail_strengths.setStyleSheet("color: #a7f3d0;")
         self._detail_strengths.setWordWrap(True)
@@ -485,6 +512,34 @@ class MainWindow(QtWidgets.QMainWindow):
         self._settings_details.setStyleSheet("color: #94a3b8;")
         layout.addWidget(self._settings_details)
 
+        values_header = QtWidgets.QLabel("Creature values")
+        values_header.setStyleSheet("font-size: 16px; font-weight: 600; margin-top: 12px;")
+        layout.addWidget(values_header)
+
+        values_helper = QtWidgets.QLabel(
+            "Import values.json from ARKStatsExtractor to calculate stat point distribution."
+        )
+        values_helper.setWordWrap(True)
+        values_helper.setStyleSheet("color: #cbd5f5;")
+        layout.addWidget(values_helper)
+
+        values_actions = QtWidgets.QHBoxLayout()
+        self._import_values_btn = QtWidgets.QPushButton("Import values.json")
+        self._import_values_btn.clicked.connect(self._import_values_json)
+        values_actions.addWidget(self._import_values_btn)
+        values_actions.addStretch(1)
+        layout.addLayout(values_actions)
+
+        self._values_summary = QtWidgets.QLabel("No values.json loaded.")
+        self._values_summary.setWordWrap(True)
+        self._values_summary.setStyleSheet("color: #94a3b8;")
+        layout.addWidget(self._values_summary)
+
+        self._values_details = QtWidgets.QLabel("")
+        self._values_details.setWordWrap(True)
+        self._values_details.setStyleSheet("color: #94a3b8;")
+        layout.addWidget(self._values_details)
+
         layout.addStretch(1)
         return widget
 
@@ -527,6 +582,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def refresh_data(self) -> None:
         self._creature_cache = list(list_creatures(self._conn))
+        self._recompute_stat_points()
         self._update_dashboard(self._creature_cache)
         self._update_species_filters()
         self._apply_creature_filters()
@@ -543,6 +599,51 @@ class MainWindow(QtWidgets.QMainWindow):
             creature.mutations_maternal + creature.mutations_paternal for creature in creature_list
         )
         self._mutations_count.setText(str(mutations_total))
+
+    def _recompute_stat_points(self) -> None:
+        self._stat_points = {}
+        if self._values_store.count() == 0:
+            return
+        for creature in self._creature_cache:
+            points = self._compute_points_for_creature(creature)
+            if creature.external_id and points:
+                self._stat_points[creature.external_id] = points
+
+    def _compute_points_for_creature(self, creature: Creature) -> dict[str, int]:
+        values = self._resolve_species_values(creature)
+        if values is None:
+            return {}
+        return compute_wild_levels(
+            creature.stats,
+            values,
+            self._stat_multipliers,
+            creature.imprinting_quality,
+        )
+
+    def _resolve_species_values(self, creature: Creature):
+        if creature.blueprint:
+            values = self._values_store.get_by_blueprint(creature.blueprint)
+            if values is not None:
+                return values
+        return self._values_store.get_by_species(creature.species)
+
+    def _get_stat_points(self, creature: Creature) -> dict[str, int]:
+        if creature.external_id and creature.external_id in self._stat_points:
+            return self._stat_points[creature.external_id]
+        return self._compute_points_for_creature(creature)
+
+    def _get_stat_points_value(self, creature: Creature, key: str) -> float | None:
+        points = self._get_stat_points(creature)
+        if not points:
+            return None
+        value = points.get(key)
+        return float(value) if value is not None else None
+
+    def _points_available(self, creatures: Iterable[Creature]) -> bool:
+        for creature in creatures:
+            if self._get_stat_points(creature):
+                return True
+        return False
 
     def _populate_creatures_table(self, creatures: Iterable[Creature]) -> None:
         creature_list = list(creatures)
@@ -658,25 +759,40 @@ class MainWindow(QtWidgets.QMainWindow):
         ]
         males = [c for c in creatures if c.sex.lower() == "male"]
         females = [c for c in creatures if c.sex.lower() == "female"]
+        use_points = self._points_available(creatures)
 
         pairs: list[tuple[float, Creature, Creature, float, float]] = []
         for male in males:
             for female in females:
-                score, male_stat, female_stat = self._score_pair(male, female, focus)
+                score, male_stat, female_stat = self._score_pair(
+                    male,
+                    female,
+                    focus,
+                    use_points=use_points,
+                )
                 pairs.append((score, male, female, male_stat, female_stat))
 
         pairs.sort(key=lambda item: item[0], reverse=True)
         top_pairs = pairs[:10]
-        self._render_breeding_cards(top_pairs, focus)
+        self._render_breeding_cards(top_pairs, focus, use_points)
 
-    def _score_pair(self, male: Creature, female: Creature, focus: str) -> tuple[float, float, float]:
+    def _score_pair(
+        self,
+        male: Creature,
+        female: Creature,
+        focus: str,
+        use_points: bool = False,
+    ) -> tuple[float, float, float]:
         if focus == "Overall":
             best_stats = [
-                max(self._get_stat_value(male, key), self._get_stat_value(female, key))
+                max(
+                    self._get_stat_value(male, key, use_points=use_points),
+                    self._get_stat_value(female, key, use_points=use_points),
+                )
                 for key in ("Health", "Stamina", "Weight", "MeleeDamageMultiplier")
             ]
             score = sum(best_stats)
-            return score, self._overall_score(male), self._overall_score(female)
+            return score, self._overall_score(male, use_points), self._overall_score(female, use_points)
 
         key = {
             "Health": "Health",
@@ -684,18 +800,18 @@ class MainWindow(QtWidgets.QMainWindow):
             "Weight": "Weight",
             "Melee": "MeleeDamageMultiplier",
         }.get(focus, "Health")
-        male_stat = self._get_stat_value(male, key)
-        female_stat = self._get_stat_value(female, key)
+        male_stat = self._get_stat_value(male, key, use_points=use_points)
+        female_stat = self._get_stat_value(female, key, use_points=use_points)
         score = max(male_stat, female_stat)
         return score, male_stat, female_stat
 
-    def _overall_score(self, creature: Creature) -> float:
+    def _overall_score(self, creature: Creature, use_points: bool = False) -> float:
         return sum(
-            self._get_stat_value(creature, key)
+            self._get_stat_value(creature, key, use_points=use_points)
             for key in ("Health", "Stamina", "Weight", "MeleeDamageMultiplier")
         )
 
-    def _species_max_stats(self, species: str) -> dict[str, float]:
+    def _species_max_stats(self, species: str, use_points: bool = False) -> dict[str, float]:
         candidates = [c for c in self._creature_cache if c.species == species]
         stats = {
             "Health": 1.0,
@@ -704,10 +820,17 @@ class MainWindow(QtWidgets.QMainWindow):
             "MeleeDamageMultiplier": 1.0,
         }
         for key in stats:
-            stats[key] = max((self._get_stat_value(c, key) for c in candidates), default=1.0)
+            stats[key] = max(
+                (self._get_stat_value(c, key, use_points=use_points) for c in candidates),
+                default=1.0,
+            )
         return stats
 
-    def _get_stat_value(self, creature: Creature, key: str) -> float:
+    def _get_stat_value(self, creature: Creature, key: str, use_points: bool = False) -> float:
+        if use_points:
+            points_value = self._get_stat_points_value(creature, key)
+            if points_value is not None:
+                return points_value
         value = creature.stats.get(key)
         if value is None:
             return 0.0
@@ -750,6 +873,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self,
         pairs: list[tuple[float, Creature, Creature, float, float]],
         focus: str,
+        use_points: bool,
     ) -> None:
         layout = self._breeding_cards_layout
         while layout.count() > 1:
@@ -776,14 +900,17 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             card_layout = QtWidgets.QHBoxLayout(card)
             card_layout.setSpacing(16)
-            max_stats = self._species_max_stats(male.species)
-            male_box = self._pair_info_box("Male", male, male_stat, max_stats)
-            female_box = self._pair_info_box("Female", female, female_stat, max_stats)
+            max_stats = self._species_max_stats(male.species, use_points=use_points)
+            male_box = self._pair_info_box("Male", male, male_stat, max_stats, use_points)
+            female_box = self._pair_info_box("Female", female, female_stat, max_stats, use_points)
 
             summary = QtWidgets.QVBoxLayout()
             focus_label = QtWidgets.QLabel(f"Focus: {focus}")
             focus_label.setStyleSheet("color: #93c5fd; font-weight: 600;")
-            score_label = QtWidgets.QLabel(f"Combined score: {self._format_score(score)}")
+            suffix = "points" if use_points else "raw"
+            score_label = QtWidgets.QLabel(
+                f"Combined score ({suffix}): {self._format_score(score)}"
+            )
             score_label.setStyleSheet("color: #f8fafc; font-size: 14px;")
             summary.addWidget(focus_label)
             summary.addWidget(score_label)
@@ -801,6 +928,7 @@ class MainWindow(QtWidgets.QMainWindow):
         creature: Creature,
         focus_stat: float,
         max_stats: dict[str, float],
+        use_points: bool = False,
     ) -> QtWidgets.QWidget:
         sex_lower = creature.sex.lower() if creature.sex else ""
         accent = "#94a3b8"
@@ -819,15 +947,43 @@ class MainWindow(QtWidgets.QMainWindow):
         name_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
         sex_label = QtWidgets.QLabel(creature.sex or "Unknown")
         sex_label.setStyleSheet(f"color: {accent}; font-weight: 600;")
-        stat_label = QtWidgets.QLabel(f"Stat: {self._format_score(focus_stat)}")
+        stat_suffix = "pts" if use_points else "raw"
+        stat_label = QtWidgets.QLabel(f"Stat ({stat_suffix}): {self._format_score(focus_stat)}")
         stat_label.setStyleSheet("color: #a7f3d0;")
         layout.addWidget(label)
         layout.addWidget(name_label)
         layout.addWidget(sex_label)
         layout.addWidget(stat_label)
-        layout.addWidget(self._stat_bar_row("H", creature, "Health", max_stats.get("Health", 1.0), "#22c55e"))
-        layout.addWidget(self._stat_bar_row("S", creature, "Stamina", max_stats.get("Stamina", 1.0), "#38bdf8"))
-        layout.addWidget(self._stat_bar_row("W", creature, "Weight", max_stats.get("Weight", 1.0), "#f59e0b"))
+        layout.addWidget(
+            self._stat_bar_row(
+                "H",
+                creature,
+                "Health",
+                max_stats.get("Health", 1.0),
+                "#22c55e",
+                use_points,
+            )
+        )
+        layout.addWidget(
+            self._stat_bar_row(
+                "S",
+                creature,
+                "Stamina",
+                max_stats.get("Stamina", 1.0),
+                "#38bdf8",
+                use_points,
+            )
+        )
+        layout.addWidget(
+            self._stat_bar_row(
+                "W",
+                creature,
+                "Weight",
+                max_stats.get("Weight", 1.0),
+                "#f59e0b",
+                use_points,
+            )
+        )
         layout.addWidget(
             self._stat_bar_row(
                 "M",
@@ -835,6 +991,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 "MeleeDamageMultiplier",
                 max_stats.get("MeleeDamageMultiplier", 1.0),
                 "#f97316",
+                use_points,
             )
         )
         return box
@@ -846,6 +1003,7 @@ class MainWindow(QtWidgets.QMainWindow):
         key: str,
         max_value: float,
         color: str,
+        use_points: bool = False,
     ) -> QtWidgets.QWidget:
         row = QtWidgets.QWidget()
         row_layout = QtWidgets.QHBoxLayout(row)
@@ -856,7 +1014,7 @@ class MainWindow(QtWidgets.QMainWindow):
         tag.setStyleSheet("color: #94a3b8; font-size: 10px;")
         bar = QtWidgets.QProgressBar()
         bar.setMaximum(100)
-        value = self._get_stat_value(creature, key)
+        value = self._get_stat_value(creature, key, use_points=use_points)
         ratio = 0.0 if max_value <= 0 else min(max(value / max_value, 0.0), 1.0)
         bar.setValue(int(ratio * 100))
         bar.setTextVisible(False)
@@ -877,6 +1035,23 @@ class MainWindow(QtWidgets.QMainWindow):
         row_layout.addWidget(tag)
         row_layout.addWidget(bar, 1)
         return row
+
+    def _make_point_badge(self, label: str) -> QtWidgets.QLabel:
+        badge = QtWidgets.QLabel(f"{label} -")
+        badge.setAlignment(QtCore.Qt.AlignCenter)
+        badge.setFixedWidth(54)
+        badge.setStyleSheet(
+            """
+            QLabel {
+                background: #111827;
+                border: 1px solid #1f2937;
+                border-radius: 10px;
+                padding: 6px 8px;
+                font-weight: 600;
+            }
+            """
+        )
+        return badge
 
     def _sex_icon(self, sex: str | None) -> str:
         if not sex:
@@ -1150,6 +1325,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _load_server_settings(self) -> None:
         self._server_settings = get_server_settings(self._conn)
+        self._stat_multipliers = extract_stat_multipliers(self._server_settings)
         self._update_settings_view()
 
     def _update_settings_view(self) -> None:
@@ -1180,6 +1356,29 @@ class MainWindow(QtWidgets.QMainWindow):
         self._settings_summary.setText("Server settings loaded.")
         self._settings_details.setText("\n".join(summary_lines + detail_lines))
 
+    def _load_species_values(self) -> None:
+        self._values_store = SpeciesValuesStore()
+        self._values_path = get_setting(self._conn, "values_json_path")
+        if self._values_path:
+            path = Path(self._values_path)
+            if path.exists():
+                try:
+                    self._values_store.load_values_file(path)
+                except Exception:
+                    logger.exception("Failed to load values.json from %s", path)
+        self._update_values_view()
+        self._recompute_stat_points()
+
+    def _update_values_view(self) -> None:
+        count = self._values_store.count()
+        if count == 0:
+            self._values_summary.setText("No values.json loaded.")
+            self._values_details.setText("")
+            return
+        source = self._values_path or "unknown path"
+        self._values_summary.setText(f"Loaded {count} species values.")
+        self._values_details.setText(f"Source: {source}")
+
     def _import_game_user_settings(self) -> None:
         path = self._select_ini_file("Select GameUserSettings.ini")
         if not path:
@@ -1198,6 +1397,28 @@ class MainWindow(QtWidgets.QMainWindow):
         payload["sources"]["game_ini"] = path
         self._save_server_settings(payload, "Game.ini imported.")
 
+    def _import_values_json(self) -> None:
+        path = self._select_values_file("Select values.json")
+        if not path:
+            return
+        store = SpeciesValuesStore()
+        try:
+            store.load_values_file(Path(path))
+        except Exception:
+            logger.exception("Failed to load values.json from %s", path)
+            self.show_toast("Failed to import values.json.", "error")
+            return
+        if store.count() == 0:
+            self.show_toast("values.json did not contain species data.", "error")
+            return
+        self._values_store = store
+        self._values_path = path
+        set_setting(self._conn, "values_json_path", path)
+        self._update_values_view()
+        self._recompute_stat_points()
+        self.refresh_data()
+        self.show_toast("values.json imported.", "success")
+
     def _select_ini_file(self, title: str) -> str | None:
         start_dir = str(Path.home())
         selected, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -1208,6 +1429,19 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         if not selected:
             self.show_toast("No settings file selected.", "info")
+            return None
+        return selected
+
+    def _select_values_file(self, title: str) -> str | None:
+        start_dir = str(Path.home())
+        selected, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            title,
+            start_dir,
+            "JSON files (*.json);;All files (*)",
+        )
+        if not selected:
+            self.show_toast("No values.json selected.", "info")
             return None
         return selected
 
@@ -1226,7 +1460,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def _save_server_settings(self, payload: dict[str, object], message: str) -> None:
         set_server_settings(self._conn, payload)
         self._server_settings = payload
+        self._stat_multipliers = extract_stat_multipliers(self._server_settings)
         self._update_settings_view()
+        self._recompute_stat_points()
+        self.refresh_data()
         self.show_toast(message, "success")
 
     def show_toast(self, message: str, kind: str = "info") -> None:
