@@ -24,3 +24,6 @@ arkbreeder = "arkbreeder.ui.app:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["arkbreeder*"]
+
+[tool.setuptools.package-data]
+arkbreeder = ["resources/*.json"]

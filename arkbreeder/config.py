@@ -38,3 +38,7 @@ def export_dir() -> Path:
     if override:
         return Path(override).expanduser()
     return DEFAULT_EXPORT_DIR
+
+
+def bundled_values_path() -> Path:
+    return Path(__file__).resolve().parent / "resources" / "values.default.json"

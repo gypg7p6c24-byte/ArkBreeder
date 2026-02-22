@@ -7,7 +7,7 @@ from typing import Iterable
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from arkbreeder.config import user_data_dir
+from arkbreeder.config import bundled_values_path, user_data_dir
 from arkbreeder.core.server_settings import parse_ini_file
 from arkbreeder.core.species_values import SpeciesValuesStore
 from arkbreeder.core.stats import StatMultipliers, compute_wild_levels, extract_stat_multipliers
@@ -54,6 +54,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._server_settings: dict | None = None
         self._values_store = SpeciesValuesStore()
         self._values_path: str | None = None
+        self._values_from_bundle = False
         self._stat_multipliers = StatMultipliers()
         self._stat_points: dict[str, dict[str, int]] = {}
         self._creature_cache: list[Creature] = []
@@ -542,6 +543,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._pedigree_mother = self._pedigree_mother_box.findChild(QtWidgets.QLabel, "value")
         self._pedigree_father = self._pedigree_father_box.findChild(QtWidgets.QLabel, "value")
         self._pedigree_subject = self._pedigree_subject_box.findChild(QtWidgets.QLabel, "value")
+        self._pedigree_mother_meta = self._pedigree_mother_box.findChild(QtWidgets.QLabel, "meta")
+        self._pedigree_father_meta = self._pedigree_father_box.findChild(QtWidgets.QLabel, "meta")
+        self._pedigree_subject_meta = self._pedigree_subject_box.findChild(QtWidgets.QLabel, "meta")
 
         tree_layout.addWidget(self._pedigree_mother_box, 0, 0, alignment=QtCore.Qt.AlignCenter)
         tree_layout.addWidget(self._pedigree_father_box, 0, 2, alignment=QtCore.Qt.AlignCenter)
@@ -1036,6 +1040,10 @@ class MainWindow(QtWidgets.QMainWindow):
             widget = item.widget()
             if widget:
                 widget.deleteLater()
+                continue
+            child_layout = item.layout()
+            if child_layout:
+                self._clear_layout(child_layout)
 
     def _empty_dashboard_label(self, text: str) -> QtWidgets.QLabel:
         label = QtWidgets.QLabel(text)
@@ -1053,11 +1061,17 @@ class MainWindow(QtWidgets.QMainWindow):
     def _recompute_stat_points(self) -> None:
         self._stat_points = {}
         if self._values_store.count() == 0:
+            logger.debug("Stat points disabled: no species values loaded.")
             return
         for creature in self._creature_cache:
             points = self._compute_points_for_creature(creature)
             if creature.external_id and points:
                 self._stat_points[creature.external_id] = points
+        logger.debug(
+            "Computed stat points for %d/%d creatures.",
+            len(self._stat_points),
+            len(self._creature_cache),
+        )
 
     def _compute_points_for_creature(self, creature: Creature) -> dict[str, int]:
         values = self._resolve_species_values(creature)
@@ -1244,31 +1258,37 @@ class MainWindow(QtWidgets.QMainWindow):
             grouped.setdefault(key, []).append(creature)
         use_points = self._points_available(creatures)
 
-        pairs: list[tuple[float, Creature, Creature, float, float]] = []
-        for group in grouped.values():
+        pairs: list[tuple[str, float, Creature, Creature]] = []
+        missing_pairs: list[tuple[str, bool, bool]] = []
+        for species_name, group in grouped.items():
             males = [c for c in group if c.sex.lower() == "male"]
             females = [c for c in group if c.sex.lower() == "female"]
             if not males or not females:
+                missing_pairs.append((species_name, bool(males), bool(females)))
                 continue
-            group_pairs: list[tuple[float, Creature, Creature, float, float]] = []
+            group_pairs: list[tuple[float, Creature, Creature]] = []
             for male in males:
                 for female in females:
-                    score, male_stat, female_stat = self._score_pair(
+                    score, _, _ = self._score_pair(
                         male,
                         female,
                         focus,
                         use_points=use_points,
                     )
-                    group_pairs.append((score, male, female, male_stat, female_stat))
+                    group_pairs.append((score, male, female))
             group_pairs.sort(key=lambda item: item[0], reverse=True)
             if species == "All species":
-                pairs.extend(group_pairs[:1])
+                best_score, best_male, best_female = group_pairs[0]
+                pairs.append((species_name, best_score, best_male, best_female))
             else:
-                pairs.extend(group_pairs)
+                pairs.extend(
+                    (species_name, score, male, female)
+                    for score, male, female in group_pairs
+                )
 
-        pairs.sort(key=lambda item: item[0], reverse=True)
-        top_pairs = pairs[:10]
-        self._render_breeding_cards(top_pairs, focus, use_points)
+        pairs.sort(key=lambda item: item[1], reverse=True)
+        top_pairs = pairs[:10] if species != "All species" else pairs
+        self._render_breeding_cards(top_pairs, focus, use_points, missing_pairs)
 
     def _score_pair(
         self,
@@ -1372,27 +1392,34 @@ class MainWindow(QtWidgets.QMainWindow):
         value_label.setObjectName("value")
         value_label.setAlignment(QtCore.Qt.AlignCenter)
         value_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
+        meta_label = QtWidgets.QLabel("")
+        meta_label.setObjectName("meta")
+        meta_label.setAlignment(QtCore.Qt.AlignCenter)
+        meta_label.setWordWrap(True)
+        meta_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
         layout.addWidget(label, alignment=QtCore.Qt.AlignCenter)
         layout.addWidget(value_label)
+        layout.addWidget(meta_label)
         return node
 
     def _render_breeding_cards(
         self,
-        pairs: list[tuple[float, Creature, Creature, float, float]],
+        pairs: list[tuple[str, float, Creature, Creature]],
         focus: str,
         use_points: bool,
+        missing_pairs: list[tuple[str, bool, bool]],
     ) -> None:
         layout = self._breeding_cards_layout
         self._clear_layout(layout)
 
-        if not pairs:
+        if not pairs and not missing_pairs:
             empty = QtWidgets.QLabel("No breeding pairs found for this filter.")
             empty.setStyleSheet("color: #94a3b8;")
             layout.addWidget(empty, 0, 0)
             return
 
         columns = 2
-        for index, (score, male, female, _male_stat, _female_stat) in enumerate(pairs):
+        for index, (species_name, score, male, female) in enumerate(pairs):
             card = QtWidgets.QFrame()
             card.setStyleSheet(
                 "QFrame { background: rgba(15, 23, 42, 0.7); border-radius: 16px; }"
@@ -1406,6 +1433,10 @@ class MainWindow(QtWidgets.QMainWindow):
             card_layout = QtWidgets.QVBoxLayout(card)
             card_layout.setSpacing(10)
             card_layout.setContentsMargins(12, 12, 12, 12)
+
+            species_label = QtWidgets.QLabel(species_name)
+            species_label.setStyleSheet("color: #cbd5f5; font-weight: 600;")
+            card_layout.addWidget(species_label)
 
             max_stats = self._species_max_stats(male.species, use_points=use_points)
             male_box = self._pair_info_box(male, max_stats, use_points)
@@ -1421,6 +1452,33 @@ class MainWindow(QtWidgets.QMainWindow):
             row = index // columns
             col = index % columns
             layout.addWidget(card, row, col)
+
+        start_index = len(pairs)
+        for offset, (species_name, has_male, has_female) in enumerate(missing_pairs):
+            info = QtWidgets.QFrame()
+            info.setStyleSheet(
+                "QFrame { background: rgba(11, 19, 36, 0.45); border: 1px dashed #334155; border-radius: 14px; }"
+            )
+            info_layout = QtWidgets.QVBoxLayout(info)
+            info_layout.setContentsMargins(12, 12, 12, 12)
+            title = QtWidgets.QLabel(species_name)
+            title.setStyleSheet("color: #cbd5f5; font-weight: 600;")
+            needs = []
+            if not has_male:
+                needs.append("male")
+            if not has_female:
+                needs.append("female")
+            details = QtWidgets.QLabel(
+                "No pair yet: add " + " and ".join(needs) + "."
+            )
+            details.setStyleSheet("color: #94a3b8;")
+            details.setWordWrap(True)
+            info_layout.addWidget(title)
+            info_layout.addWidget(details)
+            index = start_index + offset
+            row = index // columns
+            col = index % columns
+            layout.addWidget(info, row, col)
 
     def _pair_info_box(
         self,
@@ -1774,18 +1832,26 @@ class MainWindow(QtWidgets.QMainWindow):
             self._pedigree_empty.setVisible(True)
             if self._pedigree_subject:
                 self._pedigree_subject.setText("Select a creature")
+            if self._pedigree_subject_meta:
+                self._pedigree_subject_meta.setText("")
             if self._pedigree_mother:
                 self._pedigree_mother.setText("Unknown")
+            if self._pedigree_mother_meta:
+                self._pedigree_mother_meta.setText("")
             if self._pedigree_father:
                 self._pedigree_father.setText("Unknown")
+            if self._pedigree_father_meta:
+                self._pedigree_father_meta.setText("")
             return
         self._pedigree_tree.setVisible(True)
         self._pedigree_empty.setVisible(False)
         selected = self._pedigree_creature_picker.currentData()
         creature = selected if isinstance(selected, Creature) and selected in candidates else candidates[0]
         if self._pedigree_subject:
-            self._pedigree_subject.setText(
-                f"{creature.name}\n{self._display_species(creature.species)}"
+            self._pedigree_subject.setText(creature.name)
+        if self._pedigree_subject_meta:
+            self._pedigree_subject_meta.setText(
+                f"{self._sex_icon(creature.sex)} {creature.sex} • L{creature.level} • {self._display_species(creature.species)}"
             )
         mother = self._find_creature_by_id(creature.mother_id) or self._find_creature_by_external_id(
             creature.mother_external_id
@@ -1795,8 +1861,22 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         if self._pedigree_mother:
             self._pedigree_mother.setText(mother.name if mother else "Unknown")
+        if self._pedigree_mother_meta:
+            if mother:
+                self._pedigree_mother_meta.setText(
+                    f"{self._sex_icon(mother.sex)} {mother.sex} • L{mother.level} • {self._display_species(mother.species)}"
+                )
+            else:
+                self._pedigree_mother_meta.setText("")
         if self._pedigree_father:
             self._pedigree_father.setText(father.name if father else "Unknown")
+        if self._pedigree_father_meta:
+            if father:
+                self._pedigree_father_meta.setText(
+                    f"{self._sex_icon(father.sex)} {father.sex} • L{father.level} • {self._display_species(father.species)}"
+                )
+            else:
+                self._pedigree_father_meta.setText("")
 
     def _set_table_item(self, row: int, col: int, value: str, external_id: str | None = None) -> None:
         item = QtWidgets.QTableWidgetItem(value)
@@ -1991,14 +2071,28 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _load_species_values(self) -> None:
         self._values_store = SpeciesValuesStore()
+        self._values_from_bundle = False
         self._values_path = get_setting(self._conn, "values_json_path")
+        loaded = False
         if self._values_path:
-            path = Path(self._values_path)
-            if path.exists():
+            custom_path = Path(self._values_path)
+            if custom_path.exists():
                 try:
-                    self._values_store.load_values_file(path)
+                    self._values_store.load_values_file(custom_path)
+                    loaded = self._values_store.count() > 0
                 except Exception:
-                    logger.exception("Failed to load values.json from %s", path)
+                    logger.exception("Failed to load values.json from %s", custom_path)
+        if not loaded:
+            default_path = bundled_values_path()
+            if default_path.exists():
+                try:
+                    self._values_store.load_values_file(default_path)
+                    loaded = self._values_store.count() > 0
+                except Exception:
+                    logger.exception("Failed to load bundled values from %s", default_path)
+                if loaded:
+                    self._values_from_bundle = True
+                    self._values_path = str(default_path)
         self._update_values_view()
         self._update_points_info_labels()
         self._recompute_stat_points()
@@ -2010,6 +2104,12 @@ class MainWindow(QtWidgets.QMainWindow):
             self._values_details.setText("")
             return
         source = self._values_path or "unknown path"
+        if self._values_from_bundle:
+            self._values_summary.setText(f"Loaded {count} built-in species values.")
+            self._values_details.setText(
+                "Source: bundled defaults (import your own values.json to override)."
+            )
+            return
         self._values_summary.setText(f"Loaded {count} species values.")
         self._values_details.setText(f"Source: {source}")
 
@@ -2047,6 +2147,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self._values_store = store
         self._values_path = path
+        self._values_from_bundle = False
         set_setting(self._conn, "values_json_path", path)
         self._update_values_view()
         self._update_points_info_labels()
