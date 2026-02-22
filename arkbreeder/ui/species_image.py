@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import re
 import urllib.parse
@@ -18,11 +19,9 @@ class SpeciesImageWidget(QtWidgets.QLabel):
         self.setStyleSheet("border: 1px solid #1f2937; border-radius: 10px;")
         self._manager = QtNetwork.QNetworkAccessManager(self)
         self._manager.finished.connect(self._on_reply)
-        self._pending_species: str | None = None
-        self._pending_kind: str | None = None
-        self._pending_url: QtCore.QUrl | None = None
-        self._pending_sources: list[tuple[str, str, str]] = []
-        self._pending_base: str | None = None
+        self._active_request_id = 0
+        self._active_species: str | None = None
+        self._active_sources: list[tuple[str, str, str]] = []
         self._loading_timer = QtCore.QTimer(self)
         self._loading_timer.setInterval(350)
         self._loading_timer.timeout.connect(self._tick_loading)
@@ -31,79 +30,124 @@ class SpeciesImageWidget(QtWidgets.QLabel):
 
     def set_species(self, species: str) -> None:
         if not species:
+            self._stop_loading()
+            self.setPixmap(QtGui.QPixmap())
             self.setText("No image")
             return
-        self._pending_species = species
+        self._active_request_id += 1
+        request_id = self._active_request_id
+        self._active_species = species
+
         cached = self._cache_path(species)
-        if cached.exists():
-            self._set_pixmap(QtGui.QPixmap(str(cached)))
-            return
+        if self._is_valid_cache(species, cached):
+            pixmap = QtGui.QPixmap(str(cached))
+            if not pixmap.isNull():
+                self._set_pixmap(pixmap)
+                return
+            self._invalidate_cache(species)
+
         self.setPixmap(QtGui.QPixmap())
         self._start_loading()
-        self._pending_sources = [
+        self._active_sources = [
             ("pageimage", "wiki", self._wiki_api_url(species)),
             ("search", "wiki", self._wiki_search_url(species)),
             ("pageimage", "fandom", self._fandom_api_url(species)),
             ("search", "fandom", self._fandom_search_url(species)),
         ]
-        self._fetch_next_source()
+        self._fetch_next_source(request_id)
 
     def _on_reply(self, reply: QtNetwork.QNetworkReply) -> None:
+        request_id = int(reply.property("request_id") or 0)
+        kind = str(reply.property("kind") or "")
+        base = str(reply.property("base") or "")
+        species = str(reply.property("species") or "")
+
+        if request_id != self._active_request_id:
+            reply.deleteLater()
+            return
+
         if reply.error() != QtNetwork.QNetworkReply.NoError:
-            if self._pending_kind == "html" and self._fetch_next_source():
+            reply.deleteLater()
+            if self._fetch_next_source(request_id):
                 return
             self._stop_loading()
             self.setText("Image not available")
             return
+
         data = reply.readAll()
-        if self._pending_kind == "pageimage":
+        if kind == "pageimage":
             image_url = self._extract_api_image(bytes(data))
             if not image_url:
-                if self._fetch_next_source():
+                reply.deleteLater()
+                if self._fetch_next_source(request_id):
                     return
                 self._stop_loading()
                 self.setText("Image not available")
                 return
-            self._pending_kind = "image"
-            self._pending_url = QtCore.QUrl(image_url)
-            self._manager.get(self._build_request(self._pending_url))
+            self._issue_request(image_url, request_id, "image", base, species)
+            reply.deleteLater()
             return
-        if self._pending_kind == "search":
+        if kind == "search":
             title = self._extract_search_title(bytes(data))
             if not title:
-                if self._fetch_next_source():
+                reply.deleteLater()
+                if self._fetch_next_source(request_id):
                     return
                 self._stop_loading()
                 self.setText("Image unavailable")
                 return
-            if self._pending_base == "fandom":
-                self._pending_kind = "pageimage"
-                self._pending_url = QtCore.QUrl(self._fandom_api_url(title))
+            if base == "fandom":
+                next_url = self._fandom_api_url(title)
             else:
-                self._pending_kind = "pageimage"
-                self._pending_url = QtCore.QUrl(self._wiki_api_url(title))
-            self._manager.get(self._build_request(self._pending_url))
+                next_url = self._wiki_api_url(title)
+            self._issue_request(next_url, request_id, "pageimage", base, species)
+            reply.deleteLater()
             return
-        if self._pending_kind == "image":
+        if kind == "image":
             pixmap = QtGui.QPixmap()
             pixmap.loadFromData(data)
             if pixmap.isNull():
+                reply.deleteLater()
+                if self._fetch_next_source(request_id):
+                    return
                 self._stop_loading()
                 self.setText("Image not available")
                 return
-            if self._pending_species:
-                pixmap.save(str(self._cache_path(self._pending_species)))
+            if species:
+                pixmap.save(str(self._cache_path(species)))
+                self._write_cache_metadata(species)
             self._set_pixmap(pixmap)
+        reply.deleteLater()
 
-    def _fetch_next_source(self) -> bool:
-        if not self._pending_sources:
+    def _fetch_next_source(self, request_id: int) -> bool:
+        if request_id != self._active_request_id:
             return False
-        kind, base, page_url = self._pending_sources.pop(0)
-        self._pending_kind = kind
-        self._pending_base = base
-        self._pending_url = QtCore.QUrl(page_url)
-        self._manager.get(self._build_request(self._pending_url))
+        if not self._active_sources:
+            return False
+        kind, base, page_url = self._active_sources.pop(0)
+        self._issue_request(
+            page_url,
+            request_id=request_id,
+            kind=kind,
+            base=base,
+            species=self._active_species,
+        )
         return True
+
+    def _issue_request(
+        self,
+        url: str,
+        request_id: int,
+        kind: str,
+        base: str,
+        species: str | None,
+    ) -> None:
+        qurl = QtCore.QUrl(url)
+        reply = self._manager.get(self._build_request(qurl))
+        reply.setProperty("request_id", request_id)
+        reply.setProperty("kind", kind)
+        reply.setProperty("base", base)
+        reply.setProperty("species", species or "")
 
     def _set_pixmap(self, pixmap: QtGui.QPixmap) -> None:
         self._stop_loading()
@@ -133,6 +177,37 @@ class SpeciesImageWidget(QtWidgets.QLabel):
         cache_dir = user_data_dir() / "cache" / "images"
         cache_dir.mkdir(parents=True, exist_ok=True)
         return cache_dir / f"{safe}.png"
+
+    def _cache_meta_path(self, species: str) -> Path:
+        safe = re.sub(r"[^a-zA-Z0-9_-]+", "_", species).lower()
+        cache_dir = user_data_dir() / "cache" / "images"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir / f"{safe}.json"
+
+    def _is_valid_cache(self, species: str, cache_path: Path) -> bool:
+        if not cache_path.exists():
+            return False
+        meta_path = self._cache_meta_path(species)
+        if not meta_path.exists():
+            return False
+        try:
+            metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            return False
+        return isinstance(metadata, dict) and metadata.get("species") == species
+
+    def _write_cache_metadata(self, species: str) -> None:
+        meta_path = self._cache_meta_path(species)
+        payload = {"species": species}
+        meta_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    def _invalidate_cache(self, species: str) -> None:
+        for path in (self._cache_path(species), self._cache_meta_path(species)):
+            try:
+                if path.exists():
+                    path.unlink()
+            except OSError:
+                continue
 
     def _wiki_api_url(self, species: str) -> str:
         mapped = _SPECIES_PAGE_OVERRIDES.get(species, species)
