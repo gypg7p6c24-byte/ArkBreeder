@@ -214,5 +214,6 @@ class SpeciesImageWidget(QtWidgets.QLabel):
 
 _SPECIES_PAGE_OVERRIDES = {
     "Ptero": "Pteranodon",
+    "Pterodactyl": "Pteranodon",
     "Argent": "Argentavis",
 }

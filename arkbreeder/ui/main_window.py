@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Iterable
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from arkbreeder.config import user_data_dir
 from arkbreeder.core.server_settings import parse_ini_file
 from arkbreeder.core.species_values import SpeciesValuesStore
 from arkbreeder.core.stats import StatMultipliers, compute_wild_levels, extract_stat_multipliers
@@ -34,6 +36,10 @@ _DASHBOARD_COLORS = [
     "#60a5fa",
     "#f97316",
 ]
+
+_SPECIES_DISPLAY_OVERRIDES = {
+    "Ptero": "Pterodactyl",
+}
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -77,8 +83,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._nav.setFocusPolicy(QtCore.Qt.NoFocus)
         self._nav.setStyleSheet('''
         QListWidget { background: #0b1220; color: #e5e7eb; border: none; }
-        QListWidget::item { padding: 10px 12px; margin: 4px 8px; border-radius: 12px; border: 0px; }
-        QListWidget::item:hover { background: #0f172a; }
+        QListWidget::item { padding: 10px 12px; margin: 4px 8px; border-radius: 12px; border: 0px; background: transparent; }
+        QListWidget::item:hover { background: transparent; color: #ffffff; }
         QListWidget::item:selected { background: #1f2937; color: #ffffff; }
         QListWidget::item:focus { outline: none; }
         ''')
@@ -203,6 +209,7 @@ class MainWindow(QtWidgets.QMainWindow):
         left_title.setStyleSheet("color: #e2e8f0; font-weight: 600;")
         left_layout.addWidget(left_title)
         self._species_donut = DonutChartWidget()
+        self._species_donut.setMinimumSize(180, 180)
         left_layout.addWidget(self._species_donut, 1)
         self._species_legend = QtWidgets.QVBoxLayout()
         self._species_legend.setSpacing(6)
@@ -226,6 +233,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         gender_panel, self._dashboard_gender_layout = self._dashboard_panel("Gender split")
         self._gender_donut = DonutChartWidget()
+        self._gender_donut.setMinimumSize(180, 180)
         self._dashboard_gender_layout.addWidget(self._gender_donut, 1)
         self._gender_legend = QtWidgets.QVBoxLayout()
         self._gender_legend.setSpacing(6)
@@ -338,13 +346,15 @@ class MainWindow(QtWidgets.QMainWindow):
             ]
         )
         self._creatures_table.horizontalHeader().setStretchLastSection(True)
-        self._creatures_table.setAlternatingRowColors(True)
+        self._creatures_table.setAlternatingRowColors(False)
         self._creatures_table.setStyleSheet(
             """
-            QTableWidget::item:selected { background: #1f2937; }
-            QTableWidget::item:alternate { background: #0b1324; }
+            QTableWidget { background: transparent; border: none; gridline-color: transparent; }
+            QTableWidget::item { padding: 6px; }
+            QTableWidget::item:selected { background: #1f2937; color: #f8fafc; }
             """
         )
+        self._creatures_table.setShowGrid(False)
         self._creatures_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self._creatures_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self._creatures_table.verticalHeader().setVisible(False)
@@ -400,9 +410,9 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QSizePolicy.Expanding,
             QtWidgets.QSizePolicy.Expanding,
         )
-        self._breeding_cards_layout = QtWidgets.QVBoxLayout(self._breeding_cards_container)
-        self._breeding_cards_layout.setSpacing(12)
-        self._breeding_cards_layout.addStretch(1)
+        self._breeding_cards_layout = QtWidgets.QGridLayout(self._breeding_cards_container)
+        self._breeding_cards_layout.setSpacing(16)
+        self._breeding_cards_layout.setContentsMargins(4, 4, 4, 4)
 
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
@@ -420,9 +430,8 @@ class MainWindow(QtWidgets.QMainWindow):
         panel.setStyleSheet(
             """
             QFrame {
-                background: #0f172a;
-                border: 1px solid #1f2937;
-                border-radius: 12px;
+                background: rgba(15, 23, 42, 0.45);
+                border-radius: 16px;
             }
             """
         )
@@ -439,6 +448,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self._detail_subtitle)
 
         self._detail_image = SpeciesImageWidget()
+        self._detail_image.setStyleSheet("border: none;")
         layout.addWidget(self._detail_image, alignment=QtCore.Qt.AlignCenter)
 
         self._detail_radar = RadarChart(["Health", "Stamina", "Weight", "Melee"])
@@ -458,6 +468,27 @@ class MainWindow(QtWidgets.QMainWindow):
             points_row.addWidget(badge)
         points_row.addStretch(1)
         layout.addLayout(points_row)
+
+        self._detail_stat_values: dict[str, QtWidgets.QLabel] = {}
+        stat_grid = QtWidgets.QGridLayout()
+        stat_grid.setHorizontalSpacing(12)
+        stat_grid.setVerticalSpacing(6)
+        for row, (label, key) in enumerate(
+            (
+                ("Health", "Health"),
+                ("Stamina", "Stamina"),
+                ("Weight", "Weight"),
+                ("Melee", "MeleeDamageMultiplier"),
+            )
+        ):
+            name_label = QtWidgets.QLabel(label)
+            name_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
+            value_label = QtWidgets.QLabel("-")
+            value_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
+            self._detail_stat_values[key] = value_label
+            stat_grid.addWidget(name_label, row, 0)
+            stat_grid.addWidget(value_label, row, 1)
+        layout.addLayout(stat_grid)
 
         self._points_info = QtWidgets.QLabel(
             "Stat points unavailable — import values.json in Settings."
@@ -624,6 +655,13 @@ class MainWindow(QtWidgets.QMainWindow):
         values_helper.setStyleSheet("color: #cbd5f5;")
         layout.addWidget(values_helper)
 
+        values_hint = QtWidgets.QLabel(
+            "Hint: values.json usually lives in the ARKStatsExtractor data folder."
+        )
+        values_hint.setWordWrap(True)
+        values_hint.setStyleSheet("color: #94a3b8; font-size: 12px;")
+        layout.addWidget(values_hint)
+
         values_actions = QtWidgets.QHBoxLayout()
         self._import_values_btn = QtWidgets.QPushButton("Import values.json")
         self._import_values_btn.clicked.connect(self._import_values_json)
@@ -695,7 +733,11 @@ class MainWindow(QtWidgets.QMainWindow):
     def _update_dashboard(self, creatures: Iterable[Creature]) -> None:
         creature_list = list(creatures)
         self._creatures_count.setText(str(len(creature_list)))
-        species = {creature.species for creature in creature_list if creature.species}
+        species = {
+            self._display_species(creature.species)
+            for creature in creature_list
+            if creature.species
+        }
         self._species_count.setText(str(len(species)))
         mutations_total = sum(
             creature.mutations_maternal + creature.mutations_paternal for creature in creature_list
@@ -709,7 +751,8 @@ class MainWindow(QtWidgets.QMainWindow):
         for creature in creature_list:
             if not creature.species:
                 continue
-            species_counts[creature.species] = species_counts.get(creature.species, 0) + 1
+            species_name = self._display_species(creature.species)
+            species_counts[species_name] = species_counts.get(species_name, 0) + 1
 
         sorted_counts = sorted(species_counts.items(), key=lambda item: item[1], reverse=True)
         top_counts = sorted_counts[:6]
@@ -727,7 +770,9 @@ class MainWindow(QtWidgets.QMainWindow):
         average_levels = []
         for label, count in species_counts.items():
             total_level = sum(
-                creature.level for creature in creature_list if creature.species == label
+                creature.level
+                for creature in creature_list
+                if self._display_species(creature.species) == label
             )
             average_levels.append((label, total_level / max(count, 1)))
         average_levels.sort(key=lambda item: item[1], reverse=True)
@@ -787,8 +832,9 @@ class MainWindow(QtWidgets.QMainWindow):
         series = [
             ("Male", counts["Male"], "#60a5fa"),
             ("Female", counts["Female"], "#f472b6"),
-            ("Unknown", counts["Unknown"], "#94a3b8"),
         ]
+        if counts["Unknown"] > 0:
+            series.append(("Unknown", counts["Unknown"], "#94a3b8"))
         self._gender_donut.set_series(series)
         if hasattr(self, "_gender_legend"):
             self._update_legend(self._gender_legend, series)
@@ -799,7 +845,7 @@ class MainWindow(QtWidgets.QMainWindow):
         grouped: dict[str, list[Creature]] = {}
         for creature in creatures:
             if creature.species:
-                grouped.setdefault(creature.species, []).append(creature)
+                grouped.setdefault(self._display_species(creature.species), []).append(creature)
         averages = []
         for species, group in grouped.items():
             total = sum(c.mutations_maternal + c.mutations_paternal for c in group)
@@ -859,7 +905,7 @@ class MainWindow(QtWidgets.QMainWindow):
             layout.setSpacing(4)
             title = QtWidgets.QLabel(label)
             title.setStyleSheet("color: #93c5fd; font-weight: 600;")
-            name = QtWidgets.QLabel(f"{creature.name} ({creature.species})")
+            name = QtWidgets.QLabel(f"{creature.name} ({self._display_species(creature.species)})")
             name.setStyleSheet("color: #e2e8f0;")
             points = QtWidgets.QLabel(f"{value} points")
             points.setStyleSheet("color: #facc15; font-weight: 600;")
@@ -880,7 +926,7 @@ class MainWindow(QtWidgets.QMainWindow):
         grouped: dict[str, list[Creature]] = {}
         for creature in creatures:
             if creature.species:
-                grouped.setdefault(creature.species, []).append(creature)
+                grouped.setdefault(self._display_species(creature.species), []).append(creature)
 
         best_pairs: list[tuple[float, str, Creature, Creature]] = []
         for species, group in grouped.items():
@@ -940,7 +986,7 @@ class MainWindow(QtWidgets.QMainWindow):
         grouped: dict[str, list[Creature]] = {}
         for creature in creatures:
             if creature.species:
-                grouped.setdefault(creature.species, []).append(creature)
+                grouped.setdefault(self._display_species(creature.species), []).append(creature)
 
         items: list[str] = []
         for species, group in grouped.items():
@@ -1052,7 +1098,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creatures_table.setRowCount(len(creature_list))
         for row, creature in enumerate(creature_list):
             self._set_table_item(row, 0, creature.name, creature.external_id)
-            self._set_table_item(row, 1, creature.species)
+            self._set_table_item(row, 1, self._display_species(creature.species))
             self._set_table_item(row, 2, creature.sex)
             self._set_table_item(row, 3, str(creature.level))
             self._set_table_item(
@@ -1090,10 +1136,10 @@ class MainWindow(QtWidgets.QMainWindow):
         filtered = []
         for creature in self._creature_cache:
             if species_filter and species_filter != "All species":
-                if creature.species != species_filter:
+                if self._display_species(creature.species) != species_filter:
                     continue
             if text:
-                hay = f"{creature.name} {creature.species}".lower()
+                hay = f"{creature.name} {self._display_species(creature.species)}".lower()
                 if text not in hay:
                     continue
             if cutoff and creature.updated_at:
@@ -1109,7 +1155,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self._populate_creatures_table(filtered)
 
     def _update_species_filters(self) -> None:
-        species_list = sorted({c.species for c in self._creature_cache if c.species})
+        species_list = sorted(
+            {
+                self._display_species(c.species)
+                for c in self._creature_cache
+                if c.species
+            }
+        )
         self._update_filter_combo(self._creature_species_filter, species_list)
         self._update_filter_combo(self._breeding_species_filter, species_list)
         self._update_filter_combo(self._mutations_species_filter, species_list)
@@ -1133,7 +1185,7 @@ class MainWindow(QtWidgets.QMainWindow):
         candidates = [
             c
             for c in self._creature_cache
-            if species == "All species" or c.species == species
+            if species == "All species" or self._display_species(c.species) == species
         ]
         current = self._pedigree_creature_picker.currentText() if self._pedigree_creature_picker.count() else ""
         self._pedigree_creature_picker.blockSignals(True)
@@ -1153,22 +1205,35 @@ class MainWindow(QtWidgets.QMainWindow):
         creatures = [
             c
             for c in self._creature_cache
-            if species == "All species" or c.species == species
+            if species == "All species" or self._display_species(c.species) == species
         ]
-        males = [c for c in creatures if c.sex.lower() == "male"]
-        females = [c for c in creatures if c.sex.lower() == "female"]
+        grouped: dict[str, list[Creature]] = {}
+        for creature in creatures:
+            key = self._display_species(creature.species)
+            grouped.setdefault(key, []).append(creature)
         use_points = self._points_available(creatures)
 
         pairs: list[tuple[float, Creature, Creature, float, float]] = []
-        for male in males:
-            for female in females:
-                score, male_stat, female_stat = self._score_pair(
-                    male,
-                    female,
-                    focus,
-                    use_points=use_points,
-                )
-                pairs.append((score, male, female, male_stat, female_stat))
+        for group in grouped.values():
+            males = [c for c in group if c.sex.lower() == "male"]
+            females = [c for c in group if c.sex.lower() == "female"]
+            if not males or not females:
+                continue
+            group_pairs: list[tuple[float, Creature, Creature, float, float]] = []
+            for male in males:
+                for female in females:
+                    score, male_stat, female_stat = self._score_pair(
+                        male,
+                        female,
+                        focus,
+                        use_points=use_points,
+                    )
+                    group_pairs.append((score, male, female, male_stat, female_stat))
+            group_pairs.sort(key=lambda item: item[0], reverse=True)
+            if species == "All species":
+                pairs.extend(group_pairs[:1])
+            else:
+                pairs.extend(group_pairs)
 
         pairs.sort(key=lambda item: item[0], reverse=True)
         top_pairs = pairs[:10]
@@ -1210,7 +1275,11 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
     def _species_max_stats(self, species: str, use_points: bool = False) -> dict[str, float]:
-        candidates = [c for c in self._creature_cache if c.species == species]
+        candidates = [
+            c
+            for c in self._creature_cache
+            if self._display_species(c.species) == self._display_species(species)
+        ]
         stats = {
             "Health": 1.0,
             "Stamina": 1.0,
@@ -1239,6 +1308,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _format_score(self, value: float) -> str:
         return f"{value:.2f}"
+
+    def _display_species(self, species: str) -> str:
+        if not species:
+            return "Unknown"
+        return _SPECIES_DISPLAY_OVERRIDES.get(species, species)
 
     def _line(self, vertical: bool) -> QtWidgets.QFrame:
         line = QtWidgets.QFrame()
@@ -1274,55 +1348,50 @@ class MainWindow(QtWidgets.QMainWindow):
         use_points: bool,
     ) -> None:
         layout = self._breeding_cards_layout
-        while layout.count() > 1:
-            item = layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
+        self._clear_layout(layout)
 
         if not pairs:
             empty = QtWidgets.QLabel("No breeding pairs found for this filter.")
             empty.setStyleSheet("color: #94a3b8;")
-            layout.insertWidget(0, empty)
+            layout.addWidget(empty, 0, 0)
             return
 
+        columns = 2
         for index, (score, male, female, male_stat, female_stat) in enumerate(pairs):
             card = QtWidgets.QFrame()
-            border = "#38bdf8" if index == 0 else "#1f2937"
             card.setStyleSheet(
-                f"QFrame {{ background: #0f172a; border: 1px solid {border}; border-radius: 12px; }}"
+                "QFrame { background: rgba(15, 23, 42, 0.7); border-radius: 16px; }"
             )
             card.setSizePolicy(
-                QtWidgets.QSizePolicy.Expanding,
-                QtWidgets.QSizePolicy.Minimum,
+                QtWidgets.QSizePolicy.Preferred,
+                QtWidgets.QSizePolicy.Preferred,
             )
-            card_layout = QtWidgets.QHBoxLayout(card)
-            card_layout.setSpacing(16)
+            card.setMinimumWidth(220)
+            card.setMaximumWidth(280)
+            card_layout = QtWidgets.QVBoxLayout(card)
+            card_layout.setSpacing(10)
+
+            header = QtWidgets.QLabel(self._display_species(male.species))
+            header.setStyleSheet("color: #e2e8f0; font-weight: 600; font-size: 13px;")
+            card_layout.addWidget(header)
+
             max_stats = self._species_max_stats(male.species, use_points=use_points)
-            male_box = self._pair_info_box("Male", male, male_stat, max_stats, use_points)
-            female_box = self._pair_info_box("Female", female, female_stat, max_stats, use_points)
-
-            summary = QtWidgets.QVBoxLayout()
-            focus_label = QtWidgets.QLabel(f"Focus: {focus}")
-            focus_label.setStyleSheet("color: #93c5fd; font-weight: 600;")
-            suffix = "points" if use_points else "raw"
-            score_label = QtWidgets.QLabel(
-                f"Combined score ({suffix}): {self._format_score(score)}"
-            )
-            score_label.setStyleSheet("color: #f8fafc; font-size: 14px;")
-            summary.addWidget(focus_label)
-            summary.addWidget(score_label)
-            summary.addStretch(1)
-
+            male_box = self._pair_info_box(male, male_stat, max_stats, use_points)
+            female_box = self._pair_info_box(female, female_stat, max_stats, use_points)
             card_layout.addWidget(male_box)
             card_layout.addWidget(female_box)
-            card_layout.addLayout(summary)
 
-            layout.insertWidget(layout.count() - 1, card)
+            suffix = "pts" if use_points else "raw"
+            score_label = QtWidgets.QLabel(f"Score ({suffix}): {self._format_score(score)}")
+            score_label.setStyleSheet("color: #93c5fd; font-weight: 600;")
+            card_layout.addWidget(score_label)
+
+            row = index // columns
+            col = index % columns
+            layout.addWidget(card, row, col)
 
     def _pair_info_box(
         self,
-        title: str,
         creature: Creature,
         focus_stat: float,
         max_stats: dict[str, float],
@@ -1336,21 +1405,21 @@ class MainWindow(QtWidgets.QMainWindow):
             accent = "#f472b6"
         box = QtWidgets.QFrame()
         box.setStyleSheet(
-            f"QFrame {{ background: #111827; border: 1px solid {accent}; border-radius: 10px; }}"
+            "QFrame { background: rgba(11, 19, 36, 0.85); border-radius: 12px; }"
         )
         layout = QtWidgets.QVBoxLayout(box)
-        label = QtWidgets.QLabel(title)
-        label.setStyleSheet("color: #94a3b8; font-size: 11px; text-transform: uppercase;")
+        layout.setSpacing(6)
+        header_row = QtWidgets.QHBoxLayout()
+        avatar = self._small_species_image(self._display_species(creature.species))
+        header_row.addWidget(avatar)
         name_label = QtWidgets.QLabel(f"{self._sex_icon(creature.sex)} {creature.name}")
-        name_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
-        sex_label = QtWidgets.QLabel(creature.sex or "Unknown")
-        sex_label.setStyleSheet(f"color: {accent}; font-weight: 600;")
+        name_label.setStyleSheet("color: #f8fafc; font-weight: 600; font-size: 13px;")
+        header_row.addWidget(name_label)
+        header_row.addStretch(1)
+        layout.addLayout(header_row)
         stat_suffix = "pts" if use_points else "raw"
         stat_label = QtWidgets.QLabel(f"Stat ({stat_suffix}): {self._format_score(focus_stat)}")
-        stat_label.setStyleSheet("color: #a7f3d0;")
-        layout.addWidget(label)
-        layout.addWidget(name_label)
-        layout.addWidget(sex_label)
+        stat_label.setStyleSheet(f"color: {accent}; font-weight: 600;")
         layout.addWidget(stat_label)
         layout.addWidget(
             self._stat_bar_row(
@@ -1450,6 +1519,32 @@ class MainWindow(QtWidgets.QMainWindow):
             """
         )
         return badge
+
+    def _small_species_image(self, species: str) -> QtWidgets.QLabel:
+        label = QtWidgets.QLabel()
+        label.setFixedSize(48, 36)
+        label.setAlignment(QtCore.Qt.AlignCenter)
+        label.setStyleSheet("background: #0b1324; border-radius: 8px; color: #94a3b8;")
+        cache_path = self._species_cache_path(species)
+        if cache_path.exists():
+            pixmap = QtGui.QPixmap(str(cache_path))
+            if not pixmap.isNull():
+                label.setPixmap(
+                    pixmap.scaled(
+                        label.size(),
+                        QtCore.Qt.KeepAspectRatio,
+                        QtCore.Qt.SmoothTransformation,
+                    )
+                )
+                return label
+        label.setText(species[:1].upper() if species else "?")
+        return label
+
+    def _species_cache_path(self, species: str) -> Path:
+        safe = re.sub(r"[^a-zA-Z0-9_-]+", "_", species).lower()
+        cache_dir = user_data_dir() / "cache" / "images"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir / f"{safe}.png"
 
     def _update_point_badges(self, creature: Creature, species_group: list[Creature]) -> None:
         labels = {
@@ -1607,7 +1702,7 @@ class MainWindow(QtWidgets.QMainWindow):
         creatures = [
             c
             for c in self._creature_cache
-            if species == "All species" or c.species == species
+            if species == "All species" or self._display_species(c.species) == species
         ]
         self._render_mutation_cards(creatures)
 
@@ -1616,7 +1711,7 @@ class MainWindow(QtWidgets.QMainWindow):
         candidates = [
             c
             for c in self._creature_cache
-            if species == "All species" or c.species == species
+            if species == "All species" or self._display_species(c.species) == species
         ]
         if not candidates:
             if self._pedigree_subject:
@@ -1629,7 +1724,9 @@ class MainWindow(QtWidgets.QMainWindow):
         selected = self._pedigree_creature_picker.currentData()
         creature = selected if isinstance(selected, Creature) else candidates[0]
         if self._pedigree_subject:
-            self._pedigree_subject.setText(f"{creature.name}\n{creature.species}")
+            self._pedigree_subject.setText(
+                f"{creature.name}\n{self._display_species(creature.species)}"
+            )
         mother = self._find_creature_by_id(creature.mother_id) or self._find_creature_by_external_id(
             creature.mother_external_id
         )
@@ -1701,11 +1798,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _update_creature_detail(self, creature: Creature) -> None:
         self._detail_title.setText(creature.name or "Unknown")
-        subtitle = f"{creature.species} • {creature.sex} • L{creature.level}"
+        subtitle = f"{self._display_species(creature.species)} • {creature.sex} • L{creature.level}"
         self._detail_subtitle.setText(subtitle)
-        self._detail_image.set_species(creature.species)
+        self._detail_image.set_species(self._display_species(creature.species))
 
-        species_group = [c for c in self._creature_cache if c.species == creature.species]
+        species_group = [
+            c
+            for c in self._creature_cache
+            if self._display_species(c.species) == self._display_species(creature.species)
+        ]
         use_points = self._points_available(species_group)
         self._update_point_badges(creature, species_group)
         stats_keys = ["Health", "Stamina", "Weight", "MeleeDamageMultiplier"]
@@ -1729,6 +1830,10 @@ class MainWindow(QtWidgets.QMainWindow):
             "Melee": max_values.get("MeleeDamageMultiplier", 1.0),
         }
         self._detail_radar.set_values(values, radar_max)
+
+        for key, label in self._detail_stat_values.items():
+            value = creature.stats.get(key)
+            label.setText(self._format_stat(value))
 
         if len(species_group) < 2:
             self._detail_strengths.setText("Strengths: Add more of this species")
