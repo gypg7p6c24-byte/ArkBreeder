@@ -39,6 +39,7 @@ _DASHBOARD_COLORS = [
 
 _SPECIES_DISPLAY_OVERRIDES = {
     "Ptero": "Pterodactyl",
+    "Argent": "Argentavis",
 }
 
 
@@ -1069,7 +1070,13 @@ class MainWindow(QtWidgets.QMainWindow):
             values = self._values_store.get_by_blueprint(creature.blueprint)
             if values is not None:
                 return values
-        return self._values_store.get_by_species(creature.species)
+        values = self._values_store.get_by_species(creature.species)
+        if values is not None:
+            return values
+        display_species = self._display_species(creature.species)
+        if display_species != creature.species:
+            return self._values_store.get_by_species(display_species)
+        return None
 
     def _get_stat_points(self, creature: Creature) -> dict[str, int]:
         if creature.external_id and creature.external_id in self._stat_points:
@@ -1370,10 +1377,7 @@ class MainWindow(QtWidgets.QMainWindow):
             card.setMaximumWidth(280)
             card_layout = QtWidgets.QVBoxLayout(card)
             card_layout.setSpacing(10)
-
-            header = QtWidgets.QLabel(self._display_species(male.species))
-            header.setStyleSheet("color: #e2e8f0; font-weight: 600; font-size: 13px;")
-            card_layout.addWidget(header)
+            card_layout.setContentsMargins(12, 12, 12, 12)
 
             max_stats = self._species_max_stats(male.species, use_points=use_points)
             male_box = self._pair_info_box(male, male_stat, max_stats, use_points)
@@ -1496,6 +1500,10 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         row_layout.addWidget(tag)
         row_layout.addWidget(bar, 1)
+        if use_points:
+            value_label = QtWidgets.QLabel(str(int(value)))
+            value_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
+            row_layout.addWidget(value_label)
         return row
 
     def _make_point_badge(self, label: str) -> QtWidgets.QLabel:
@@ -1827,8 +1835,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self._detail_radar.set_values(values, radar_max)
 
         for key, label in self._detail_stat_values.items():
-            value = creature.stats.get(key)
-            label.setText(self._format_stat(value))
+            raw_value = creature.stats.get(key)
+            if use_points:
+                points_value = self._get_stat_points_value(creature, key)
+                if points_value is not None:
+                    label.setText(f"{int(points_value)} pts")
+                    label.setToolTip(f"Raw: {self._format_stat(raw_value)}")
+                    continue
+            label.setText(self._format_stat(raw_value))
+            label.setToolTip("")
 
         if len(species_group) < 2:
             self._detail_strengths.setText("Strengths: Add more of this species")

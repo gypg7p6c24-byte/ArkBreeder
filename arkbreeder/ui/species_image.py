@@ -38,6 +38,7 @@ class SpeciesImageWidget(QtWidgets.QLabel):
         if cached.exists():
             self._set_pixmap(QtGui.QPixmap(str(cached)))
             return
+        self.setPixmap(QtGui.QPixmap())
         self._start_loading()
         self._pending_sources = [
             ("pageimage", "wiki", self._wiki_api_url(species)),
