@@ -1073,9 +1073,11 @@ class MainWindow(QtWidgets.QMainWindow):
         for key, badge in self._detail_point_badges.items():
             label = labels.get(key, "?")
             value = points.get(key) if points else None
+            raw_value = self._get_stat_value(creature, key, use_points=False)
             if value is None:
                 badge.setText(f"{label} -")
                 badge.setStyleSheet(self._point_badge_style("#111827", "#94a3b8"))
+                badge.setToolTip(f"Raw: {raw_value:.2f}\nPoints: -")
                 continue
             max_value = max_points.get(key, 0.0)
             ratio = 0.0 if max_value <= 0 else min(max(value / max_value, 0.0), 1.0)
@@ -1083,6 +1085,7 @@ class MainWindow(QtWidgets.QMainWindow):
             text_color = "#0b1220" if ratio >= 0.6 else "#f8fafc"
             badge.setText(f"{label} {int(value)}")
             badge.setStyleSheet(self._point_badge_style(color, text_color))
+            badge.setToolTip(f"Raw: {raw_value:.2f}\nPoints: {int(value)}")
 
     def _point_badge_color(self, ratio: float) -> str:
         if ratio >= 0.85:
