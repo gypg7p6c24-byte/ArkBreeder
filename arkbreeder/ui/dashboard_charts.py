@@ -27,7 +27,7 @@ class DonutChartWidget(QtWidgets.QWidget):
             "#60a5fa",
             "#f97316",
         ]
-        self.setMinimumHeight(150)
+        self.setMinimumHeight(110)
 
     def set_series(self, series: Iterable[Tuple[str, float, str | None]]) -> None:
         normalized: List[ChartSlice] = []
@@ -128,8 +128,7 @@ class BarChartWidget(QtWidgets.QWidget):
             return
 
         row_height = min(24.0, rect.height() / max(len(self._series), 1))
-        total_height = row_height * len(self._series)
-        y_start = rect.top() + max(0.0, (rect.height() - total_height) / 2)
+        y_start = rect.top()
         font = painter.font()
         font.setPointSize(9)
         painter.setFont(font)
