@@ -48,14 +48,8 @@ class DonutChartWidget(QtWidgets.QWidget):
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        rect = self.rect().adjusted(10, 10, -10, -10)
+        rect = self.rect().adjusted(6, 6, -6, -6)
         size = min(rect.width(), rect.height())
-        chart_rect = QtCore.QRectF(
-            rect.center().x() - size / 2,
-            rect.center().y() - size / 2,
-            size,
-            size,
-        )
 
         total = sum(slice_.value for slice_ in self._series)
         if total <= 0:
@@ -63,7 +57,14 @@ class DonutChartWidget(QtWidgets.QWidget):
             painter.drawText(self.rect(), QtCore.Qt.AlignCenter, "No data")
             return
 
-        ring_width = max(16, int(size * 0.14))
+        ring_width = max(10, int(size * 0.14))
+        outer_radius = max(8.0, size / 2 - ring_width / 2 - 1.0)
+        chart_rect = QtCore.QRectF(
+            rect.center().x() - outer_radius,
+            rect.center().y() - outer_radius,
+            outer_radius * 2,
+            outer_radius * 2,
+        )
         start_angle = 90 * 16
         for slice_ in self._series:
             span = -(slice_.value / total) * 360 * 16

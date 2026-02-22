@@ -88,8 +88,17 @@ class RadarChart(QtWidgets.QWidget):
         font = painter.font()
         font.setPointSize(9)
         painter.setFont(font)
+        metrics = painter.fontMetrics()
         for axis, angle in zip(self._axes, angles):
-            label_radius = radius + 12
+            label_radius = radius + (18 if axis_count >= 6 else 12)
             x = center.x() + label_radius * math.cos(angle)
             y = center.y() + label_radius * math.sin(angle)
-            painter.drawText(QtCore.QPointF(x - 18, y + 4), axis)
+            text_width = metrics.horizontalAdvance(axis)
+            text_height = metrics.height()
+            rect = QtCore.QRectF(
+                x - text_width / 2 - 2,
+                y - text_height / 2,
+                text_width + 4,
+                text_height + 2,
+            )
+            painter.drawText(rect, QtCore.Qt.AlignCenter, axis)

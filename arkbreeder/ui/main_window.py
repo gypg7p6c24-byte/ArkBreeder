@@ -285,6 +285,7 @@ class MainWindow(QtWidgets.QMainWindow):
         left_layout.addWidget(self._species_donut, 1)
         self._species_legend = QtWidgets.QVBoxLayout()
         self._species_legend.setSpacing(1)
+        self._species_legend.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         left_layout.addLayout(self._species_legend)
 
         right = QtWidgets.QFrame()
@@ -314,6 +315,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._dashboard_gender_layout.addWidget(self._gender_donut, 1)
         self._gender_legend = QtWidgets.QVBoxLayout()
         self._gender_legend.setSpacing(2)
+        self._gender_legend.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         self._dashboard_gender_layout.addLayout(self._gender_legend)
 
         mutation_panel, self._dashboard_mutation_layout = self._dashboard_panel("Mutation pressure")
@@ -435,6 +437,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creatures_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self._creatures_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self._creatures_table.verticalHeader().setVisible(False)
+        self._creatures_table.horizontalHeader().setVisible(False)
         self._creatures_table.setSortingEnabled(True)
         self._creatures_table.itemSelectionChanged.connect(self._on_creature_selected)
 
@@ -463,7 +466,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _build_breeding_page(self) -> QtWidgets.QWidget:
         widget = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(widget)
-        layout.setSpacing(12)
+        layout.setSpacing(6)
 
         toolbar = QtWidgets.QHBoxLayout()
         toolbar.setSpacing(8)
@@ -541,7 +544,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._detail_image.setStyleSheet("border: none;")
         layout.addWidget(self._detail_image, alignment=QtCore.Qt.AlignCenter)
 
-        self._detail_radar = RadarChart(["Health", "Stamina", "Weight", "Melee"])
+        self._detail_radar = RadarChart(
+            ["Health", "Stamina", "Oxygen", "Food", "Weight", "Melee", "Speed"]
+        )
         layout.addWidget(self._detail_radar)
 
         self._detail_point_badges: dict[str, QtWidgets.QLabel] = {}
@@ -583,13 +588,13 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self._points_info)
 
         self._detail_strengths = QtWidgets.QLabel("Strengths: -")
-        self._detail_strengths.setStyleSheet("color: #a7f3d0;")
+        self._detail_strengths.setStyleSheet("color: #a7f3d0; font-size: 14px; font-weight: 600;")
         self._detail_strengths.setTextFormat(QtCore.Qt.RichText)
         self._detail_strengths.setWordWrap(True)
         layout.addWidget(self._detail_strengths)
 
         self._detail_weaknesses = QtWidgets.QLabel("Weaknesses: -")
-        self._detail_weaknesses.setStyleSheet("color: #fecaca;")
+        self._detail_weaknesses.setStyleSheet("color: #fecaca; font-size: 14px; font-weight: 600;")
         self._detail_weaknesses.setTextFormat(QtCore.Qt.RichText)
         self._detail_weaknesses.setWordWrap(True)
         layout.addWidget(self._detail_weaknesses)
@@ -930,7 +935,7 @@ class MainWindow(QtWidgets.QMainWindow):
             text.setStyleSheet("color: #cbd5f5; font-size: 11px;")
             row.addWidget(dot)
             row.addWidget(text)
-            row.addSpacing(2)
+            row.addStretch(1)
             container = QtWidgets.QWidget()
             container.setLayout(row)
             layout.addWidget(container)
@@ -1628,8 +1633,8 @@ class MainWindow(QtWidgets.QMainWindow):
         elif sex_lower == "female":
             accent = "#f472b6"
         box = QtWidgets.QFrame()
-        box.setMinimumWidth(216)
-        box.setMaximumWidth(246)
+        box.setMinimumWidth(198)
+        box.setMaximumWidth(226)
         box.setStyleSheet(
             "QFrame {"
             "background: rgba(11, 19, 36, 0.85);"
@@ -2097,26 +2102,27 @@ class MainWindow(QtWidgets.QMainWindow):
         ]
         use_points = self._points_available(species_group)
         self._update_point_badges(creature, species_group)
-        stats_keys = ["Health", "Stamina", "Weight", "MeleeDamageMultiplier"]
+        radar_axes = [
+            ("Health", "Health"),
+            ("Stamina", "Stamina"),
+            ("Oxygen", "Oxygen"),
+            ("Food", "Food"),
+            ("Weight", "Weight"),
+            ("Melee", "MeleeDamageMultiplier"),
+            ("Speed", "MovementSpeed"),
+        ]
         max_values = {
-            key: max(
+            label: max(
                 (self._get_stat_value(c, key, use_points=use_points) for c in species_group),
                 default=0.0,
             )
-            for key in stats_keys
+            for label, key in radar_axes
         }
         values = {
-            "Health": self._get_stat_value(creature, "Health", use_points=use_points),
-            "Stamina": self._get_stat_value(creature, "Stamina", use_points=use_points),
-            "Weight": self._get_stat_value(creature, "Weight", use_points=use_points),
-            "Melee": self._get_stat_value(creature, "MeleeDamageMultiplier", use_points=use_points),
+            label: self._get_stat_value(creature, key, use_points=use_points)
+            for label, key in radar_axes
         }
-        radar_max = {
-            "Health": max_values.get("Health", 1.0),
-            "Stamina": max_values.get("Stamina", 1.0),
-            "Weight": max_values.get("Weight", 1.0),
-            "Melee": max_values.get("MeleeDamageMultiplier", 1.0),
-        }
+        radar_max = {label: max_values.get(label, 1.0) for label, _key in radar_axes}
         self._detail_radar.set_values(values, radar_max)
 
         for key, label in self._detail_stat_values.items():
@@ -2184,7 +2190,7 @@ class MainWindow(QtWidgets.QMainWindow):
         safe_color = re.sub(r"[^a-zA-Z0-9]+", "", color).lower() or "default"
         cache_dir = user_data_dir() / "cache" / "badges"
         cache_dir.mkdir(parents=True, exist_ok=True)
-        target = cache_dir / f"{safe_label}_{safe_color}.png"
+        target = cache_dir / f"{safe_label}_{safe_color}_v2.png"
         if target.exists():
             return target
 
