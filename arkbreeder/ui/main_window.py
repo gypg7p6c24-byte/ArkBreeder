@@ -74,11 +74,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self._nav.addItems(self._page_titles)
         self._nav.setFixedWidth(180)
         self._nav.setSpacing(6)
+        self._nav.setFocusPolicy(QtCore.Qt.NoFocus)
         self._nav.setStyleSheet('''
         QListWidget { background: #0b1220; color: #e5e7eb; border: none; }
-        QListWidget::item { padding: 10px 12px; margin: 4px 8px; border-radius: 12px; }
+        QListWidget::item { padding: 10px 12px; margin: 4px 8px; border-radius: 12px; border: 0px; }
         QListWidget::item:hover { background: #0f172a; }
         QListWidget::item:selected { background: #1f2937; color: #ffffff; }
+        QListWidget::item:focus { outline: none; }
         ''')
 
         self._stack = QtWidgets.QStackedWidget()
@@ -219,9 +221,17 @@ class MainWindow(QtWidgets.QMainWindow):
         charts.addWidget(left, 1)
         charts.addWidget(right, 1)
 
+        insights = QtWidgets.QHBoxLayout()
+        insights.setSpacing(16)
+        pairs_panel, self._dashboard_pairs_layout = self._dashboard_panel("Top breeding pairs")
+        attention_panel, self._dashboard_attention_layout = self._dashboard_panel("Needs attention")
+        insights.addWidget(pairs_panel, 1)
+        insights.addWidget(attention_panel, 1)
+
         layout.addWidget(hero)
         layout.addLayout(cards)
         layout.addLayout(charts)
+        layout.addLayout(insights)
         layout.addStretch(1)
         return widget
 
@@ -245,6 +255,19 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(value_label)
         layout.addWidget(caption_label)
         return card
+
+    def _dashboard_panel(self, title: str) -> tuple[QtWidgets.QFrame, QtWidgets.QVBoxLayout]:
+        panel = QtWidgets.QFrame()
+        panel.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.6); border-radius: 16px; }")
+        layout = QtWidgets.QVBoxLayout(panel)
+        layout.setSpacing(10)
+        title_label = QtWidgets.QLabel(title)
+        title_label.setStyleSheet("color: #e2e8f0; font-weight: 600;")
+        layout.addWidget(title_label)
+        content = QtWidgets.QVBoxLayout()
+        content.setSpacing(8)
+        layout.addLayout(content)
+        return panel, content
 
     def _build_creatures_page(self) -> QtWidgets.QWidget:
         widget = QtWidgets.QWidget()
@@ -693,6 +716,9 @@ class MainWindow(QtWidgets.QMainWindow):
         ]
         self._levels_bar.set_series(bar_series)
 
+        self._update_dashboard_pairs(creature_list)
+        self._update_dashboard_attention(creature_list)
+
     def _update_species_legend(self, series: list[tuple[str, float, str]]) -> None:
         if not hasattr(self, "_species_legend"):
             return
@@ -719,6 +745,129 @@ class MainWindow(QtWidgets.QMainWindow):
             container = QtWidgets.QWidget()
             container.setLayout(row)
             self._species_legend.addWidget(container)
+
+    def _update_dashboard_pairs(self, creatures: list[Creature]) -> None:
+        if not hasattr(self, "_dashboard_pairs_layout"):
+            return
+        self._clear_layout(self._dashboard_pairs_layout)
+        if not creatures:
+            self._dashboard_pairs_layout.addWidget(self._empty_dashboard_label("No creatures yet."))
+            return
+
+        use_points = self._points_available(creatures)
+        grouped: dict[str, list[Creature]] = {}
+        for creature in creatures:
+            if creature.species:
+                grouped.setdefault(creature.species, []).append(creature)
+
+        best_pairs: list[tuple[float, str, Creature, Creature]] = []
+        for species, group in grouped.items():
+            males = [c for c in group if c.sex.lower() == "male"]
+            females = [c for c in group if c.sex.lower() == "female"]
+            if not males or not females:
+                continue
+            best_score = -1.0
+            best_pair: tuple[Creature, Creature] | None = None
+            for male in males:
+                for female in females:
+                    score, _, _ = self._score_pair(male, female, "Overall", use_points=use_points)
+                    if score > best_score:
+                        best_score = score
+                        best_pair = (male, female)
+            if best_pair:
+                best_pairs.append((best_score, species, best_pair[0], best_pair[1]))
+
+        if not best_pairs:
+            self._dashboard_pairs_layout.addWidget(
+                self._empty_dashboard_label("No breeding pairs available yet.")
+            )
+            return
+
+        best_pairs.sort(key=lambda item: item[0], reverse=True)
+        for score, species, male, female in best_pairs[:3]:
+            card = QtWidgets.QFrame()
+            card.setStyleSheet(
+                "QFrame { background: rgba(11, 19, 36, 0.8); border-radius: 12px; }"
+            )
+            card_layout = QtWidgets.QVBoxLayout(card)
+            card_layout.setSpacing(6)
+            header = QtWidgets.QLabel(species)
+            header.setStyleSheet("color: #e2e8f0; font-weight: 600;")
+            pair_line = QtWidgets.QLabel(
+                f"{self._sex_icon(male.sex)} {male.name}  ×  {self._sex_icon(female.sex)} {female.name}"
+            )
+            pair_line.setStyleSheet("color: #cbd5f5;")
+            suffix = "points" if use_points else "raw"
+            score_label = QtWidgets.QLabel(f"Score ({suffix}): {score:.2f}")
+            score_label.setStyleSheet("color: #93c5fd; font-weight: 600;")
+            card_layout.addWidget(header)
+            card_layout.addWidget(pair_line)
+            card_layout.addWidget(score_label)
+            self._dashboard_pairs_layout.addWidget(card)
+
+    def _update_dashboard_attention(self, creatures: list[Creature]) -> None:
+        if not hasattr(self, "_dashboard_attention_layout"):
+            return
+        self._clear_layout(self._dashboard_attention_layout)
+        if not creatures:
+            self._dashboard_attention_layout.addWidget(
+                self._empty_dashboard_label("Import creatures to unlock insights.")
+            )
+            return
+
+        grouped: dict[str, list[Creature]] = {}
+        for creature in creatures:
+            if creature.species:
+                grouped.setdefault(creature.species, []).append(creature)
+
+        items: list[str] = []
+        for species, group in grouped.items():
+            males = [c for c in group if c.sex.lower() == "male"]
+            females = [c for c in group if c.sex.lower() == "female"]
+            if not males:
+                items.append(f"{species}: add a male")
+            if not females:
+                items.append(f"{species}: add a female")
+            if len(group) < 2:
+                count = len(group)
+                suffix = "creature" if count == 1 else "creatures"
+                items.append(f"{species}: only {count} {suffix}")
+
+        if self._values_store.count() == 0:
+            items.insert(0, "Import values.json to enable stat points.")
+
+        if not items:
+            self._dashboard_attention_layout.addWidget(
+                self._empty_dashboard_label("All species have breeding pairs.")
+            )
+            return
+
+        for text in items[:6]:
+            row = QtWidgets.QHBoxLayout()
+            dot = QtWidgets.QFrame()
+            dot.setFixedSize(8, 8)
+            dot.setStyleSheet("QFrame { background: #f97316; border-radius: 4px; }")
+            label = QtWidgets.QLabel(text)
+            label.setStyleSheet("color: #f8fafc;")
+            row.addWidget(dot)
+            row.addWidget(label)
+            row.addStretch(1)
+            container = QtWidgets.QWidget()
+            container.setLayout(row)
+            self._dashboard_attention_layout.addWidget(container)
+
+    def _clear_layout(self, layout: QtWidgets.QLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+    def _empty_dashboard_label(self, text: str) -> QtWidgets.QLabel:
+        label = QtWidgets.QLabel(text)
+        label.setStyleSheet("color: #94a3b8;")
+        label.setWordWrap(True)
+        return label
 
     def _update_points_info_labels(self) -> None:
         has_values = self._values_store.count() > 0
