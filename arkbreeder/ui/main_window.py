@@ -170,7 +170,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         header = QtWidgets.QHBoxLayout()
         self._page_title = QtWidgets.QLabel(self._page_titles[0])
-        self._page_title.setStyleSheet("font-size: 22px; font-weight: 600; color: #f8fafc;")
+        self._page_title.setStyleSheet("font-size: 30px; font-weight: 700; color: #f8fafc;")
         header.addWidget(self._page_title)
         header.addStretch(1)
 
@@ -292,7 +292,7 @@ class MainWindow(QtWidgets.QMainWindow):
         hero_layout = QtWidgets.QVBoxLayout(hero)
         hero_layout.setContentsMargins(6, 0, 6, 2)
         hero_title = QtWidgets.QLabel("Welcome to ARK Breeder")
-        hero_title.setStyleSheet("font-size: 17px; font-weight: 600; color: #f8fafc;")
+        hero_title.setStyleSheet("font-size: 21px; font-weight: 700; color: #f8fafc;")
         hero_layout.addWidget(hero_title)
 
         charts = QtWidgets.QHBoxLayout()
@@ -304,7 +304,7 @@ class MainWindow(QtWidgets.QMainWindow):
         left_layout.setContentsMargins(10, 6, 10, 6)
         left_layout.setSpacing(2)
         left_title = QtWidgets.QLabel("Species distribution")
-        left_title.setStyleSheet("color: #e2e8f0; font-weight: 600; font-size: 14px;")
+        left_title.setStyleSheet("color: #e2e8f0; font-weight: 700; font-size: 16px;")
         left_layout.addWidget(left_title)
         self._species_donut = DonutChartWidget()
         self._species_donut.setMinimumSize(96, 96)
@@ -323,8 +323,8 @@ class MainWindow(QtWidgets.QMainWindow):
         right_layout = QtWidgets.QVBoxLayout(right)
         right_layout.setContentsMargins(10, 6, 10, 6)
         right_layout.setSpacing(4)
-        right_title = QtWidgets.QLabel("Average level by species")
-        right_title.setStyleSheet("color: #e2e8f0; font-weight: 600; font-size: 14px;")
+        right_title = QtWidgets.QLabel("Best breeding potential by species")
+        right_title.setStyleSheet("color: #e2e8f0; font-weight: 700; font-size: 16px;")
         right_layout.addWidget(right_title)
         self._levels_bar = BarChartWidget()
         right_layout.addWidget(self._levels_bar, 1)
@@ -394,7 +394,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.setContentsMargins(10, 6, 10, 6)
         layout.setSpacing(3)
         title_label = QtWidgets.QLabel(title)
-        title_label.setStyleSheet("color: #e2e8f0; font-weight: 600; font-size: 14px;")
+        title_label.setStyleSheet("color: #e2e8f0; font-weight: 700; font-size: 16px;")
         layout.addWidget(title_label)
         content = QtWidgets.QVBoxLayout()
         content.setSpacing(3)
@@ -475,7 +475,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creatures_table.itemSelectionChanged.connect(self._on_creature_selected)
 
         left_layout.addWidget(self._creatures_table)
-        left_layout.addStretch(1)
 
         right_panel = self._build_creature_detail_panel()
         right = QtWidgets.QScrollArea()
@@ -757,7 +756,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.setSpacing(12)
 
         export_header = QtWidgets.QLabel("Export watch folder")
-        export_header.setStyleSheet("font-size: 16px; font-weight: 600;")
+        export_header.setStyleSheet("font-size: 18px; font-weight: 700;")
         layout.addWidget(export_header)
 
         self._settings_export_path = QtWidgets.QLabel(f"Default: {self._export_dir}")
@@ -773,7 +772,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addLayout(export_actions)
 
         header = QtWidgets.QLabel("Server settings")
-        header.setStyleSheet("font-size: 16px; font-weight: 600;")
+        header.setStyleSheet("font-size: 18px; font-weight: 700;")
         layout.addWidget(header)
 
         helper = QtWidgets.QLabel(
@@ -805,7 +804,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self._settings_details)
 
         values_header = QtWidgets.QLabel("Creature values")
-        values_header.setStyleSheet("font-size: 16px; font-weight: 600; margin-top: 12px;")
+        values_header.setStyleSheet("font-size: 18px; font-weight: 700; margin-top: 12px;")
         layout.addWidget(values_header)
 
         values_helper = QtWidgets.QLabel(
@@ -931,18 +930,38 @@ class MainWindow(QtWidgets.QMainWindow):
         self._species_donut.set_series(donut_series)
         self._update_species_legend(donut_series)
 
-        average_levels = []
-        for label, count in species_counts.items():
-            total_level = sum(
-                creature.level
-                for creature in creature_list
-                if self._display_species(creature.species) == label
+        grouped: dict[str, list[Creature]] = {}
+        for creature in creature_list:
+            if creature.species:
+                grouped.setdefault(self._display_species(creature.species), []).append(creature)
+
+        use_points = self._points_available(creature_list)
+        breeding_potential: list[tuple[str, float]] = []
+        for label, group in grouped.items():
+            males = [c for c in group if c.sex.lower() == "male"]
+            females = [c for c in group if c.sex.lower() == "female"]
+            if not males or not females:
+                continue
+            best_score = max(
+                self._score_pair(male, female, "Overall", use_points=use_points)[0]
+                for male in males
+                for female in females
             )
-            average_levels.append((label, total_level / max(count, 1)))
-        average_levels.sort(key=lambda item: item[1], reverse=True)
+            breeding_potential.append((label, best_score))
+
+        if not breeding_potential:
+            for label, count in species_counts.items():
+                total_level = sum(
+                    creature.level
+                    for creature in creature_list
+                    if self._display_species(creature.species) == label
+                )
+                breeding_potential.append((label, total_level / max(count, 1)))
+
+        breeding_potential.sort(key=lambda item: item[1], reverse=True)
         bar_series = [
             (label, value, _DASHBOARD_COLORS[idx % len(_DASHBOARD_COLORS)])
-            for idx, (label, value) in enumerate(average_levels[:6])
+            for idx, (label, value) in enumerate(breeding_potential[:6])
         ]
         self._levels_bar.set_series(bar_series)
 
@@ -1047,24 +1066,58 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._empty_dashboard_label("Stat points unavailable for current creatures.")
             )
             return
+        max_points = max(value for _short, _label, value, _creature in entries)
         for short, label, value, creature in entries:
             card = QtWidgets.QFrame()
             card.setStyleSheet(
                 "QFrame { background: rgba(11, 19, 36, 0.8); border-radius: 12px; }"
             )
-            layout = QtWidgets.QHBoxLayout(card)
-            layout.setContentsMargins(8, 5, 8, 5)
-            layout.setSpacing(6)
+            layout = QtWidgets.QVBoxLayout(card)
+            layout.setContentsMargins(8, 6, 8, 6)
+            layout.setSpacing(4)
             title = QtWidgets.QLabel(f"{self._point_icon(short)} {label}")
-            title.setStyleSheet("color: #93c5fd; font-weight: 600; font-size: 11px;")
-            name = QtWidgets.QLabel(f"{creature.name}:")
-            name.setStyleSheet("color: #e2e8f0; font-size: 11px; font-weight: 600;")
+            title.setStyleSheet("color: #93c5fd; font-weight: 700; font-size: 13px;")
+
+            species_text = self._display_species(creature.species)
+            owner = QtWidgets.QLabel(f"{creature.name} ({species_text})")
+            owner.setStyleSheet("color: #e2e8f0; font-size: 12px; font-weight: 600;")
+
+            ratio = 0.0 if max_points <= 0 else min(max(float(value) / float(max_points), 0.0), 1.0)
+            tier = self._tier_color(ratio)
+            bar = QtWidgets.QProgressBar()
+            bar.setMaximum(100)
+            bar.setValue(int(ratio * 100))
+            bar.setTextVisible(False)
+            bar.setFixedHeight(8)
+            bar.setStyleSheet(
+                f"""
+                QProgressBar {{
+                    background: #0f172a;
+                    border: 1px solid #1f2937;
+                    border-radius: 4px;
+                }}
+                QProgressBar::chunk {{
+                    background: {tier};
+                    border-radius: 4px;
+                }}
+                """
+            )
+
             points = QtWidgets.QLabel(str(value))
-            points.setStyleSheet("color: #facc15; font-weight: 700; font-size: 11px;")
+            points.setStyleSheet(
+                f"color: {tier}; font-weight: 800; font-size: 14px;"
+            )
+            points.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+
+            points_row = QtWidgets.QHBoxLayout()
+            points_row.setContentsMargins(0, 0, 0, 0)
+            points_row.setSpacing(6)
+            points_row.addWidget(bar, 1)
+            points_row.addWidget(points)
+
             layout.addWidget(title)
-            layout.addWidget(name)
-            layout.addWidget(points)
-            layout.addStretch(1)
+            layout.addWidget(owner)
+            layout.addLayout(points_row)
             self._dashboard_points_layout.addWidget(card)
         self._dashboard_points_layout.addStretch(1)
 
@@ -1681,13 +1734,21 @@ class MainWindow(QtWidgets.QMainWindow):
                 for short, value in targets:
                     chip = QtWidgets.QLabel(f"{self._point_icon(short)} {value}")
                     chip.setStyleSheet(
-                        "color: #e2e8f0; font-size: 11px; font-weight: 600;"
-                        "background: #0f172a; border: 1px solid #1f2937; border-radius: 7px;"
+                        "color: #67e8f9; font-size: 11px; font-weight: 700;"
+                        "background: rgba(103, 232, 249, 26); border: 1px solid #67e8f9; border-radius: 7px;"
                         "padding: 1px 6px;"
                     )
                     target_row.addWidget(chip)
                 target_row.addStretch(1)
                 row_layout.addLayout(target_row)
+
+            if show_ranking:
+                hint = self._next_plan_hint(ranked_pairs, targets, use_points=use_points)
+                if hint:
+                    hint_label = QtWidgets.QLabel(hint)
+                    hint_label.setStyleSheet("color: #93c5fd; font-size: 11px;")
+                    hint_label.setWordWrap(True)
+                    row_layout.addWidget(hint_label)
 
             max_stats = self._species_max_stats(species_name, use_points=use_points)
             for rank, _score, male, female in ranked_pairs:
@@ -1712,11 +1773,16 @@ class MainWindow(QtWidgets.QMainWindow):
                     use_points=use_points,
                 )
                 pair_layout.addWidget(male_box)
+                plus = QtWidgets.QLabel("+")
+                plus.setAlignment(QtCore.Qt.AlignCenter)
+                plus.setFixedWidth(18)
+                plus.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 700;")
+                pair_layout.addWidget(plus)
                 pair_layout.addWidget(female_box)
-                arrow = QtWidgets.QLabel("→")
+                arrow = QtWidgets.QLabel("⟶")
                 arrow.setAlignment(QtCore.Qt.AlignCenter)
-                arrow.setFixedWidth(18)
-                arrow.setStyleSheet("color: #93c5fd; font-size: 18px; font-weight: 700;")
+                arrow.setFixedWidth(28)
+                arrow.setStyleSheet("color: #93c5fd; font-size: 20px; font-weight: 700;")
                 pair_layout.addWidget(arrow)
                 pair_layout.addWidget(child_box)
                 pair_layout.addStretch(1)
@@ -1809,6 +1875,9 @@ class MainWindow(QtWidgets.QMainWindow):
             "color: #cbd5f5; font-weight: 700; font-size: 13px; background: transparent; border: none;"
         )
         layout.addWidget(name_label)
+        species_label = self._display_species(male.species or female.species)
+        avatar = self._small_species_image(species_label, size=100)
+        layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
 
         child_points = self._expected_child_points(male, female, use_points=use_points)
         colors = {
@@ -1844,6 +1913,52 @@ class MainWindow(QtWidgets.QMainWindow):
             result[key] = max(float(male_value), float(female_value))
         return result
 
+    def _next_plan_hint(
+        self,
+        ranked_pairs: list[tuple[int, float, Creature, Creature]],
+        targets: list[tuple[str, int]],
+        use_points: bool = False,
+    ) -> str | None:
+        if len(ranked_pairs) <= 1 or not targets:
+            return None
+        first_male = ranked_pairs[0][2]
+        first_female = ranked_pairs[0][3]
+        expected = self._expected_child_points(first_male, first_female, use_points=use_points)
+        short_to_key = {short: key for short, key, _title in _BREEDING_POINT_STAT_CONFIG}
+        pending = [
+            (short, short_to_key[short], target)
+            for short, target in targets
+            if short in short_to_key and expected.get(short_to_key[short], 0.0) + 0.001 < float(target)
+        ]
+        if not pending:
+            return "Plan: #1 already matches all current target stats."
+
+        best_rank = None
+        best_gain = 0.0
+        best_stats: list[str] = []
+        for rank, _score, male, female in ranked_pairs[1:]:
+            gained_stats: list[str] = []
+            gain_total = 0.0
+            for short, key, _target in pending:
+                donor = max(
+                    self._get_stat_value(male, key, use_points=use_points, points_only=use_points),
+                    self._get_stat_value(female, key, use_points=use_points, points_only=use_points),
+                )
+                delta = donor - expected.get(key, 0.0)
+                if delta > 0:
+                    gain_total += delta
+                    gained_stats.append(short)
+            if gain_total > best_gain:
+                best_gain = gain_total
+                best_rank = rank
+                best_stats = gained_stats
+
+        if best_rank is None or not best_stats:
+            pending_labels = ", ".join(short for short, _key, _target in pending)
+            return f"Plan: keep #1 and look for donor lines improving {pending_labels}."
+        boosted = ", ".join(best_stats)
+        return f"Plan: breed Expected #1 with donor from #{best_rank} to push {boosted}."
+
     def _stat_bar_row(
         self,
         label: str,
@@ -1875,6 +1990,7 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         is_top_value = max_value > 0 and value >= (max_value - 0.001)
         ratio = 0.0 if max_value <= 0 else min(max(value / max_value, 0.0), 1.0)
+        tier_color = self._tier_color(ratio)
         bar.setValue(int(ratio * 100))
         bar.setTextVisible(False)
         bar.setFixedHeight(7)
@@ -1901,19 +2017,25 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             displayed_value = self._format_stat(creature.stats.get(key), key, creature=creature)
         value_label = QtWidgets.QLabel(displayed_value)
-        if is_top_value:
+        if points_only or use_points:
             tag.setStyleSheet(
-                "color: #dcfce7; font-size: 11px; font-weight: 700;"
-                "background: #14532d; border: 1px solid #22c55e; border-radius: 6px;"
+                f"color: {tier_color}; font-size: 11px; font-weight: 700;"
+                "background: #0f172a; border: 1px solid #1f2937; border-radius: 6px;"
             )
             value_label.setStyleSheet(
-                "color: #dcfce7; font-size: 11px; font-weight: 700;"
-                "background: #14532d; border: 1px solid #22c55e; border-radius: 6px; padding: 1px 4px;"
+                f"color: {tier_color}; font-size: 11px; font-weight: 700;"
+                "background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; padding: 1px 4px;"
             )
-        else:
+        if not (points_only or use_points):
             value_label.setStyleSheet(
                 "color: #cbd5f5; font-size: 11px; font-weight: 700;"
                 "background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; padding: 1px 4px;"
+            )
+        if is_top_value and (points_only or use_points):
+            value_label.setStyleSheet(
+                f"color: {tier_color}; font-size: 11px; font-weight: 800;"
+                f"background: rgba(103, 232, 249, 30); border: 1px solid {tier_color};"
+                "border-radius: 6px; padding: 1px 4px;"
             )
         value_label.setMinimumWidth(34)
         value_label.setAlignment(QtCore.Qt.AlignCenter)
@@ -1942,6 +2064,7 @@ class MainWindow(QtWidgets.QMainWindow):
         bar.setMaximum(100)
         ratio = 0.0 if max_value <= 0 else min(max(float(value) / float(max_value), 0.0), 1.0)
         is_top_value = max_value > 0 and value >= (max_value - 0.001)
+        tier_color = self._tier_color(ratio)
         bar.setValue(int(ratio * 100))
         bar.setTextVisible(False)
         bar.setFixedHeight(7)
@@ -1961,19 +2084,19 @@ class MainWindow(QtWidgets.QMainWindow):
         row_layout.addWidget(tag)
         row_layout.addWidget(bar, 1)
         value_label = QtWidgets.QLabel(str(int(round(value))))
+        tag.setStyleSheet(
+            f"color: {tier_color}; font-size: 11px; font-weight: 700;"
+            "background: #0f172a; border: 1px solid #1f2937; border-radius: 6px;"
+        )
+        value_label.setStyleSheet(
+            f"color: {tier_color}; font-size: 11px; font-weight: 700;"
+            "background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; padding: 1px 4px;"
+        )
         if is_top_value:
-            tag.setStyleSheet(
-                "color: #dcfce7; font-size: 11px; font-weight: 700;"
-                "background: #14532d; border: 1px solid #22c55e; border-radius: 6px;"
-            )
             value_label.setStyleSheet(
-                "color: #dcfce7; font-size: 11px; font-weight: 700;"
-                "background: #14532d; border: 1px solid #22c55e; border-radius: 6px; padding: 1px 4px;"
-            )
-        else:
-            value_label.setStyleSheet(
-                "color: #cbd5f5; font-size: 11px; font-weight: 700;"
-                "background: #0f172a; border: 1px solid #1f2937; border-radius: 6px; padding: 1px 4px;"
+                f"color: {tier_color}; font-size: 11px; font-weight: 800;"
+                f"background: rgba(103, 232, 249, 30); border: 1px solid {tier_color};"
+                "border-radius: 6px; padding: 1px 4px;"
             )
         value_label.setMinimumWidth(34)
         value_label.setAlignment(QtCore.Qt.AlignCenter)
@@ -2060,8 +2183,15 @@ class MainWindow(QtWidgets.QMainWindow):
                 continue
             badge.setText(f"{icon} {int(value)}")
             max_value = max_points_by_key.get(key)
-            if max_value is not None and int(value) >= max_value:
-                badge.setStyleSheet(self._point_badge_style("#14532d", "#dcfce7", "#22c55e"))
+            if max_value is not None and max_value > 0:
+                ratio = min(max(float(value) / float(max_value), 0.0), 1.0)
+                tier = self._tier_color(ratio)
+                if int(value) >= max_value:
+                    badge.setStyleSheet(
+                        self._point_badge_style("rgba(103, 232, 249, 30)", tier, tier)
+                    )
+                else:
+                    badge.setStyleSheet(self._point_badge_style("#111827", tier, "#1f2937"))
             else:
                 badge.setStyleSheet(self._point_badge_style("#111827", "#e5e7eb"))
             badge.setToolTip(f"Raw: {raw_text}\nPoints: {int(value)}")
@@ -2076,6 +2206,21 @@ class MainWindow(QtWidgets.QMainWindow):
         if ratio >= 0.25:
             return "#f97316"
         return "#ef4444"
+
+    def _tier_color(self, ratio: float) -> str:
+        # Requested progression from low to high:
+        # white -> green -> dark blue -> violet -> yellow -> red -> light blue
+        palette = [
+            "#e5e7eb",
+            "#22c55e",
+            "#1d4ed8",
+            "#a855f7",
+            "#facc15",
+            "#ef4444",
+            "#67e8f9",
+        ]
+        idx = int(round(max(0.0, min(1.0, ratio)) * (len(palette) - 1)))
+        return palette[idx]
 
     def _point_badge_style(
         self,
@@ -2395,12 +2540,17 @@ class MainWindow(QtWidgets.QMainWindow):
             species_group,
             use_points=use_points,
         )
+        if len(species_group) <= 1:
+            self._detail_strengths.setText("Strengths: Add more of this species for comparison.")
+            self._detail_weaknesses.setText("Weaknesses: Add more of this species for comparison.")
+            return
+
         self._detail_strengths.setText(
             "Strengths: "
             + (
                 self._render_stat_badges(strengths, "#22c55e")
                 if strengths
-                else "Add more of this species for comparison."
+                else "No standout strengths."
             )
         )
         self._detail_weaknesses.setText(
@@ -2408,7 +2558,7 @@ class MainWindow(QtWidgets.QMainWindow):
             + (
                 self._render_stat_badges(weaknesses, "#ef4444")
                 if weaknesses
-                else "Add more of this species for comparison."
+                else "No clear weaknesses."
             )
         )
 

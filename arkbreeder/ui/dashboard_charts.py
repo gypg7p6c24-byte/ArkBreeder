@@ -77,7 +77,8 @@ class DonutChartWidget(QtWidgets.QWidget):
         painter.setPen(QtGui.QColor("#e2e8f0"))
         font = painter.font()
         font.setBold(True)
-        font.setPointSize(11)
+        dynamic_size = max(11, int(size * 0.17))
+        font.setPointSize(dynamic_size)
         painter.setFont(font)
         painter.drawText(chart_rect, QtCore.Qt.AlignCenter, f"{int(total)}")
 
