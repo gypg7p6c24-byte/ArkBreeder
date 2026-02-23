@@ -469,8 +469,7 @@ class MainWindow(QtWidgets.QMainWindow):
             """
             QTableWidget {
                 background: transparent;
-                border: 1px solid #334155;
-                border-radius: 10px;
+                border: none;
                 gridline-color: transparent;
             }
             QTableWidget::item { padding: 6px; border-bottom: 1px solid rgba(148, 163, 184, 0.18); }
@@ -483,17 +482,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 padding: 6px 8px;
                 font-weight: 700;
             }
-            QHeaderView::section:first {
-                border-top-left-radius: 10px;
-            }
-            QHeaderView::section:last {
-                border-top-right-radius: 10px;
-            }
             QTableCornerButton::section {
                 background: rgba(30, 41, 59, 0.75);
                 border: none;
                 border-bottom: 1px solid #334155;
-                border-top-left-radius: 10px;
             }
             """
         )
@@ -511,7 +503,20 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creatures_table.setSortingEnabled(True)
         self._creatures_table.itemSelectionChanged.connect(self._on_creature_selected)
 
-        left_layout.addWidget(self._creatures_table)
+        table_shell = QtWidgets.QFrame()
+        table_shell.setObjectName("creaturesTableShell")
+        table_shell.setStyleSheet(
+            "#creaturesTableShell {"
+            "background: rgba(15, 23, 42, 0.36);"
+            "border: 1px solid #334155;"
+            "border-radius: 10px;"
+            "}"
+        )
+        table_shell_layout = QtWidgets.QVBoxLayout(table_shell)
+        table_shell_layout.setContentsMargins(0, 0, 0, 0)
+        table_shell_layout.setSpacing(0)
+        table_shell_layout.addWidget(self._creatures_table)
+        left_layout.addWidget(table_shell)
 
         right_panel = self._build_creature_detail_panel()
         right = QtWidgets.QScrollArea()
@@ -663,13 +668,10 @@ class MainWindow(QtWidgets.QMainWindow):
         stats_container = QtWidgets.QWidget()
         stats_container.setLayout(stat_rows)
 
-        insights_card = QtWidgets.QFrame()
-        insights_card.setStyleSheet(
-            "QFrame { background: rgba(15, 23, 42, 0.38); border: 1px solid #334155; border-radius: 10px; }"
-        )
+        insights_card = QtWidgets.QWidget()
         insights_card.setMinimumWidth(210)
         insights_layout = QtWidgets.QVBoxLayout(insights_card)
-        insights_layout.setContentsMargins(8, 6, 8, 6)
+        insights_layout.setContentsMargins(0, 0, 0, 0)
         insights_layout.setSpacing(4)
         insights_title = QtWidgets.QLabel("Breeding insights")
         insights_title.setStyleSheet("color: #93c5fd; font-size: 12px; font-weight: 700;")
@@ -684,6 +686,10 @@ class MainWindow(QtWidgets.QMainWindow):
         stats_insights_row.setContentsMargins(0, 0, 0, 0)
         stats_insights_row.setSpacing(10)
         stats_insights_row.addWidget(stats_container, 3)
+        separator = QtWidgets.QFrame()
+        separator.setFixedWidth(1)
+        separator.setStyleSheet("QFrame { background: #334155; border-radius: 0px; }")
+        stats_insights_row.addWidget(separator)
         stats_insights_row.addWidget(insights_card, 2)
         layout.addLayout(stats_insights_row)
 
@@ -2144,31 +2150,36 @@ class MainWindow(QtWidgets.QMainWindow):
         chain_title.setStyleSheet("color: #93c5fd; font-size: 14px; font-weight: 800;")
         parent_layout.addWidget(chain_title)
 
+        previous_chain_points: dict[str, float] | None = None
+        previous_chain_title = ""
         for idx, step_info in enumerate(sequence):
             step = int(step_info["step"])
             male = step_info["male"]
             female = step_info["female"]
             if not isinstance(male, Creature) or not isinstance(female, Creature):
                 continue
-            result_points = step_info["result_points"]
-            if not isinstance(result_points, dict):
+            expected_points_raw = step_info.get("expected_points")
+            merged_points_raw = step_info.get("merged_points")
+            if not isinstance(expected_points_raw, dict) or not isinstance(merged_points_raw, dict):
                 continue
             from_child = str(step_info.get("from_child", ""))
             gains = step_info.get("gains", [])
             if not isinstance(gains, list):
                 gains = []
-
-            step_box = QtWidgets.QFrame()
-            step_box.setStyleSheet(
-                "QFrame { background: rgba(15, 23, 42, 0.38); border: 1px solid #334155; border-radius: 12px; }"
-            )
-            step_layout = QtWidgets.QVBoxLayout(step_box)
-            step_layout.setContentsMargins(8, 8, 8, 8)
-            step_layout.setSpacing(6)
+            expected_points = {
+                key: float(value)
+                for key, value in expected_points_raw.items()
+                if isinstance(key, str)
+            }
+            merged_points = {
+                key: float(value)
+                for key, value in merged_points_raw.items()
+                if isinstance(key, str)
+            }
 
             step_label = QtWidgets.QLabel(f"Step {step}")
             step_label.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 800;")
-            step_layout.addWidget(step_label)
+            parent_layout.addWidget(step_label)
 
             pair_layout = QtWidgets.QHBoxLayout()
             pair_layout.setSpacing(12)
@@ -2212,22 +2223,70 @@ class MainWindow(QtWidgets.QMainWindow):
                     max_stats,
                     targets,
                     use_points=use_points,
-                    override_points={key: float(value) for key, value in result_points.items()},
+                    override_points=expected_points,
                     title_override=self._expected_child_title(step),
                 )
             )
             pair_layout.addStretch(1)
-            step_layout.addLayout(pair_layout)
+            parent_layout.addLayout(pair_layout)
 
             gains_text = ", ".join(str(item) for item in gains) if gains else "-"
             note = "Start chain with this pair."
-            if step > 1:
+            if step > 1 and previous_chain_points is not None:
+                merge_layout = QtWidgets.QHBoxLayout()
+                merge_layout.setSpacing(12)
+                merge_layout.setContentsMargins(0, 0, 0, 0)
+                merge_layout.addWidget(
+                    self._pair_child_box(
+                        male,
+                        female,
+                        max_stats,
+                        targets,
+                        use_points=use_points,
+                        override_points=previous_chain_points,
+                        title_override=previous_chain_title,
+                    )
+                )
+                plus_merge = QtWidgets.QLabel("+")
+                plus_merge.setAlignment(QtCore.Qt.AlignCenter)
+                plus_merge.setFixedWidth(18)
+                plus_merge.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 700;")
+                merge_layout.addWidget(plus_merge)
+                merge_layout.addWidget(
+                    self._pair_child_box(
+                        male,
+                        female,
+                        max_stats,
+                        targets,
+                        use_points=use_points,
+                        override_points=expected_points,
+                        title_override=self._expected_child_title(step),
+                    )
+                )
+                merge_arrow = QtWidgets.QLabel("⟶")
+                merge_arrow.setAlignment(QtCore.Qt.AlignCenter)
+                merge_arrow.setFixedWidth(28)
+                merge_arrow.setStyleSheet("color: #93c5fd; font-size: 20px; font-weight: 700;")
+                merge_layout.addWidget(merge_arrow)
+                merge_layout.addWidget(
+                    self._pair_child_box(
+                        male,
+                        female,
+                        max_stats,
+                        targets,
+                        use_points=use_points,
+                        override_points=merged_points,
+                        title_override=self._combined_child_title(step),
+                    )
+                )
+                merge_layout.addStretch(1)
+                parent_layout.addLayout(merge_layout)
                 note = f"Breed {from_child} with this donor child, then keep gains: {gains_text}"
             note_label = QtWidgets.QLabel(note)
             note_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
-            step_layout.addWidget(note_label)
-
-            parent_layout.addWidget(step_box)
+            parent_layout.addWidget(note_label)
+            previous_chain_points = merged_points
+            previous_chain_title = self._combined_child_title(step)
             if idx < len(sequence) - 1:
                 chain_arrow = QtWidgets.QLabel("↓")
                 chain_arrow.setAlignment(QtCore.Qt.AlignCenter)
@@ -2266,7 +2325,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 "rank": start_rank,
                 "male": start_male,
                 "female": start_female,
-                "result_points": dict(base_points),
+                "expected_points": dict(base_points),
+                "merged_points": dict(base_points),
                 "gains": [],
                 "from_child": "",
             }
@@ -2296,9 +2356,10 @@ class MainWindow(QtWidgets.QMainWindow):
                     "rank": donor_rank,
                     "male": male,
                     "female": female,
-                    "result_points": dict(merged_points),
+                    "expected_points": dict(donor_points),
+                    "merged_points": dict(merged_points),
                     "gains": gains,
-                    "from_child": f"C{step_index - 1}",
+                    "from_child": self._combined_child_title(step_index - 1),
                 }
             )
             current_points = merged_points
@@ -2316,6 +2377,17 @@ class MainWindow(QtWidgets.QMainWindow):
         }
         suffix = names.get(step, str(step))
         return f"{self._sex_icon('male')}/{self._sex_icon('female')} Expected {suffix}"
+
+    def _combined_child_title(self, step: int) -> str:
+        names = {
+            1: "One",
+            2: "Two",
+            3: "Three",
+            4: "Four",
+            5: "Five",
+        }
+        suffix = names.get(step, str(step))
+        return f"{self._sex_icon('male')}/{self._sex_icon('female')} Combined {suffix}"
 
     def _build_breeding_plan_steps(
         self,
@@ -2337,7 +2409,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         steps: list[dict[str, object]] = []
         used_donors: set[int] = set()
-        max_iterations = max(0, min(10, len(ranked_pairs) - 1))
+        max_iterations = max(0, min(9, len(ranked_pairs) - 1))
         for _ in range(max_iterations):
             pending_keys = [
                 key
