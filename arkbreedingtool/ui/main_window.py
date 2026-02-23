@@ -7,7 +7,7 @@ from typing import Iterable
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from arkbreedingtool.config import bundled_values_path, user_data_dir
+from arkbreedingtool.config import APP_DISPLAY_NAME, bundled_values_path, user_data_dir
 from arkbreedingtool.core.parser import parse_creature_file
 from arkbreedingtool.core.server_settings import parse_ini_file
 from arkbreedingtool.core.species_values import SpeciesValuesStore
@@ -115,7 +115,7 @@ _FLYING_BLUEPRINT_HINTS = (
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, conn, export_dir: Path) -> None:
         super().__init__()
-        self.setWindowTitle("Ark Breeding Tool")
+        self.setWindowTitle(APP_DISPLAY_NAME)
         self.setMinimumSize(1240, 760)
         self._conn = conn
         self._export_dir = export_dir

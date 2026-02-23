@@ -3,7 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 import os
 
+from arkbreedingtool import __version__
+
 APP_NAME = "Ark Breeding Tool"
+APP_VERSION = __version__
+APP_DISPLAY_NAME = f"{APP_NAME} v{APP_VERSION}"
 APP_SLUG = "ark-breeding-tool"
 DEFAULT_EXPORT_DIR = (
     Path.home()
