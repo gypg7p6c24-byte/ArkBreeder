@@ -1,4 +1,4 @@
-# ARK Breeder
+# Ark Breeding Tool
 
 Local breeding manager for ARK: Survival Evolved.
 
@@ -43,3 +43,15 @@ ARKBREEDER_EXPORT_DIR=/custom/path arkbreeder
 ```bash
 packaging/build_deb.sh 0.1.0
 ```
+
+## Project name
+The product name is now **Ark Breeding Tool**.
+
+## Wiki
+Wiki pages are versioned in this repository under:
+- `docs/wiki/Home.md`
+- `docs/wiki/Getting-Started.md`
+- `docs/wiki/Creature-Import.md`
+- `docs/wiki/Settings-and-Multipliers.md`
+- `docs/wiki/Breeding-Workflow.md`
+- `docs/wiki/Troubleshooting.md`

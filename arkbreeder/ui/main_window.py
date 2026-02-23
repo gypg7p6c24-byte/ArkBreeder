@@ -115,7 +115,7 @@ _FLYING_BLUEPRINT_HINTS = (
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, conn, export_dir: Path) -> None:
         super().__init__()
-        self.setWindowTitle("ARK Breeder")
+        self.setWindowTitle("Ark Breeding Tool")
         self.setMinimumSize(1240, 760)
         self._conn = conn
         self._export_dir = export_dir
@@ -302,7 +302,7 @@ class MainWindow(QtWidgets.QMainWindow):
         hero = QtWidgets.QWidget()
         hero_layout = QtWidgets.QVBoxLayout(hero)
         hero_layout.setContentsMargins(6, 0, 6, 2)
-        hero_title = QtWidgets.QLabel("Welcome to ARK Breeder")
+        hero_title = QtWidgets.QLabel("Welcome to Ark Breeding Tool")
         hero_title.setStyleSheet("font-size: 21px; font-weight: 700; color: #f8fafc;")
         hero_layout.addWidget(hero_title)
 
