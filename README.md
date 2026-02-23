@@ -48,6 +48,9 @@ packaging/build_deb.sh 0.1.0
 - Product name: **Ark Breeding Tool**
 - Technical command/module names stay `arkbreedingtool` for compatibility.
 
+## Credits
+- Developed with OpenAI Codex.
+
 ## Wiki
 Wiki pages are versioned in this repository under:
 - `docs/wiki/Home.md`
