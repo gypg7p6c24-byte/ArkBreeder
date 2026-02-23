@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from arkbreedingtool.config import APP_NAME, export_dir
+from arkbreedingtool.config import APP_DISPLAY_NAME, APP_NAME, APP_VERSION, export_dir
 from arkbreedingtool.core.import_service import ExportImportService
 from arkbreedingtool.logging_config import setup_logging
 from arkbreedingtool.storage.database import get_connection, init_db
@@ -27,13 +27,13 @@ def _load_app_icon() -> QtGui.QIcon:
 
 def main() -> int:
     setup_logging()
-    logger.info("Starting Ark Breeding Tool")
+    logger.info("Starting %s (version %s)", APP_NAME, APP_VERSION)
     conn = get_connection()
     init_db(conn)
 
     app = QtWidgets.QApplication([])
     app.setApplicationName(APP_NAME)
-    app.setApplicationDisplayName(APP_NAME)
+    app.setApplicationDisplayName(APP_DISPLAY_NAME)
     app.setDesktopFileName("arkbreedingtool")
     icon = _load_app_icon()
     if not icon.isNull():
