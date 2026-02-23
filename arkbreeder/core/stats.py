@@ -89,6 +89,13 @@ def _apply_multiplier_data(data: object, multipliers: StatMultipliers) -> None:
             if key.startswith("BabyImprintingStatScale"):
                 multipliers.imprinting = value
                 continue
+            lowered = key.lower()
+            if lowered == "overrideofficialdifficulty":
+                multipliers.max_wild_level = max(1, int(round(value * 30.0)))
+                continue
+            if lowered == "difficultyoffset" and multipliers.max_wild_level is None and value > 0:
+                multipliers.max_wild_level = max(1, int(round(value * 150.0)))
+                continue
 
             match = re.match(r"PerLevelStatsMultiplier_DinoWild\[(\d+)\]", key)
             if match:
@@ -120,6 +127,19 @@ def _apply_manual_overrides(data: object, multipliers: StatMultipliers) -> None:
     imprint = _safe_float(data.get("imprinting"))
     if imprint is not None:
         multipliers.imprinting = imprint
+    max_wild_level = _safe_float(data.get("max_wild_level"))
+    if max_wild_level is not None and max_wild_level > 0:
+        multipliers.max_wild_level = int(round(max_wild_level))
+    override_difficulty = _safe_float(data.get("override_official_difficulty"))
+    if override_difficulty is not None and override_difficulty > 0:
+        multipliers.max_wild_level = max(1, int(round(override_difficulty * 30.0)))
+    difficulty_offset = _safe_float(data.get("difficulty_offset"))
+    if (
+        difficulty_offset is not None
+        and difficulty_offset > 0
+        and multipliers.max_wild_level is None
+    ):
+        multipliers.max_wild_level = max(1, int(round(difficulty_offset * 150.0)))
 
     stats = data.get("stats")
     if not isinstance(stats, dict):

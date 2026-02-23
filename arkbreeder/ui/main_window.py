@@ -79,13 +79,6 @@ _STAT_INDEX_BY_POINT_KEY: dict[str, int] = {
     "MovementSpeed": 9,
 }
 
-_MANUAL_MULTIPLIER_COLUMNS: list[tuple[str, str]] = [
-    ("wild", "Wild"),
-    ("tamed", "Tamed"),
-    ("add", "Add"),
-    ("affinity", "Affinity"),
-]
-
 _FLYING_SPECIES = {
     "argentavis",
     "pteranodon",
@@ -132,7 +125,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._values_store = SpeciesValuesStore()
         self._values_path: str | None = None
         self._values_from_bundle = False
-        self._manual_multiplier_inputs: dict[tuple[str, str], QtWidgets.QDoubleSpinBox] = {}
+        self._manual_max_level_input: QtWidgets.QSpinBox | None = None
+        self._manual_override_difficulty_input: QtWidgets.QDoubleSpinBox | None = None
+        self._manual_difficulty_offset_input: QtWidgets.QDoubleSpinBox | None = None
         self._manual_imprint_input: QtWidgets.QDoubleSpinBox | None = None
         self._stat_multipliers = StatMultipliers()
         self._stat_points: dict[str, dict[str, int]] = {}
@@ -604,11 +599,11 @@ class MainWindow(QtWidgets.QMainWindow):
         overview_layout.setContentsMargins(0, 0, 0, 0)
         overview_layout.setSpacing(2)
         overview_title = QtWidgets.QLabel("Breeding actions overview")
-        overview_title.setStyleSheet("color: #cbd5f5; font-size: 19px; font-weight: 900;")
+        overview_title.setStyleSheet("color: #cbd5f5; font-size: 24px; font-weight: 900;")
         overview_layout.addWidget(overview_title)
         self._breeding_overview_grid = QtWidgets.QGridLayout()
         self._breeding_overview_grid.setContentsMargins(0, 0, 0, 0)
-        self._breeding_overview_grid.setHorizontalSpacing(6)
+        self._breeding_overview_grid.setHorizontalSpacing(2)
         self._breeding_overview_grid.setVerticalSpacing(4)
         self._breeding_overview_grid.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         overview_layout.addLayout(self._breeding_overview_grid)
@@ -945,19 +940,79 @@ class MainWindow(QtWidgets.QMainWindow):
         actions.addStretch(1)
         layout.addLayout(actions)
 
-        manual_header = QtWidgets.QLabel("Manual multiplier overrides")
-        manual_header.setStyleSheet("font-size: 16px; font-weight: 700; margin-top: 6px;")
-        layout.addWidget(manual_header)
+        manual_frame = QtWidgets.QFrame()
+        manual_frame.setStyleSheet(
+            "QFrame { background: rgba(15, 23, 42, 0.32); border: 1px solid #334155; border-radius: 10px; }"
+        )
+        manual_layout = QtWidgets.QVBoxLayout(manual_frame)
+        manual_layout.setContentsMargins(12, 10, 12, 10)
+        manual_layout.setSpacing(8)
+
+        manual_header = QtWidgets.QLabel("Manual overrides")
+        manual_header.setStyleSheet("font-size: 16px; font-weight: 700;")
+        manual_layout.addWidget(manual_header)
 
         manual_helper = QtWidgets.QLabel(
-            "Use this only if imported creatures look inconsistent with official defaults."
+            "Use this if imported INI values are missing or your server is custom."
         )
         manual_helper.setWordWrap(True)
         manual_helper.setStyleSheet("color: #cbd5f5;")
-        layout.addWidget(manual_helper)
+        manual_layout.addWidget(manual_helper)
+
+        cap_row = QtWidgets.QHBoxLayout()
+        cap_row.setSpacing(8)
+        max_level_label = QtWidgets.QLabel("Max wild level cap")
+        max_level_label.setStyleSheet("color: #cbd5f5;")
+        cap_row.addWidget(max_level_label)
+        max_level_spin = QtWidgets.QSpinBox()
+        max_level_spin.setRange(0, 10000)
+        max_level_spin.setValue(0)
+        max_level_spin.setFixedWidth(120)
+        max_level_spin.setStyleSheet(
+            "QSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }"
+        )
+        self._manual_max_level_input = max_level_spin
+        cap_row.addWidget(max_level_spin)
+        cap_row.addStretch(1)
+        manual_layout.addLayout(cap_row)
+
+        difficulty_row = QtWidgets.QHBoxLayout()
+        difficulty_row.setSpacing(8)
+        override_label = QtWidgets.QLabel("OverrideOfficialDifficulty")
+        override_label.setStyleSheet("color: #cbd5f5;")
+        difficulty_row.addWidget(override_label)
+        override_spin = QtWidgets.QDoubleSpinBox()
+        override_spin.setDecimals(4)
+        override_spin.setRange(0.0, 1000.0)
+        override_spin.setSingleStep(0.1)
+        override_spin.setValue(0.0)
+        override_spin.setFixedWidth(120)
+        override_spin.setStyleSheet(
+            "QDoubleSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }"
+        )
+        self._manual_override_difficulty_input = override_spin
+        difficulty_row.addWidget(override_spin)
+
+        offset_label = QtWidgets.QLabel("DifficultyOffset")
+        offset_label.setStyleSheet("color: #cbd5f5;")
+        difficulty_row.addWidget(offset_label)
+        offset_spin = QtWidgets.QDoubleSpinBox()
+        offset_spin.setDecimals(4)
+        offset_spin.setRange(0.0, 100.0)
+        offset_spin.setSingleStep(0.05)
+        offset_spin.setValue(0.0)
+        offset_spin.setFixedWidth(110)
+        offset_spin.setStyleSheet(
+            "QDoubleSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }"
+        )
+        self._manual_difficulty_offset_input = offset_spin
+        difficulty_row.addWidget(offset_spin)
+        difficulty_row.addStretch(1)
+        manual_layout.addLayout(difficulty_row)
 
         imprint_row = QtWidgets.QHBoxLayout()
-        imprint_label = QtWidgets.QLabel("Imprinting scale")
+        imprint_row.setSpacing(8)
+        imprint_label = QtWidgets.QLabel("BabyImprintingStatScale")
         imprint_label.setStyleSheet("color: #cbd5f5;")
         imprint_row.addWidget(imprint_label)
         imprint_spin = QtWidgets.QDoubleSpinBox()
@@ -972,33 +1027,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self._manual_imprint_input = imprint_spin
         imprint_row.addWidget(imprint_spin)
         imprint_row.addStretch(1)
-        layout.addLayout(imprint_row)
+        manual_layout.addLayout(imprint_row)
 
-        manual_grid = QtWidgets.QGridLayout()
-        manual_grid.setHorizontalSpacing(8)
-        manual_grid.setVerticalSpacing(6)
-        manual_grid.addWidget(QtWidgets.QLabel("Stat"), 0, 0)
-        for col, (_kind, title) in enumerate(_MANUAL_MULTIPLIER_COLUMNS, start=1):
-            title_label = QtWidgets.QLabel(title)
-            title_label.setStyleSheet("color: #cbd5f5; font-weight: 600;")
-            manual_grid.addWidget(title_label, 0, col)
-        for row, (_short, key, title) in enumerate(_POINT_STAT_CONFIG, start=1):
-            stat_label = QtWidgets.QLabel(title)
-            stat_label.setStyleSheet("color: #cbd5f5;")
-            manual_grid.addWidget(stat_label, row, 0)
-            for col, (kind, _col_title) in enumerate(_MANUAL_MULTIPLIER_COLUMNS, start=1):
-                spin = QtWidgets.QDoubleSpinBox()
-                spin.setDecimals(4)
-                spin.setRange(0.0, 1000.0)
-                spin.setSingleStep(0.05)
-                spin.setValue(1.0)
-                spin.setFixedWidth(94)
-                spin.setStyleSheet(
-                    "QDoubleSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 2px; }"
-                )
-                self._manual_multiplier_inputs[(kind, key)] = spin
-                manual_grid.addWidget(spin, row, col)
-        layout.addLayout(manual_grid)
+        manual_hint = QtWidgets.QLabel(
+            "Max wild level is used by the solver. 0 means auto-detect from imported INI."
+        )
+        manual_hint.setWordWrap(True)
+        manual_hint.setStyleSheet("color: #94a3b8; font-size: 12px;")
+        manual_layout.addWidget(manual_hint)
 
         manual_actions = QtWidgets.QHBoxLayout()
         self._manual_apply_btn = QtWidgets.QPushButton("Apply manual overrides")
@@ -1008,7 +1044,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._manual_reset_btn.clicked.connect(self._reset_manual_overrides)
         manual_actions.addWidget(self._manual_reset_btn)
         manual_actions.addStretch(1)
-        layout.addLayout(manual_actions)
+        manual_layout.addLayout(manual_actions)
+
+        layout.addWidget(manual_frame)
 
         self._settings_warning = QtWidgets.QLabel("")
         self._settings_warning.setWordWrap(True)
@@ -1785,10 +1823,6 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         columns = 1
-        if len(items) >= 2:
-            columns = 2
-        if len(items) >= 5:
-            columns = 3
         for idx, item in enumerate(items):
             species_name = str(item.get("species", "Unknown"))
             step_count = int(item.get("step_count", 1))
@@ -1805,22 +1839,26 @@ class MainWindow(QtWidgets.QMainWindow):
             lead_male = self._truncate_text(lead_male_name or "Male", 10)
             lead_female = self._truncate_text(lead_female_name or "Female", 10)
 
-            card = QtWidgets.QWidget()
+            card = QtWidgets.QFrame()
+            card.setStyleSheet(
+                "QFrame {"
+                "background: rgba(11, 19, 36, 0.28);"
+                "border: 1px solid #334155;"
+                "border-radius: 11px;"
+                "}"
+            )
             card.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Maximum)
             card_layout = QtWidgets.QVBoxLayout(card)
-            card_layout.setContentsMargins(2, 2, 2, 2)
-            card_layout.setSpacing(3)
+            card_layout.setContentsMargins(8, 7, 8, 7)
+            card_layout.setSpacing(4)
 
             title_row = QtWidgets.QHBoxLayout()
             title_row.setContentsMargins(0, 0, 0, 0)
             title_row.setSpacing(4)
             species_label = QtWidgets.QLabel(species_name)
             species_label.setStyleSheet(
-                "color: #f8fafc; font-size: 15px; font-weight: 900;"
-                "background: rgba(15, 23, 42, 0.24);"
-                "border: 1px solid #334155;"
-                "border-radius: 9px;"
-                "padding: 2px 7px;"
+                "color: #f8fafc; font-size: 16px; font-weight: 900;"
+                "background: transparent; border: none;"
             )
             title_row.addWidget(species_label, alignment=QtCore.Qt.AlignLeft)
             title_row.addStretch(1)
@@ -1835,7 +1873,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 "}"
             )
             pair_row = QtWidgets.QHBoxLayout(pair_frame)
-            pair_row.setContentsMargins(4, 4, 4, 4)
+            pair_row.setContentsMargins(5, 5, 5, 5)
             pair_row.setSpacing(5)
             pair_row.addWidget(
                 self._overview_mini_breeder_card(
@@ -1900,7 +1938,7 @@ class MainWindow(QtWidgets.QMainWindow):
         border_color = "#60a5fa" if sex == "male" else "#f472b6"
         text_color = "#dbeafe" if sex == "male" else "#fce7f3"
         box = QtWidgets.QFrame()
-        box.setMinimumWidth(106)
+        box.setMinimumWidth(92)
         box.setStyleSheet(
             "QFrame {"
             "background: rgba(15, 23, 42, 0.36);"
@@ -4019,6 +4057,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         non_default_count = 0
         lines = ["Stat calculation inputs:"]
+        if multipliers.max_wild_level is not None and int(multipliers.max_wild_level) > 0:
+            non_default_count += 1
+            lines.append(f"- Max wild level cap: {int(multipliers.max_wild_level)}")
         if abs(float(multipliers.imprinting) - 1.0) > 0.0001:
             non_default_count += 1
         lines.append(f"- Imprinting scale: x{self._fmt_multiplier(multipliers.imprinting)}")
@@ -4085,45 +4126,73 @@ class MainWindow(QtWidgets.QMainWindow):
         return formatted or "0"
 
     def _manual_overrides_payload(self) -> dict[str, object]:
-        payload: dict[str, object] = {"stats": {}}
+        payload: dict[str, object] = {}
+        if self._manual_max_level_input is not None:
+            payload["max_wild_level"] = int(self._manual_max_level_input.value())
+        if self._manual_override_difficulty_input is not None:
+            payload["override_official_difficulty"] = float(
+                self._manual_override_difficulty_input.value()
+            )
+        if self._manual_difficulty_offset_input is not None:
+            payload["difficulty_offset"] = float(self._manual_difficulty_offset_input.value())
         if self._manual_imprint_input is not None:
             payload["imprinting"] = float(self._manual_imprint_input.value())
-        stats: dict[str, dict[str, float]] = {}
-        for _short, key, _title in _POINT_STAT_CONFIG:
-            row: dict[str, float] = {}
-            for kind, _label in _MANUAL_MULTIPLIER_COLUMNS:
-                spin = self._manual_multiplier_inputs.get((kind, key))
-                if spin is None:
-                    continue
-                row[kind] = float(spin.value())
-            stats[key] = row
-        payload["stats"] = stats
         return payload
 
     def _load_manual_overrides_inputs(self) -> None:
-        if not self._manual_multiplier_inputs and self._manual_imprint_input is None:
+        if (
+            self._manual_max_level_input is None
+            and self._manual_override_difficulty_input is None
+            and self._manual_difficulty_offset_input is None
+            and self._manual_imprint_input is None
+        ):
             return
-        defaults = {"imprinting": 1.0, "stats": {}}
+        defaults: dict[str, object] = {}
         if self._server_settings:
             raw = self._server_settings.get("manual_overrides")
             if isinstance(raw, dict):
                 defaults = raw
-        imprint_value = float(defaults.get("imprinting", 1.0))
+        max_wild_default = int(defaults.get("max_wild_level") or 0)
+        if max_wild_default <= 0 and self._stat_multipliers.max_wild_level:
+            max_wild_default = int(self._stat_multipliers.max_wild_level)
+        if self._manual_max_level_input is not None:
+            self._manual_max_level_input.setValue(max(0, max_wild_default))
+
+        imported_override = self._server_setting_float("OverrideOfficialDifficulty") or 0.0
+        override_default = float(defaults.get("override_official_difficulty") or imported_override)
+        if self._manual_override_difficulty_input is not None:
+            self._manual_override_difficulty_input.setValue(max(0.0, override_default))
+
+        imported_offset = self._server_setting_float("DifficultyOffset") or 0.0
+        offset_default = float(defaults.get("difficulty_offset") or imported_offset)
+        if self._manual_difficulty_offset_input is not None:
+            self._manual_difficulty_offset_input.setValue(max(0.0, offset_default))
+
+        imprint_value = float(defaults.get("imprinting") or self._stat_multipliers.imprinting or 1.0)
         if self._manual_imprint_input is not None:
             self._manual_imprint_input.setValue(imprint_value)
-        stat_data = defaults.get("stats", {})
-        if not isinstance(stat_data, dict):
-            stat_data = {}
-        for _short, key, _title in _POINT_STAT_CONFIG:
-            row = stat_data.get(key, {})
-            if not isinstance(row, dict):
-                row = {}
-            for kind, _label in _MANUAL_MULTIPLIER_COLUMNS:
-                spin = self._manual_multiplier_inputs.get((kind, key))
-                if spin is None:
+
+    def _server_setting_float(self, key_name: str) -> float | None:
+        if not self._server_settings:
+            return None
+        needle = key_name.strip().lower()
+        for source_key in ("game_user_settings", "game_ini"):
+            source = self._server_settings.get(source_key)
+            if not isinstance(source, dict):
+                continue
+            for section in source.values():
+                if not isinstance(section, dict):
                     continue
-                value = float(row.get(kind, 1.0))
-                spin.setValue(value)
+                for raw_key, raw_value in section.items():
+                    if not isinstance(raw_key, str):
+                        continue
+                    if raw_key.strip().lower() != needle:
+                        continue
+                    try:
+                        return float(raw_value)
+                    except (TypeError, ValueError):
+                        return None
+        return None
 
     def _apply_manual_overrides(self) -> None:
         payload = self._ensure_server_settings_payload()
@@ -4131,10 +4200,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self._save_server_settings(payload, "Manual overrides applied.")
 
     def _reset_manual_overrides(self) -> None:
+        if self._manual_max_level_input is not None:
+            self._manual_max_level_input.setValue(0)
+        if self._manual_override_difficulty_input is not None:
+            self._manual_override_difficulty_input.setValue(0.0)
+        if self._manual_difficulty_offset_input is not None:
+            self._manual_difficulty_offset_input.setValue(0.0)
         if self._manual_imprint_input is not None:
             self._manual_imprint_input.setValue(1.0)
-        for spin in self._manual_multiplier_inputs.values():
-            spin.setValue(1.0)
         payload = self._ensure_server_settings_payload()
         payload["manual_overrides"] = self._manual_overrides_payload()
         self._save_server_settings(payload, "Manual overrides reset.")
