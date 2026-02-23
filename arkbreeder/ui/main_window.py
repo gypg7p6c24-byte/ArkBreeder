@@ -443,10 +443,6 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self._creature_updated_filter.currentIndexChanged.connect(self._apply_creature_filters)
         toolbar.addWidget(self._creature_updated_filter)
-
-        self._refresh_button = QtWidgets.QPushButton("Refresh list")
-        self._refresh_button.clicked.connect(self.refresh_data)
-        toolbar.addWidget(self._refresh_button)
         toolbar.addStretch(1)
         left_layout.addLayout(toolbar)
 
@@ -562,18 +558,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         toolbar = QtWidgets.QHBoxLayout()
         toolbar.setSpacing(8)
+        self._breeding_back_btn = QtWidgets.QPushButton("← Back to overview")
+        self._breeding_back_btn.clicked.connect(lambda: self._open_breeding_species_plan("All species"))
+        self._breeding_back_btn.setVisible(False)
+        toolbar.addWidget(self._breeding_back_btn)
+
         self._breeding_species_filter = QtWidgets.QComboBox()
         self._breeding_species_filter.currentIndexChanged.connect(self._update_breeding_pairs)
         toolbar.addWidget(self._breeding_species_filter)
-
-        self._breeding_stat_focus = QtWidgets.QComboBox()
-        self._breeding_stat_focus.addItems(_BREEDING_FOCUS_OPTIONS)
-        self._breeding_stat_focus.currentIndexChanged.connect(self._update_breeding_pairs)
-        toolbar.addWidget(self._breeding_stat_focus)
-
-        self._breeding_refresh_btn = QtWidgets.QPushButton("Suggest pairs")
-        self._breeding_refresh_btn.clicked.connect(self._update_breeding_pairs)
-        toolbar.addWidget(self._breeding_refresh_btn)
         toolbar.addStretch(1)
         layout.addLayout(toolbar)
 
@@ -631,6 +623,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QSizePolicy.Expanding,
             QtWidgets.QSizePolicy.Expanding,
         )
+        self._breeding_cards_scroll = scroll
         layout.addWidget(scroll)
         return widget
 
@@ -667,7 +660,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._detail_crown = QtWidgets.QLabel("♛")
         self._detail_crown.setStyleSheet(
-            "color: rgba(103, 232, 249, 0.92); font-size: 86px; font-weight: 800; padding-right: 2px;"
+            "color: rgba(103, 232, 249, 0.94); font-size: 98px; font-weight: 800; padding-right: 2px;"
         )
         self._detail_crown.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignRight)
         self._detail_crown.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
@@ -723,7 +716,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         insights_card = QtWidgets.QWidget()
         insights_layout = QtWidgets.QVBoxLayout(insights_card)
-        insights_layout.setContentsMargins(12, 0, 0, 0)
+        insights_layout.setContentsMargins(8, 0, 0, 0)
         insights_layout.setSpacing(4)
         insights_title = QtWidgets.QLabel("Breeding insights")
         insights_title.setStyleSheet("color: #93c5fd; font-size: 12px; font-weight: 700;")
@@ -737,13 +730,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
         stats_insights_row = QtWidgets.QHBoxLayout()
         stats_insights_row.setContentsMargins(0, 0, 0, 0)
-        stats_insights_row.setSpacing(10)
+        stats_insights_row.setSpacing(8)
         stats_insights_row.addWidget(stats_container, 1)
         separator = QtWidgets.QFrame()
         separator.setFixedWidth(1)
         separator.setStyleSheet("QFrame { background: #334155; border-radius: 0px; }")
         stats_insights_row.addWidget(separator)
         stats_insights_row.addWidget(insights_card, 1)
+        stats_insights_row.setStretch(0, 1)
+        stats_insights_row.setStretch(2, 1)
         layout.addLayout(stats_insights_row)
 
         self._points_info = QtWidgets.QLabel(
@@ -941,6 +936,37 @@ class MainWindow(QtWidgets.QMainWindow):
         self._settings_details.setWordWrap(True)
         self._settings_details.setStyleSheet("color: #94a3b8;")
         layout.addWidget(self._settings_details)
+
+        diagnostics_header = QtWidgets.QLabel("Import diagnostics")
+        diagnostics_header.setStyleSheet("font-size: 16px; font-weight: 700; margin-top: 6px;")
+        layout.addWidget(diagnostics_header)
+
+        self._settings_log_output = QtWidgets.QPlainTextEdit()
+        self._settings_log_output.setReadOnly(True)
+        self._settings_log_output.setMinimumHeight(140)
+        self._settings_log_output.setMaximumHeight(220)
+        self._settings_log_output.setStyleSheet(
+            "QPlainTextEdit {"
+            "background: rgba(11, 19, 36, 0.9);"
+            "border: 1px solid #334155;"
+            "border-radius: 10px;"
+            "color: #cbd5f5;"
+            "padding: 8px;"
+            "font-family: 'DejaVu Sans Mono';"
+            "font-size: 11px;"
+            "}"
+        )
+        layout.addWidget(self._settings_log_output)
+
+        diagnostics_actions = QtWidgets.QHBoxLayout()
+        self._settings_copy_log_btn = QtWidgets.QPushButton("Copy diagnostics")
+        self._settings_copy_log_btn.clicked.connect(self._copy_settings_log)
+        diagnostics_actions.addWidget(self._settings_copy_log_btn)
+        self._settings_clear_log_btn = QtWidgets.QPushButton("Clear")
+        self._settings_clear_log_btn.clicked.connect(self._clear_settings_log)
+        diagnostics_actions.addWidget(self._settings_clear_log_btn)
+        diagnostics_actions.addStretch(1)
+        layout.addLayout(diagnostics_actions)
 
         values_header = QtWidgets.QLabel("Creature values")
         values_header.setStyleSheet("font-size: 18px; font-weight: 700; margin-top: 12px;")
@@ -1619,8 +1645,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _update_breeding_pairs(self) -> None:
         species = self._breeding_species_filter.currentText()
-        focus = self._breeding_stat_focus.currentText()
+        focus = "Overall"
         show_ranking = species != "All species"
+        if hasattr(self, "_breeding_back_btn"):
+            self._breeding_back_btn.setVisible(show_ranking)
+        if hasattr(self, "_breeding_cards_scroll"):
+            self._breeding_cards_scroll.setVisible(show_ranking)
         creatures = [
             c
             for c in self._creature_cache
@@ -1679,6 +1709,8 @@ class MainWindow(QtWidgets.QMainWindow):
                         "score": plan_ranked_pairs[0][1],
                         "step_count": max(1, len(sequence)),
                         "pending": pending,
+                        "lead_male_name": lead_male.name or "Male",
+                        "lead_female_name": lead_female.name or "Female",
                         "next_action": (
                             f"{self._truncate_text(lead_male.name or 'Male', 10)} + "
                             f"{self._truncate_text(lead_female.name or 'Female', 10)}"
@@ -1692,16 +1724,19 @@ class MainWindow(QtWidgets.QMainWindow):
         rows.sort(key=lambda item: item[2][0][1] if item[2] else -1.0, reverse=True)
         overview_items.sort(
             key=lambda item: (
-                int(item.get("pending") is not None and len(item.get("pending", [])) > 0),
+                int(item.get("pending") is not None and len(item.get("pending", [])) == 0),
                 len(item.get("pending", [])),
                 -float(item.get("score", 0.0)),
             ),
-            reverse=False,
+            reverse=True,
         )
         self._render_breeding_overview(
             overview_items,
             show_overview=(species == "All species"),
         )
+        if not show_ranking:
+            self._render_breeding_cards([], focus, use_points, show_ranking=False)
+            return
         self._render_breeding_cards(rows, focus, use_points, show_ranking=show_ranking)
 
     def _render_breeding_overview(
@@ -1736,6 +1771,10 @@ class MainWindow(QtWidgets.QMainWindow):
             is_ready = len(pending) == 0
             status_color = "#67e8f9" if is_ready else "#fbbf24"
             status_text = "Ready" if is_ready else "Missing stats"
+            lead_male_name = str(item.get("lead_male_name", "Male"))
+            lead_female_name = str(item.get("lead_female_name", "Female"))
+            lead_male = self._truncate_text(lead_male_name or "Male", 10)
+            lead_female = self._truncate_text(lead_female_name or "Female", 10)
 
             card = QtWidgets.QFrame()
             card.setStyleSheet(
@@ -1766,7 +1805,42 @@ class MainWindow(QtWidgets.QMainWindow):
             title_row.addWidget(status_chip)
             card_layout.addLayout(title_row)
 
-            next_label = QtWidgets.QLabel(f"Next: {next_action}")
+            preview_row = QtWidgets.QHBoxLayout()
+            preview_row.setContentsMargins(0, 0, 0, 0)
+            preview_row.setSpacing(6)
+            male_chip = QtWidgets.QFrame()
+            male_chip.setStyleSheet(
+                "QFrame { background: rgba(96, 165, 250, 0.12); border: 1px solid #60a5fa; border-radius: 8px; }"
+            )
+            male_layout = QtWidgets.QHBoxLayout(male_chip)
+            male_layout.setContentsMargins(5, 4, 5, 4)
+            male_layout.setSpacing(4)
+            male_layout.addWidget(self._small_species_image(species_name, size=30))
+            male_name_label = QtWidgets.QLabel(f"{self._sex_icon('male')} {lead_male}")
+            male_name_label.setStyleSheet("color: #dbeafe; font-size: 10px; font-weight: 700;")
+            male_layout.addWidget(male_name_label)
+            preview_row.addWidget(male_chip)
+
+            plus = QtWidgets.QLabel("+")
+            plus.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 700;")
+            preview_row.addWidget(plus)
+
+            female_chip = QtWidgets.QFrame()
+            female_chip.setStyleSheet(
+                "QFrame { background: rgba(244, 114, 182, 0.12); border: 1px solid #f472b6; border-radius: 8px; }"
+            )
+            female_layout = QtWidgets.QHBoxLayout(female_chip)
+            female_layout.setContentsMargins(5, 4, 5, 4)
+            female_layout.setSpacing(4)
+            female_layout.addWidget(self._small_species_image(species_name, size=30))
+            female_name_label = QtWidgets.QLabel(f"{self._sex_icon('female')} {lead_female}")
+            female_name_label.setStyleSheet("color: #fce7f3; font-size: 10px; font-weight: 700;")
+            female_layout.addWidget(female_name_label)
+            preview_row.addWidget(female_chip)
+            preview_row.addStretch(1)
+            card_layout.addLayout(preview_row)
+
+            next_label = QtWidgets.QLabel(f"Next action: {next_action}")
             next_label.setStyleSheet("color: #cbd5f5; font-size: 11px; font-weight: 600;")
             card_layout.addWidget(next_label)
 
@@ -1802,6 +1876,9 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         index = self._breeding_species_filter.findText(species)
         if index >= 0:
+            if self._breeding_species_filter.currentIndex() == index:
+                self._update_breeding_pairs()
+                return
             self._breeding_species_filter.setCurrentIndex(index)
 
     def _species_target_points(self, group: list[Creature]) -> list[tuple[str, int]]:
@@ -2184,9 +2261,9 @@ class MainWindow(QtWidgets.QMainWindow):
             text_glow.setColor(QtGui.QColor(255, 255, 255, 180))
             name_label.setGraphicsEffect(text_glow)
             crown_glow = QtWidgets.QGraphicsDropShadowEffect(crown_label)
-            crown_glow.setBlurRadius(10)
+            crown_glow.setBlurRadius(14)
             crown_glow.setOffset(0, 0)
-            crown_glow.setColor(QtGui.QColor(103, 232, 249, 220))
+            crown_glow.setColor(QtGui.QColor(103, 232, 249, 240))
             crown_label.setGraphicsEffect(crown_glow)
 
         avatar = self._small_species_image(self._display_species(creature.species), size=100)
@@ -2283,9 +2360,9 @@ class MainWindow(QtWidgets.QMainWindow):
             text_glow.setColor(QtGui.QColor(255, 255, 255, 170))
             name_label.setGraphicsEffect(text_glow)
             crown_glow = QtWidgets.QGraphicsDropShadowEffect(crown_label)
-            crown_glow.setBlurRadius(10)
+            crown_glow.setBlurRadius(14)
             crown_glow.setOffset(0, 0)
-            crown_glow.setColor(QtGui.QColor(103, 232, 249, 220))
+            crown_glow.setColor(QtGui.QColor(103, 232, 249, 240))
             crown_label.setGraphicsEffect(crown_glow)
 
         colors = {
@@ -2922,7 +2999,7 @@ class MainWindow(QtWidgets.QMainWindow):
         icons = {
             "H": "✚",
             "S": "⚗",
-            "O": "O₂",
+            "O": "💧",
             "F": "♨",
             "W": "⚖",
             "M": "🗡︎",
@@ -3313,8 +3390,10 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         size = self._detail_crown.sizeHint()
         self._detail_crown.resize(size)
-        x = max(0, self._detail_panel.width() - size.width() - 10)
-        self._detail_crown.move(x, 2)
+        margins = self._detail_panel.contentsMargins()
+        x = max(0, self._detail_panel.width() - size.width() - margins.right() - 8)
+        y = max(0, margins.top() - 3)
+        self._detail_crown.move(x, y)
 
     def _update_creature_detail(self, creature: Creature) -> None:
         rank, ranked_count = self._species_sex_rank(creature)
@@ -3328,9 +3407,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._position_detail_crown()
         if is_top_candidate:
             crown_glow = QtWidgets.QGraphicsDropShadowEffect(self._detail_crown)
-            crown_glow.setBlurRadius(16)
+            crown_glow.setBlurRadius(26)
             crown_glow.setOffset(0, 0)
-            crown_glow.setColor(QtGui.QColor(103, 232, 249, 215))
+            crown_glow.setColor(QtGui.QColor(103, 232, 249, 240))
             self._detail_crown.setGraphicsEffect(crown_glow)
         else:
             self._detail_crown.setGraphicsEffect(None)
@@ -3483,14 +3562,15 @@ class MainWindow(QtWidgets.QMainWindow):
         ask_confirm = get_setting(self._conn, "confirm_delete_creature") != "0"
         if ask_confirm:
             dialog = QtWidgets.QMessageBox(self)
+            dialog.setOption(QtWidgets.QMessageBox.DontUseNativeDialog, True)
             dialog.setIcon(QtWidgets.QMessageBox.Warning)
             dialog.setWindowTitle("Delete creature")
             dialog.setText(f"Delete '{creature.name}'?")
             dialog.setInformativeText("This action removes the creature from local data.")
             dialog.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
             dialog.setStyleSheet(
-                "QMessageBox { background: #0f172a; color: #e5e7eb; }"
-                "QLabel { color: #e5e7eb; }"
+                "QMessageBox { background: #0f172a; color: #e5e7eb; border: 1px solid #334155; border-radius: 12px; }"
+                "QLabel { color: #e5e7eb; font-size: 12px; }"
                 "QPushButton { background: #1e293b; color: #e5e7eb; border: 1px solid #334155;"
                 "padding: 6px 10px; border-radius: 6px; min-width: 92px; }"
                 "QPushButton:hover { background: #243247; }"
@@ -3527,16 +3607,19 @@ class MainWindow(QtWidgets.QMainWindow):
         elif lowered == "female":
             accent = "#f472b6"
             glow = QtGui.QColor(244, 114, 182, 120)
+        if spotlight:
+            accent = "#67e8f9"
+            glow = QtGui.QColor(103, 232, 249, 230)
         self._detail_panel.setStyleSheet(
             "#detailPanel {"
-            f"background: rgba(15, 23, 42, {'0.52' if spotlight else '0.44'}); border: 2px solid {accent};"
+            f"background: rgba(15, 23, 42, {'0.58' if spotlight else '0.44'}); border: 2px solid {accent};"
             "border-radius: 16px;"
             "}"
         )
         effect = QtWidgets.QGraphicsDropShadowEffect(self._detail_panel)
-        effect.setBlurRadius(20 if spotlight else 14)
+        effect.setBlurRadius(34 if spotlight else 14)
         effect.setOffset(0, 0)
-        glow.setAlpha(160 if spotlight else 100)
+        glow.setAlpha(245 if spotlight else 100)
         effect.setColor(glow)
         self._detail_panel.setGraphicsEffect(effect)
 
@@ -3702,6 +3785,31 @@ class MainWindow(QtWidgets.QMainWindow):
         formatted = f"{value:.4f}".rstrip("0").rstrip(".")
         return formatted or "0"
 
+    def _append_settings_log(self, message: str) -> None:
+        if not hasattr(self, "_settings_log_output"):
+            return
+        stamp = QtCore.QDateTime.currentDateTime().toString("HH:mm:ss")
+        self._settings_log_output.appendPlainText(f"[{stamp}] {message}")
+        bar = self._settings_log_output.verticalScrollBar()
+        if bar is not None:
+            bar.setValue(bar.maximum())
+
+    def _copy_settings_log(self) -> None:
+        if not hasattr(self, "_settings_log_output"):
+            return
+        text = self._settings_log_output.toPlainText().strip()
+        if not text:
+            self.show_toast("No diagnostics to copy.", "info")
+            return
+        QtGui.QGuiApplication.clipboard().setText(text)
+        self.show_toast("Diagnostics copied.", "success")
+
+    def _clear_settings_log(self) -> None:
+        if not hasattr(self, "_settings_log_output"):
+            return
+        self._settings_log_output.clear()
+        self._append_settings_log("Diagnostics cleared.")
+
     def _load_species_values(self) -> None:
         self._values_store = SpeciesValuesStore()
         self._values_from_bundle = False
@@ -3750,10 +3858,18 @@ class MainWindow(QtWidgets.QMainWindow):
         path = self._select_ini_file("Select GameUserSettings.ini")
         if not path:
             return
+        self._append_settings_log(f"Import requested: GameUserSettings.ini from {path}")
         parsed = parse_ini_file(Path(path))
+        section_count = len(parsed)
+        key_count = sum(len(values) for values in parsed.values())
+        self._append_settings_log(
+            f"Parsed GameUserSettings.ini -> {section_count} sections, {key_count} keys."
+        )
         if not self._is_valid_game_user_settings_ini(parsed, path):
             self.show_toast("Fichier non conforme (GameUserSettings.ini attendu).", "error")
+            self._append_settings_log("Validation failed for GameUserSettings.ini (file rejected).")
             return
+        self._append_settings_log("Validation passed for GameUserSettings.ini.")
         payload = self._ensure_server_settings_payload()
         payload["game_user_settings"] = parsed
         payload["sources"]["game_user_settings"] = path
@@ -3763,10 +3879,16 @@ class MainWindow(QtWidgets.QMainWindow):
         path = self._select_ini_file("Select Game.ini")
         if not path:
             return
+        self._append_settings_log(f"Import requested: Game.ini from {path}")
         parsed = parse_ini_file(Path(path))
+        section_count = len(parsed)
+        key_count = sum(len(values) for values in parsed.values())
+        self._append_settings_log(f"Parsed Game.ini -> {section_count} sections, {key_count} keys.")
         if not self._is_valid_game_ini(parsed, path):
             self.show_toast("Fichier non conforme (Game.ini attendu).", "error")
+            self._append_settings_log("Validation failed for Game.ini (file rejected).")
             return
+        self._append_settings_log("Validation passed for Game.ini.")
         payload = self._ensure_server_settings_payload()
         payload["game_ini"] = parsed
         payload["sources"]["game_ini"] = path
@@ -3886,6 +4008,9 @@ class MainWindow(QtWidgets.QMainWindow):
         set_server_settings(self._conn, payload)
         self._server_settings = payload
         self._stat_multipliers = extract_stat_multipliers(self._server_settings)
+        self._append_settings_log(
+            f"Server settings saved. Multipliers tracked: {len(self._calc_multiplier_lines()) - 1}."
+        )
         self._update_settings_view()
         self._recompute_stat_points()
         self.refresh_data()
