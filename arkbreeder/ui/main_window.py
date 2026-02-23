@@ -305,12 +305,14 @@ class MainWindow(QtWidgets.QMainWindow):
         charts.setSpacing(8)
 
         left = QtWidgets.QFrame()
-        left.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.44); border-radius: 16px; }")
+        left.setStyleSheet(
+            "QFrame { background: rgba(30, 41, 59, 0.52); border: 1px solid #3b82f6; border-radius: 16px; }"
+        )
         left_layout = QtWidgets.QVBoxLayout(left)
         left_layout.setContentsMargins(10, 6, 10, 6)
         left_layout.setSpacing(2)
         left_title = QtWidgets.QLabel("Species distribution")
-        left_title.setStyleSheet("color: #e2e8f0; font-weight: 700; font-size: 16px;")
+        left_title.setStyleSheet("color: #dbeafe; font-weight: 800; font-size: 16px;")
         left_layout.addWidget(left_title)
         self._species_donut = DonutChartWidget()
         self._species_donut.setMinimumSize(96, 96)
@@ -325,7 +327,9 @@ class MainWindow(QtWidgets.QMainWindow):
         left_layout.addLayout(self._species_legend)
 
         right = QtWidgets.QFrame()
-        right.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.44); border-radius: 16px; }")
+        right.setStyleSheet(
+            "QFrame { background: rgba(15, 23, 42, 0.44); border: 1px solid #334155; border-radius: 16px; }"
+        )
         right_layout = QtWidgets.QVBoxLayout(right)
         right_layout.setContentsMargins(10, 6, 10, 6)
         right_layout.setSpacing(4)
@@ -395,7 +399,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _dashboard_panel(self, title: str) -> tuple[QtWidgets.QFrame, QtWidgets.QVBoxLayout]:
         panel = QtWidgets.QFrame()
-        panel.setStyleSheet("QFrame { background: rgba(15, 23, 42, 0.44); border-radius: 16px; }")
+        panel.setStyleSheet(
+            "QFrame { background: rgba(15, 23, 42, 0.44); border: 1px solid #334155; border-radius: 16px; }"
+        )
         layout = QtWidgets.QVBoxLayout(panel)
         layout.setContentsMargins(10, 6, 10, 6)
         layout.setSpacing(3)
@@ -473,6 +479,18 @@ class MainWindow(QtWidgets.QMainWindow):
                 color: #dbeafe;
                 padding: 6px 8px;
                 font-weight: 700;
+            }
+            QHeaderView::section:first {
+                border-top-left-radius: 10px;
+            }
+            QHeaderView::section:last {
+                border-top-right-radius: 10px;
+            }
+            QTableCornerButton::section {
+                background: rgba(30, 41, 59, 0.75);
+                border: none;
+                border-bottom: 1px solid #334155;
+                border-top-left-radius: 10px;
             }
             """
         )
@@ -639,6 +657,22 @@ class MainWindow(QtWidgets.QMainWindow):
             row_layout.addStretch(1)
             stat_rows.addWidget(row_widget)
         layout.addLayout(stat_rows)
+
+        insights_card = QtWidgets.QFrame()
+        insights_card.setStyleSheet(
+            "QFrame { background: rgba(15, 23, 42, 0.38); border: 1px solid #334155; border-radius: 10px; }"
+        )
+        insights_layout = QtWidgets.QVBoxLayout(insights_card)
+        insights_layout.setContentsMargins(8, 6, 8, 6)
+        insights_layout.setSpacing(4)
+        insights_title = QtWidgets.QLabel("Breeding insights")
+        insights_title.setStyleSheet("color: #93c5fd; font-size: 12px; font-weight: 700;")
+        self._detail_insights = QtWidgets.QLabel("Select a creature to see insights.")
+        self._detail_insights.setStyleSheet("color: #cbd5f5; font-size: 11px;")
+        self._detail_insights.setWordWrap(True)
+        insights_layout.addWidget(insights_title)
+        insights_layout.addWidget(self._detail_insights)
+        layout.addWidget(insights_card)
 
         self._points_info = QtWidgets.QLabel(
             "Stat points unavailable — import values.json in Settings."
@@ -2102,7 +2136,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         for step_info in sequence:
             step = int(step_info["step"])
-            rank = int(step_info["rank"])
             male = step_info["male"]
             female = step_info["female"]
             if not isinstance(male, Creature) or not isinstance(female, Creature):
@@ -2115,15 +2148,9 @@ class MainWindow(QtWidgets.QMainWindow):
             if not isinstance(gains, list):
                 gains = []
 
-            header_row = QtWidgets.QHBoxLayout()
-            header_row.setContentsMargins(0, 0, 0, 0)
-            header_row.setSpacing(8)
-            header_row.addWidget(self._rank_badge(step))
-            step_label = QtWidgets.QLabel(f"Step {step} • pair rank #{rank}")
-            step_label.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 700;")
-            header_row.addWidget(step_label)
-            header_row.addStretch(1)
-            parent_layout.addLayout(header_row)
+            step_label = QtWidgets.QLabel(f"Step {step}")
+            step_label.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 800;")
+            parent_layout.addWidget(step_label)
 
             pair_layout = QtWidgets.QHBoxLayout()
             pair_layout.setSpacing(12)
@@ -2884,6 +2911,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._detail_title.setText("Select a creature")
             self._detail_subtitle.setText("")
             self._detail_rank_note.setText("")
+            self._detail_insights.setText("Select a creature to see insights.")
             self._detail_strengths.setText("Strengths: -")
             self._detail_weaknesses.setText("Weaknesses: -")
             if hasattr(self, "_detail_delete_btn"):
@@ -2961,6 +2989,14 @@ class MainWindow(QtWidgets.QMainWindow):
             species_group,
             use_points=use_points,
         )
+        self._detail_insights.setText(
+            self._build_detail_insights(
+                creature,
+                species_group,
+                strengths,
+                weaknesses,
+            )
+        )
         if len(species_group) <= 1:
             self._detail_strengths.setText("Strengths: Add more of this species for comparison.")
             self._detail_weaknesses.setText("Weaknesses: Add more of this species for comparison.")
@@ -2990,6 +3026,39 @@ class MainWindow(QtWidgets.QMainWindow):
         if rank == 1:
             return f"Top {creature.sex} candidate in species"
         return f"Rank #{rank} {creature.sex} candidate in species"
+
+    def _build_detail_insights(
+        self,
+        creature: Creature,
+        species_group: list[Creature],
+        strengths: list[str],
+        weaknesses: list[str],
+    ) -> str:
+        rank, ranked_count = self._species_sex_rank(creature)
+        points_items: list[tuple[str, int]] = []
+        for short, key, _title in _DETAIL_POINT_STAT_CONFIG:
+            value = self._get_stat_points_value(creature, key)
+            if value is None:
+                continue
+            points_items.append((short, int(value)))
+        points_items.sort(key=lambda item: item[1], reverse=True)
+        top_stats = ", ".join(
+            f"{self._point_icon(short)} {value}" for short, value in points_items[:3]
+        ) or "n/a"
+        role: str
+        if ranked_count < 2 or rank is None:
+            role = "Need more same-species creatures for full ranking."
+        elif rank == 1:
+            role = f"Primary {creature.sex.lower()} breeder candidate."
+        else:
+            role = f"Backup {creature.sex.lower()} breeder (rank #{rank})."
+        strengths_text = ", ".join(strengths[:3]) if strengths else "-"
+        weakness_text = ", ".join(weaknesses[:3]) if weaknesses else "-"
+        return (
+            f"Top points: {top_stats}\n"
+            f"Role: {role}\n"
+            f"Strong: {strengths_text} • Weak: {weakness_text}"
+        )
 
     def _species_sex_rank(self, creature: Creature) -> tuple[int | None, int]:
         species_group = [
