@@ -46,13 +46,18 @@ def main() -> int:
     window.show()
     app.aboutToQuit.connect(conn.close)
 
-    service = ExportImportService(conn, export_path, on_notify=window.show_toast)
+    service = ExportImportService(
+        conn,
+        export_path,
+        delete_after_import=False,
+        on_notify=window.show_toast,
+    )
     timer = QtCore.QTimer()
     timer.setInterval(500)
     window._import_service = service
     timer.timeout.connect(window.handle_import_tick)
     timer.start()
-    logger.info("Watching export directory: %s", export_path)
+    logger.info("Watching export directory (keep files): %s", export_path)
     return app.exec()
 
 
