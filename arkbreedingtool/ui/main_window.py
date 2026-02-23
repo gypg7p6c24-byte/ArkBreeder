@@ -134,11 +134,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creature_cache: list[Creature] = []
         self._creature_rows: list[Creature] = []
         self._selected_creature: Creature | None = None
-        self._species_image_prefetchers: dict[str, SpeciesImageWidget] = {}
-        self._species_image_waiting_labels: dict[str, list[QtWidgets.QLabel]] = {}
-        self._species_image_poll_timer = QtCore.QTimer(self)
-        self._species_image_poll_timer.setInterval(250)
-        self._species_image_poll_timer.timeout.connect(self._flush_species_image_waiting_labels)
         self._page_titles = [
             "Dashboard",
             "Creatures",
@@ -563,7 +558,7 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.addWidget(self._breeding_back_btn)
 
         self._breeding_scope_label = QtWidgets.QLabel("Overview")
-        self._breeding_scope_label.setStyleSheet("color: #e2e8f0; font-size: 32px; font-weight: 900;")
+        self._breeding_scope_label.setStyleSheet("color: #e2e8f0; font-size: 23px; font-weight: 900;")
         toolbar.addWidget(self._breeding_scope_label)
 
         self._breeding_species_filter = QtWidgets.QComboBox()
@@ -595,10 +590,10 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         overview_layout = QtWidgets.QVBoxLayout(self._breeding_overview_panel)
         overview_layout.setContentsMargins(0, 0, 0, 0)
-        overview_layout.setSpacing(2)
+        overview_layout.setSpacing(1)
         overview_layout.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         overview_title = QtWidgets.QLabel("Breeding actions overview")
-        overview_title.setStyleSheet("color: #cbd5f5; font-size: 22px; font-weight: 800;")
+        overview_title.setStyleSheet("color: #cbd5f5; font-size: 34px; font-weight: 900;")
         overview_layout.addWidget(overview_title)
         self._breeding_overview_grid = QtWidgets.QGridLayout()
         self._breeding_overview_grid.setContentsMargins(0, 0, 0, 0)
@@ -670,10 +665,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self._detail_crown.setStyleSheet(
             "color: rgba(103, 232, 249, 0.96);"
             "font-size: 86px;"
-            "font-weight: 900;"
-            "padding: 0px;"
-            "background: transparent;"
-            "border: none;"
+            "font-weight: 800;"
+            "padding: 0px 2px 0px 2px;"
+            "background: rgba(11, 19, 36, 0.42);"
+            "border: 1px solid rgba(103, 232, 249, 0.35);"
+            "border-radius: 18px;"
         )
         self._detail_crown.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignRight)
         self._detail_crown.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
@@ -731,7 +727,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         insights_card = QtWidgets.QWidget()
         insights_layout = QtWidgets.QVBoxLayout(insights_card)
-        insights_layout.setContentsMargins(4, 0, 0, 0)
+        insights_layout.setContentsMargins(6, 0, 0, 0)
         insights_layout.setSpacing(4)
         insights_title = QtWidgets.QLabel("Breeding insights")
         insights_title.setStyleSheet("color: #93c5fd; font-size: 12px; font-weight: 700;")
@@ -745,13 +741,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         stats_insights_row = QtWidgets.QHBoxLayout()
         stats_insights_row.setContentsMargins(0, 0, 0, 0)
-        stats_insights_row.setSpacing(2)
+        stats_insights_row.setSpacing(6)
         stats_container.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
         insights_card.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
         stats_insights_row.addWidget(stats_container, 1)
         separator = QtWidgets.QFrame()
         separator.setFixedWidth(1)
-        separator.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Expanding)
         separator.setStyleSheet("QFrame { background: #334155; border-radius: 0px; }")
         stats_insights_row.addWidget(separator)
         stats_insights_row.addWidget(insights_card, 1)
@@ -945,9 +940,12 @@ class MainWindow(QtWidgets.QMainWindow):
         actions.addStretch(1)
         layout.addLayout(actions)
 
-        manual_frame = QtWidgets.QWidget()
+        manual_frame = QtWidgets.QFrame()
+        manual_frame.setStyleSheet(
+            "QFrame { background: rgba(15, 23, 42, 0.32); border: 1px solid #334155; border-radius: 10px; }"
+        )
         manual_layout = QtWidgets.QVBoxLayout(manual_frame)
-        manual_layout.setContentsMargins(0, 0, 0, 0)
+        manual_layout.setContentsMargins(12, 10, 12, 10)
         manual_layout.setSpacing(8)
 
         manual_header = QtWidgets.QLabel("Manual overrides")
@@ -962,7 +960,6 @@ class MainWindow(QtWidgets.QMainWindow):
         manual_layout.addWidget(manual_helper)
 
         cap_row = QtWidgets.QHBoxLayout()
-        cap_row.setContentsMargins(0, 0, 0, 0)
         cap_row.setSpacing(8)
         max_level_label = QtWidgets.QLabel("Max wild level cap")
         max_level_label.setStyleSheet("color: #cbd5f5;")
@@ -970,8 +967,7 @@ class MainWindow(QtWidgets.QMainWindow):
         max_level_spin = QtWidgets.QSpinBox()
         max_level_spin.setRange(0, 10000)
         max_level_spin.setValue(0)
-        max_level_spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        max_level_spin.setMaximumWidth(220)
+        max_level_spin.setFixedWidth(120)
         max_level_spin.setStyleSheet(
             "QSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }"
         )
@@ -981,7 +977,6 @@ class MainWindow(QtWidgets.QMainWindow):
         manual_layout.addLayout(cap_row)
 
         difficulty_row = QtWidgets.QHBoxLayout()
-        difficulty_row.setContentsMargins(0, 0, 0, 0)
         difficulty_row.setSpacing(8)
         override_label = QtWidgets.QLabel("OverrideOfficialDifficulty")
         override_label.setStyleSheet("color: #cbd5f5;")
@@ -991,39 +986,31 @@ class MainWindow(QtWidgets.QMainWindow):
         override_spin.setRange(0.0, 1000.0)
         override_spin.setSingleStep(0.1)
         override_spin.setValue(0.0)
-        override_spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        override_spin.setMaximumWidth(220)
+        override_spin.setFixedWidth(120)
         override_spin.setStyleSheet(
             "QDoubleSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }"
         )
         self._manual_override_difficulty_input = override_spin
         difficulty_row.addWidget(override_spin)
-        difficulty_row.addStretch(1)
-        manual_layout.addLayout(difficulty_row)
 
-        offset_row = QtWidgets.QHBoxLayout()
-        offset_row.setContentsMargins(0, 0, 0, 0)
-        offset_row.setSpacing(8)
         offset_label = QtWidgets.QLabel("DifficultyOffset")
         offset_label.setStyleSheet("color: #cbd5f5;")
-        offset_row.addWidget(offset_label)
+        difficulty_row.addWidget(offset_label)
         offset_spin = QtWidgets.QDoubleSpinBox()
         offset_spin.setDecimals(4)
         offset_spin.setRange(0.0, 100.0)
         offset_spin.setSingleStep(0.05)
         offset_spin.setValue(0.0)
-        offset_spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        offset_spin.setMaximumWidth(220)
+        offset_spin.setFixedWidth(110)
         offset_spin.setStyleSheet(
             "QDoubleSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }"
         )
         self._manual_difficulty_offset_input = offset_spin
-        offset_row.addWidget(offset_spin)
-        offset_row.addStretch(1)
-        manual_layout.addLayout(offset_row)
+        difficulty_row.addWidget(offset_spin)
+        difficulty_row.addStretch(1)
+        manual_layout.addLayout(difficulty_row)
 
         imprint_row = QtWidgets.QHBoxLayout()
-        imprint_row.setContentsMargins(0, 0, 0, 0)
         imprint_row.setSpacing(8)
         imprint_label = QtWidgets.QLabel("BabyImprintingStatScale")
         imprint_label.setStyleSheet("color: #cbd5f5;")
@@ -1033,8 +1020,7 @@ class MainWindow(QtWidgets.QMainWindow):
         imprint_spin.setRange(0.0, 1000.0)
         imprint_spin.setSingleStep(0.05)
         imprint_spin.setValue(1.0)
-        imprint_spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        imprint_spin.setMaximumWidth(220)
+        imprint_spin.setFixedWidth(120)
         imprint_spin.setStyleSheet(
             "QDoubleSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }"
         )
@@ -1119,7 +1105,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def refresh_data(self) -> None:
         self._creature_cache = list(list_creatures(self._conn))
-        self._prefetch_species_images()
         self._recompute_stat_points()
         self._update_points_info_labels()
         self._update_settings_view()
@@ -1986,7 +1971,19 @@ class MainWindow(QtWidgets.QMainWindow):
         label.setFixedSize(size, int(size * 0.75))
         label.setAlignment(QtCore.Qt.AlignCenter)
         label.setStyleSheet("background: transparent; border: none; color: #94a3b8;")
-        self._set_species_image_on_label(label, species)
+        cache_path = self._species_cache_path(species)
+        if cache_path.exists():
+            pixmap = QtGui.QPixmap(str(cache_path))
+            if not pixmap.isNull():
+                label.setPixmap(
+                    pixmap.scaled(
+                        label.size(),
+                        QtCore.Qt.KeepAspectRatio,
+                        QtCore.Qt.SmoothTransformation,
+                    )
+                )
+                return label
+        label.setText(species[:1].upper() if species else "?")
         return label
 
     def _open_breeding_species_plan(self, species: str) -> None:
@@ -3280,7 +3277,19 @@ class MainWindow(QtWidgets.QMainWindow):
         label.setFixedSize(size, int(size * 0.75))
         label.setAlignment(QtCore.Qt.AlignCenter)
         label.setStyleSheet("background: #0b1324; border-radius: 8px; color: #94a3b8;")
-        self._set_species_image_on_label(label, species)
+        cache_path = self._species_cache_path(species)
+        if cache_path.exists():
+            pixmap = QtGui.QPixmap(str(cache_path))
+            if not pixmap.isNull():
+                label.setPixmap(
+                    pixmap.scaled(
+                        label.size(),
+                        QtCore.Qt.KeepAspectRatio,
+                        QtCore.Qt.SmoothTransformation,
+                    )
+                )
+                return label
+        label.setText(species[:1].upper() if species else "?")
         return label
 
     def _species_cache_path(self, species: str) -> Path:
@@ -3288,96 +3297,6 @@ class MainWindow(QtWidgets.QMainWindow):
         cache_dir = user_data_dir() / "cache" / "images"
         cache_dir.mkdir(parents=True, exist_ok=True)
         return cache_dir / f"{safe}.png"
-
-    def _set_species_image_on_label(self, label: QtWidgets.QLabel, species: str) -> None:
-        if not species:
-            label.setPixmap(QtGui.QPixmap())
-            label.setText("?")
-            return
-        if self._apply_cached_species_pixmap(label, species):
-            return
-        label.setPixmap(QtGui.QPixmap())
-        label.setText(species[:1].upper())
-        self._queue_species_image_prefetch(label, species)
-
-    def _apply_cached_species_pixmap(self, label: QtWidgets.QLabel, species: str) -> bool:
-        cache_path = self._species_cache_path(species)
-        if not cache_path.exists():
-            return False
-        pixmap = QtGui.QPixmap(str(cache_path))
-        if pixmap.isNull():
-            return False
-        label.setPixmap(
-            pixmap.scaled(
-                label.size(),
-                QtCore.Qt.KeepAspectRatio,
-                QtCore.Qt.SmoothTransformation,
-            )
-        )
-        label.setText("")
-        return True
-
-    def _queue_species_image_prefetch(self, label: QtWidgets.QLabel, species: str) -> None:
-        species_key = self._display_species(species)
-        waiting = self._species_image_waiting_labels.setdefault(species_key, [])
-        waiting.append(label)
-        self._prefetch_species_image(species_key)
-        if not self._species_image_poll_timer.isActive():
-            self._species_image_poll_timer.start()
-
-    def _prefetch_species_images(self) -> None:
-        species_names = {
-            self._display_species(creature.species)
-            for creature in self._creature_cache
-            if creature.species
-        }
-        for species in sorted(species_names):
-            self._prefetch_species_image(species)
-
-    def _prefetch_species_image(self, species: str) -> None:
-        if not species:
-            return
-        cache_path = self._species_cache_path(species)
-        if cache_path.exists():
-            return
-        if species in self._species_image_prefetchers:
-            return
-        loader = SpeciesImageWidget(self)
-        loader.hide()
-        loader.set_species(species)
-        self._species_image_prefetchers[species] = loader
-
-    def _flush_species_image_waiting_labels(self) -> None:
-        if not self._species_image_waiting_labels:
-            self._species_image_poll_timer.stop()
-            return
-        resolved_species: list[str] = []
-        for species, labels in list(self._species_image_waiting_labels.items()):
-            if not labels:
-                resolved_species.append(species)
-                continue
-            cache_ready = self._species_cache_path(species).exists()
-            still_waiting: list[QtWidgets.QLabel] = []
-            for label in labels:
-                try:
-                    if cache_ready and self._apply_cached_species_pixmap(label, species):
-                        continue
-                except RuntimeError:
-                    continue
-                still_waiting.append(label)
-            if cache_ready or not still_waiting:
-                resolved_species.append(species)
-            else:
-                self._species_image_waiting_labels[species] = still_waiting
-
-        for species in resolved_species:
-            self._species_image_waiting_labels.pop(species, None)
-            loader = self._species_image_prefetchers.pop(species, None)
-            if loader is not None:
-                loader.deleteLater()
-
-        if not self._species_image_waiting_labels:
-            self._species_image_poll_timer.stop()
 
     def _update_point_badges(self, creature: Creature, species_group: list[Creature]) -> None:
         labels = {key: short for short, key, _title in _DETAIL_POINT_STAT_CONFIG}
@@ -3731,8 +3650,9 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         size = self._detail_crown.sizeHint()
         self._detail_crown.resize(size)
-        x = max(0, self._detail_panel.width() - size.width() - 4)
-        y = 2
+        margins = self._detail_panel.contentsMargins()
+        x = max(0, self._detail_panel.width() - size.width() - margins.right() - 1)
+        y = -10
         self._detail_crown.move(x, y)
 
     def _update_creature_detail(self, creature: Creature) -> None:
@@ -3747,7 +3667,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._position_detail_crown()
         if is_top_candidate:
             crown_glow = QtWidgets.QGraphicsDropShadowEffect(self._detail_crown)
-            crown_glow.setBlurRadius(18)
+            crown_glow.setBlurRadius(34)
             crown_glow.setOffset(0, 0)
             crown_glow.setColor(QtGui.QColor(103, 232, 249, 240))
             self._detail_crown.setGraphicsEffect(crown_glow)
@@ -4001,14 +3921,14 @@ class MainWindow(QtWidgets.QMainWindow):
             glow = QtGui.QColor(103, 232, 249, 230)
         self._detail_panel.setStyleSheet(
             "#detailPanel {"
-            f"background: rgba(15, 23, 42, {'0.62' if spotlight else '0.44'}); border: {4 if spotlight else 2}px solid {accent};"
+            f"background: rgba(15, 23, 42, {'0.62' if spotlight else '0.44'}); border: {3 if spotlight else 2}px solid {accent};"
             "border-radius: 16px;"
             "}"
         )
         effect = QtWidgets.QGraphicsDropShadowEffect(self._detail_panel)
-        effect.setBlurRadius(58 if spotlight else 16)
+        effect.setBlurRadius(42 if spotlight else 14)
         effect.setOffset(0, 0)
-        glow.setAlpha(255 if spotlight else 120)
+        glow.setAlpha(255 if spotlight else 100)
         effect.setColor(glow)
         self._detail_panel.setGraphicsEffect(effect)
 
