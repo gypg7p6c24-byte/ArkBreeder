@@ -547,6 +547,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(1)
+        layout.setAlignment(QtCore.Qt.AlignTop)
 
         toolbar = QtWidgets.QHBoxLayout()
         toolbar.setContentsMargins(0, 0, 0, 0)
@@ -557,7 +558,7 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.addWidget(self._breeding_back_btn)
 
         self._breeding_scope_label = QtWidgets.QLabel("Overview")
-        self._breeding_scope_label.setStyleSheet("color: #e2e8f0; font-size: 17px; font-weight: 800;")
+        self._breeding_scope_label.setStyleSheet("color: #e2e8f0; font-size: 23px; font-weight: 900;")
         toolbar.addWidget(self._breeding_scope_label)
 
         self._breeding_species_filter = QtWidgets.QComboBox()
@@ -575,6 +576,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._breeding_overview_panel = QtWidgets.QFrame()
         self._breeding_overview_panel.setObjectName("breedingOverviewPanel")
+        self._breeding_overview_panel.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding,
+            QtWidgets.QSizePolicy.Maximum,
+        )
         self._breeding_overview_panel.setStyleSheet(
             """
             #breedingOverviewPanel {
@@ -585,13 +590,14 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         overview_layout = QtWidgets.QVBoxLayout(self._breeding_overview_panel)
         overview_layout.setContentsMargins(0, 0, 0, 0)
-        overview_layout.setSpacing(2)
+        overview_layout.setSpacing(1)
+        overview_layout.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         overview_title = QtWidgets.QLabel("Breeding actions overview")
-        overview_title.setStyleSheet("color: #cbd5f5; font-size: 24px; font-weight: 900;")
+        overview_title.setStyleSheet("color: #cbd5f5; font-size: 34px; font-weight: 900;")
         overview_layout.addWidget(overview_title)
         self._breeding_overview_grid = QtWidgets.QGridLayout()
         self._breeding_overview_grid.setContentsMargins(0, 0, 0, 0)
-        self._breeding_overview_grid.setHorizontalSpacing(2)
+        self._breeding_overview_grid.setHorizontalSpacing(8)
         self._breeding_overview_grid.setVerticalSpacing(2)
         self._breeding_overview_grid.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         overview_layout.addLayout(self._breeding_overview_grid)
@@ -1470,6 +1476,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._points_info.setVisible(not has_values)
         if hasattr(self, "_breeding_points_info"):
             self._breeding_points_info.setVisible(not has_values)
+            self._breeding_points_info.setMaximumHeight(0 if has_values else 16777215)
 
     def _recompute_stat_points(self) -> None:
         self._stat_points = {}
@@ -1819,7 +1826,7 @@ class MainWindow(QtWidgets.QMainWindow):
         columns = 1
         if len(items) >= 2:
             columns = 2
-        if len(items) >= 6:
+        if len(items) >= 7:
             columns = 3
         for idx, item in enumerate(items):
             species_name = str(item.get("species", "Unknown"))
@@ -1844,7 +1851,7 @@ class MainWindow(QtWidgets.QMainWindow):
             card_layout.setSpacing(3)
 
             plan_frame = QtWidgets.QFrame()
-            plan_frame.setMinimumWidth(330)
+            plan_frame.setMinimumWidth(470)
             plan_frame.setStyleSheet(
                 "QFrame {"
                 "background: rgba(11, 19, 36, 0.28);"
@@ -1896,19 +1903,19 @@ class MainWindow(QtWidgets.QMainWindow):
             card_layout.addWidget(plan_frame)
 
             next_label = QtWidgets.QLabel(f"Next action: {next_action}")
-            next_label.setStyleSheet("color: #cbd5f5; font-size: 10px; font-weight: 600;")
+            next_label.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 700;")
             card_layout.addWidget(next_label)
 
             steps_label = QtWidgets.QLabel(f"Estimated steps: {step_count}")
-            steps_label.setStyleSheet("color: #93c5fd; font-size: 10px;")
+            steps_label.setStyleSheet("color: #93c5fd; font-size: 12px; font-weight: 600;")
             card_layout.addWidget(steps_label)
 
             if pending:
                 pending_label = QtWidgets.QLabel(f"Missing: {', '.join(pending)}")
-                pending_label.setStyleSheet("color: #fbbf24; font-size: 10px;")
+                pending_label.setStyleSheet("color: #fbbf24; font-size: 12px; font-weight: 600;")
             else:
                 pending_label = QtWidgets.QLabel("All target stats currently coverable.")
-                pending_label.setStyleSheet("color: #67e8f9; font-size: 10px;")
+                pending_label.setStyleSheet("color: #67e8f9; font-size: 12px; font-weight: 600;")
             pending_label.setWordWrap(True)
             card_layout.addWidget(pending_label)
 
@@ -1935,7 +1942,7 @@ class MainWindow(QtWidgets.QMainWindow):
         border_color = "#60a5fa" if sex == "male" else "#f472b6"
         text_color = "#dbeafe" if sex == "male" else "#fce7f3"
         box = QtWidgets.QFrame()
-        box.setMinimumWidth(92)
+        box.setMinimumWidth(132)
         box.setStyleSheet(
             "QFrame {"
             "background: rgba(15, 23, 42, 0.36);"
@@ -1944,18 +1951,18 @@ class MainWindow(QtWidgets.QMainWindow):
             "}"
         )
         layout = QtWidgets.QVBoxLayout(box)
-        layout.setContentsMargins(3, 3, 3, 3)
-        layout.setSpacing(2)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(3)
 
         name = QtWidgets.QLabel(f"{self._sex_icon(sex)} {self._truncate_text(breeder_name, 10)}")
         name.setAlignment(QtCore.Qt.AlignCenter)
         name.setStyleSheet(
-            f"color: {text_color}; font-size: 10px; font-weight: 700;"
+            f"color: {text_color}; font-size: 11px; font-weight: 700;"
             "background: transparent; border: none;"
         )
         layout.addWidget(name)
 
-        avatar = self._overview_species_image(species_name, size=42)
+        avatar = self._overview_species_image(species_name, size=62)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
         return box
 
