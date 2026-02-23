@@ -345,7 +345,7 @@ class MainWindow(QtWidgets.QMainWindow):
         right_layout = QtWidgets.QVBoxLayout(right)
         right_layout.setContentsMargins(10, 6, 10, 6)
         right_layout.setSpacing(4)
-        right_title = QtWidgets.QLabel("Best breeding potential by species")
+        right_title = QtWidgets.QLabel("Highest creature level by species")
         right_title.setStyleSheet("color: #e2e8f0; font-weight: 700; font-size: 16px;")
         right_layout.addWidget(right_title)
         self._levels_bar = BarChartWidget()
@@ -370,8 +370,8 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addLayout(charts)
         layout.addLayout(extras)
         layout.setStretch(0, 0)
-        layout.setStretch(1, 5)
-        layout.setStretch(2, 4)
+        layout.setStretch(1, 3)
+        layout.setStretch(2, 1)
         return widget
 
     def _build_card(
@@ -455,6 +455,20 @@ class MainWindow(QtWidgets.QMainWindow):
                 "Updated",
             ]
         )
+        header_alignments = {
+            0: QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            1: QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter,
+            2: QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter,
+            3: QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            4: QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            5: QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            6: QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            7: QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter,
+        }
+        for col, alignment in header_alignments.items():
+            header_item = self._creatures_table.horizontalHeaderItem(col)
+            if header_item is not None:
+                header_item.setTextAlignment(alignment)
         self._creatures_table.horizontalHeader().setStretchLastSection(True)
         self._creatures_table.setAlternatingRowColors(False)
         self._creatures_table.setStyleSheet(
@@ -466,7 +480,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 gridline-color: transparent;
             }
             QTableWidget::item { padding: 6px; border-bottom: 1px solid rgba(148, 163, 184, 0.18); }
-            QTableWidget::item:selected { background: #1f2937; color: #f8fafc; }
+            QTableWidget::item:hover { background: rgba(59, 130, 246, 0.16); color: #f8fafc; }
+            QTableWidget::item:selected { background: rgba(56, 189, 248, 0.30); color: #f8fafc; }
             QHeaderView {
                 background: transparent;
                 border: none;
@@ -495,6 +510,7 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self._creatures_table.setFrameShape(QtWidgets.QFrame.NoFrame)
         self._creatures_table.setShowGrid(False)
+        self._creatures_table.setMouseTracking(True)
         self._creatures_table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self._creatures_table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self._creatures_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
@@ -563,7 +579,7 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.addWidget(self._breeding_back_btn)
 
         self._breeding_scope_label = QtWidgets.QLabel("Overview")
-        self._breeding_scope_label.setStyleSheet("color: #e2e8f0; font-size: 32px; font-weight: 900;")
+        self._breeding_scope_label.setStyleSheet("color: #e2e8f0; font-size: 36px; font-weight: 900;")
         toolbar.addWidget(self._breeding_scope_label)
 
         self._breeding_species_filter = QtWidgets.QComboBox()
@@ -598,7 +614,7 @@ class MainWindow(QtWidgets.QMainWindow):
         overview_layout.setSpacing(2)
         overview_layout.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         overview_title = QtWidgets.QLabel("Breeding actions overview")
-        overview_title.setStyleSheet("color: #cbd5f5; font-size: 22px; font-weight: 800;")
+        overview_title.setStyleSheet("color: #cbd5f5; font-size: 20px; font-weight: 800;")
         overview_layout.addWidget(overview_title)
         self._breeding_overview_grid = QtWidgets.QGridLayout()
         self._breeding_overview_grid.setContentsMargins(0, 0, 0, 0)
@@ -961,87 +977,75 @@ class MainWindow(QtWidgets.QMainWindow):
         manual_helper.setStyleSheet("color: #cbd5f5;")
         manual_layout.addWidget(manual_helper)
 
-        cap_row = QtWidgets.QHBoxLayout()
-        cap_row.setContentsMargins(0, 0, 0, 0)
-        cap_row.setSpacing(8)
-        max_level_label = QtWidgets.QLabel("Max wild level cap")
+        manual_grid = QtWidgets.QGridLayout()
+        manual_grid.setContentsMargins(0, 0, 0, 0)
+        manual_grid.setHorizontalSpacing(20)
+        manual_grid.setVerticalSpacing(8)
+
+        max_level_label = QtWidgets.QLabel("- Max wild level cap")
         max_level_label.setStyleSheet("color: #cbd5f5;")
-        cap_row.addWidget(max_level_label)
         max_level_spin = QtWidgets.QSpinBox()
         max_level_spin.setRange(0, 10000)
         max_level_spin.setValue(0)
         max_level_spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        max_level_spin.setMaximumWidth(220)
+        max_level_spin.setFixedWidth(220)
         max_level_spin.setStyleSheet(
             "QSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }"
         )
         self._manual_max_level_input = max_level_spin
-        cap_row.addWidget(max_level_spin)
-        cap_row.addStretch(1)
-        manual_layout.addLayout(cap_row)
+        manual_grid.addWidget(max_level_label, 0, 0, alignment=QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        manual_grid.addWidget(max_level_spin, 0, 1, alignment=QtCore.Qt.AlignLeft)
 
-        difficulty_row = QtWidgets.QHBoxLayout()
-        difficulty_row.setContentsMargins(0, 0, 0, 0)
-        difficulty_row.setSpacing(8)
-        override_label = QtWidgets.QLabel("OverrideOfficialDifficulty")
+        override_label = QtWidgets.QLabel("- OverrideOfficialDifficulty")
         override_label.setStyleSheet("color: #cbd5f5;")
-        difficulty_row.addWidget(override_label)
         override_spin = QtWidgets.QDoubleSpinBox()
         override_spin.setDecimals(4)
         override_spin.setRange(0.0, 1000.0)
         override_spin.setSingleStep(0.1)
         override_spin.setValue(0.0)
         override_spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        override_spin.setMaximumWidth(220)
+        override_spin.setFixedWidth(220)
         override_spin.setStyleSheet(
             "QDoubleSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }"
         )
         self._manual_override_difficulty_input = override_spin
-        difficulty_row.addWidget(override_spin)
-        difficulty_row.addStretch(1)
-        manual_layout.addLayout(difficulty_row)
+        manual_grid.addWidget(override_label, 1, 0, alignment=QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        manual_grid.addWidget(override_spin, 1, 1, alignment=QtCore.Qt.AlignLeft)
 
-        offset_row = QtWidgets.QHBoxLayout()
-        offset_row.setContentsMargins(0, 0, 0, 0)
-        offset_row.setSpacing(8)
-        offset_label = QtWidgets.QLabel("DifficultyOffset")
+        offset_label = QtWidgets.QLabel("- DifficultyOffset")
         offset_label.setStyleSheet("color: #cbd5f5;")
-        offset_row.addWidget(offset_label)
         offset_spin = QtWidgets.QDoubleSpinBox()
         offset_spin.setDecimals(4)
         offset_spin.setRange(0.0, 100.0)
         offset_spin.setSingleStep(0.05)
         offset_spin.setValue(0.0)
         offset_spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        offset_spin.setMaximumWidth(220)
+        offset_spin.setFixedWidth(220)
         offset_spin.setStyleSheet(
             "QDoubleSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }"
         )
         self._manual_difficulty_offset_input = offset_spin
-        offset_row.addWidget(offset_spin)
-        offset_row.addStretch(1)
-        manual_layout.addLayout(offset_row)
+        manual_grid.addWidget(offset_label, 2, 0, alignment=QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        manual_grid.addWidget(offset_spin, 2, 1, alignment=QtCore.Qt.AlignLeft)
 
-        imprint_row = QtWidgets.QHBoxLayout()
-        imprint_row.setContentsMargins(0, 0, 0, 0)
-        imprint_row.setSpacing(8)
-        imprint_label = QtWidgets.QLabel("BabyImprintingStatScale")
+        imprint_label = QtWidgets.QLabel("- BabyImprintingStatScale")
         imprint_label.setStyleSheet("color: #cbd5f5;")
-        imprint_row.addWidget(imprint_label)
         imprint_spin = QtWidgets.QDoubleSpinBox()
         imprint_spin.setDecimals(4)
         imprint_spin.setRange(0.0, 1000.0)
         imprint_spin.setSingleStep(0.05)
         imprint_spin.setValue(1.0)
         imprint_spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        imprint_spin.setMaximumWidth(220)
+        imprint_spin.setFixedWidth(220)
         imprint_spin.setStyleSheet(
             "QDoubleSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }"
         )
         self._manual_imprint_input = imprint_spin
-        imprint_row.addWidget(imprint_spin)
-        imprint_row.addStretch(1)
-        manual_layout.addLayout(imprint_row)
+        manual_grid.addWidget(imprint_label, 3, 0, alignment=QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        manual_grid.addWidget(imprint_spin, 3, 1, alignment=QtCore.Qt.AlignLeft)
+        manual_grid.setColumnStretch(0, 0)
+        manual_grid.setColumnStretch(1, 1)
+        manual_layout.addLayout(manual_grid)
 
         manual_hint = QtWidgets.QLabel(
             "Max wild level is used by the solver. 0 means auto-detect from imported INI."
@@ -1175,33 +1179,15 @@ class MainWindow(QtWidgets.QMainWindow):
             if creature.species:
                 grouped.setdefault(self._display_species(creature.species), []).append(creature)
 
-        use_points = self._points_available(creature_list)
-        breeding_potential: list[tuple[str, float]] = []
+        highest_levels: list[tuple[str, float]] = []
         for label, group in grouped.items():
-            males = [c for c in group if c.sex.lower() == "male"]
-            females = [c for c in group if c.sex.lower() == "female"]
-            if not males or not females:
-                continue
-            best_score = max(
-                self._score_pair(male, female, "Overall", use_points=use_points)[0]
-                for male in males
-                for female in females
-            )
-            breeding_potential.append((label, best_score))
+            max_level = max((creature.level for creature in group), default=0)
+            highest_levels.append((label, float(max_level)))
 
-        if not breeding_potential:
-            for label, count in species_counts.items():
-                total_level = sum(
-                    creature.level
-                    for creature in creature_list
-                    if self._display_species(creature.species) == label
-                )
-                breeding_potential.append((label, total_level / max(count, 1)))
-
-        breeding_potential.sort(key=lambda item: item[1], reverse=True)
+        highest_levels.sort(key=lambda item: item[1], reverse=True)
         bar_series = [
             (label, value, _DASHBOARD_COLORS[idx % len(_DASHBOARD_COLORS)])
-            for idx, (label, value) in enumerate(breeding_potential[:6])
+            for idx, (label, value) in enumerate(highest_levels[:6])
         ]
         self._levels_bar.set_series(bar_series)
 
@@ -1306,18 +1292,20 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._empty_dashboard_label("Stat points unavailable for current creatures.")
             )
             return
-        max_points = max(value for _short, _label, value, _creature in entries)
-        for short, label, value, creature in entries:
+        entries.sort(key=lambda item: item[2], reverse=True)
+        display_entries = entries[:4]
+        max_points = max(value for _short, _label, value, _creature in display_entries)
+        for short, label, value, creature in display_entries:
             card = QtWidgets.QWidget()
             layout = QtWidgets.QVBoxLayout(card)
-            layout.setContentsMargins(2, 2, 2, 2)
-            layout.setSpacing(4)
+            layout.setContentsMargins(1, 1, 1, 1)
+            layout.setSpacing(2)
             title = QtWidgets.QLabel(f"{self._point_icon(short)} {label}")
-            title.setStyleSheet("color: #93c5fd; font-weight: 700; font-size: 13px;")
+            title.setStyleSheet("color: #93c5fd; font-weight: 700; font-size: 12px;")
 
             species_text = self._display_species(creature.species)
             owner = QtWidgets.QLabel(f"{creature.name} ({species_text})")
-            owner.setStyleSheet("color: #e2e8f0; font-size: 12px; font-weight: 600;")
+            owner.setStyleSheet("color: #e2e8f0; font-size: 11px; font-weight: 600;")
 
             ratio = 0.0 if max_points <= 0 else min(max(float(value) / float(max_points), 0.0), 1.0)
             tier = self._tier_color(ratio)
@@ -1325,7 +1313,7 @@ class MainWindow(QtWidgets.QMainWindow):
             bar.setMaximum(100)
             bar.setValue(int(ratio * 100))
             bar.setTextVisible(False)
-            bar.setFixedHeight(8)
+            bar.setFixedHeight(6)
             bar.setStyleSheet(
                 f"""
                 QProgressBar {{
@@ -1342,7 +1330,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             points = QtWidgets.QLabel(str(value))
             points.setStyleSheet(
-                f"color: {tier}; font-weight: 800; font-size: 14px;"
+                f"color: {tier}; font-weight: 800; font-size: 12px;"
             )
             points.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
@@ -1859,40 +1847,37 @@ class MainWindow(QtWidgets.QMainWindow):
             lead_male = self._truncate_text(lead_male_name or "Male", 10)
             lead_female = self._truncate_text(lead_female_name or "Female", 10)
 
-            card = QtWidgets.QWidget()
-            card.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Maximum)
-            card_layout = QtWidgets.QVBoxLayout(card)
-            card_layout.setContentsMargins(2, 2, 2, 2)
-            card_layout.setSpacing(3)
-
-            plan_frame = QtWidgets.QFrame()
-            plan_frame.setMinimumWidth(470)
-            plan_frame.setStyleSheet(
-                "QFrame {"
-                "background: rgba(11, 19, 36, 0.28);"
-                "border: 1px solid #334155;"
-                "border-radius: 11px;"
-                "}"
+            card = QtWidgets.QFrame()
+            card.setObjectName("breedingOverviewSpeciesCard")
+            card.setMinimumWidth(560)
+            card.setStyleSheet(
+                """
+                QFrame#breedingOverviewSpeciesCard {
+                    background: rgba(11, 19, 36, 0.40);
+                    border: 1px solid #334155;
+                    border-radius: 12px;
+                }
+                """
             )
-            plan_layout = QtWidgets.QVBoxLayout(plan_frame)
-            plan_layout.setContentsMargins(8, 7, 8, 7)
-            plan_layout.setSpacing(4)
+            card_layout = QtWidgets.QVBoxLayout(card)
+            card_layout.setContentsMargins(12, 10, 12, 10)
+            card_layout.setSpacing(6)
 
             title_row = QtWidgets.QHBoxLayout()
             title_row.setContentsMargins(0, 0, 0, 0)
-            title_row.setSpacing(4)
+            title_row.setSpacing(6)
             species_label = QtWidgets.QLabel(species_name)
             species_label.setStyleSheet(
-                "color: #f8fafc; font-size: 16px; font-weight: 900;"
+                "color: #f8fafc; font-size: 19px; font-weight: 900;"
                 "background: transparent; border: none;"
             )
             title_row.addWidget(species_label, alignment=QtCore.Qt.AlignLeft)
             title_row.addStretch(1)
-            plan_layout.addLayout(title_row)
+            card_layout.addLayout(title_row)
 
             pair_row = QtWidgets.QHBoxLayout()
-            pair_row.setContentsMargins(1, 1, 1, 1)
-            pair_row.setSpacing(5)
+            pair_row.setContentsMargins(0, 0, 0, 0)
+            pair_row.setSpacing(10)
             pair_row.addWidget(
                 self._overview_mini_breeder_card(
                     species_name,
@@ -1914,8 +1899,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     "female",
                 )
             )
-            plan_layout.addLayout(pair_row)
-            card_layout.addWidget(plan_frame)
+            card_layout.addLayout(pair_row)
 
             next_label = QtWidgets.QLabel(f"Next action: {next_action}")
             next_label.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 700;")
@@ -1930,7 +1914,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 pending_label.setStyleSheet("color: #fbbf24; font-size: 12px; font-weight: 600;")
             else:
                 pending_label = QtWidgets.QLabel("All target stats currently coverable.")
-                pending_label.setStyleSheet("color: #67e8f9; font-size: 12px; font-weight: 600;")
+                pending_label.setStyleSheet(
+                    f"color: {status_color}; font-size: 12px; font-weight: 600;"
+                )
             pending_label.setWordWrap(True)
             card_layout.addWidget(pending_label)
 
@@ -1957,27 +1943,28 @@ class MainWindow(QtWidgets.QMainWindow):
         border_color = "#60a5fa" if sex == "male" else "#f472b6"
         text_color = "#dbeafe" if sex == "male" else "#fce7f3"
         box = QtWidgets.QFrame()
-        box.setMinimumWidth(132)
+        box.setMinimumWidth(248)
+        box.setMaximumWidth(272)
         box.setStyleSheet(
             "QFrame {"
-            "background: rgba(15, 23, 42, 0.36);"
+            "background: rgba(11, 19, 36, 0.85);"
             f"border: 1px solid {border_color};"
-            "border-radius: 8px;"
+            "border-radius: 14px;"
             "}"
         )
         layout = QtWidgets.QVBoxLayout(box)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(3)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
 
         name = QtWidgets.QLabel(f"{self._sex_icon(sex)} {self._truncate_text(breeder_name, 10)}")
         name.setAlignment(QtCore.Qt.AlignCenter)
         name.setStyleSheet(
-            f"color: {text_color}; font-size: 11px; font-weight: 700;"
+            f"color: {text_color}; font-size: 13px; font-weight: 700;"
             "background: transparent; border: none;"
         )
         layout.addWidget(name)
 
-        avatar = self._overview_species_image(species_name, size=62)
+        avatar = self._overview_species_image(species_name, size=112)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
         return box
 
@@ -3646,6 +3633,17 @@ class MainWindow(QtWidgets.QMainWindow):
     def _set_table_item(self, row: int, col: int, value: str, external_id: str | None = None) -> None:
         item = QtWidgets.QTableWidgetItem(value)
         item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+        alignments = {
+            0: QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+            1: QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter,
+            2: QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter,
+            3: QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            4: QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            5: QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            6: QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+            7: QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter,
+        }
+        item.setTextAlignment(alignments.get(col, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter))
         if external_id:
             item.setData(QtCore.Qt.UserRole, external_id)
         self._creatures_table.setItem(row, col, item)
