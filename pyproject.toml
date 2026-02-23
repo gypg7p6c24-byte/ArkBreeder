@@ -19,11 +19,11 @@ Homepage = "https://github.com/gypg7p6c24-byte/ArkBreeder"
 Issues = "https://github.com/gypg7p6c24-byte/ArkBreeder/issues"
 
 [project.scripts]
-arkbreeder = "arkbreeder.ui.app:main"
+arkbreedingtool = "arkbreedingtool.ui.app:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["arkbreeder*"]
+include = ["arkbreedingtool*"]
 
 [tool.setuptools.package-data]
-arkbreeder = ["resources/*.json", "resources/*.svg"]
+arkbreedingtool = ["resources/*.json", "resources/*.svg"]

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from arkbreeder.storage.models import Creature
+from arkbreedingtool.storage.models import Creature
 
 
 def creature_from_row(row) -> Creature:

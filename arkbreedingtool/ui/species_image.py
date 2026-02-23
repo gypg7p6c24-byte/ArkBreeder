@@ -7,7 +7,7 @@ import urllib.parse
 
 from PySide6 import QtCore, QtGui, QtNetwork, QtWidgets
 
-from arkbreeder.config import user_data_dir
+from arkbreedingtool.config import user_data_dir
 
 _IMAGE_CACHE_VERSION = 2
 

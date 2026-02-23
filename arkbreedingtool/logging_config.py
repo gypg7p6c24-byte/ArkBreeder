@@ -9,7 +9,7 @@ DEFAULT_LEVEL = "INFO"
 
 
 def setup_logging() -> None:
-    level_name = os.getenv("ARKBREEDER_LOG_LEVEL", DEFAULT_LEVEL).upper()
+    level_name = os.getenv("ARKBREEDINGTOOL_LOG_LEVEL", DEFAULT_LEVEL).upper()
     level = getattr(logging, level_name, logging.INFO)
 
     logging.basicConfig(

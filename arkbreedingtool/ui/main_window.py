@@ -7,23 +7,23 @@ from typing import Iterable
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from arkbreeder.config import bundled_values_path, user_data_dir
-from arkbreeder.core.parser import parse_creature_file
-from arkbreeder.core.server_settings import parse_ini_file
-from arkbreeder.core.species_values import SpeciesValuesStore
-from arkbreeder.core.stats import StatMultipliers, compute_wild_levels, extract_stat_multipliers
-from arkbreeder.storage.models import Creature
-from arkbreeder.storage.repository import delete_creature, list_creatures
-from arkbreeder.storage.settings import (
+from arkbreedingtool.config import bundled_values_path, user_data_dir
+from arkbreedingtool.core.parser import parse_creature_file
+from arkbreedingtool.core.server_settings import parse_ini_file
+from arkbreedingtool.core.species_values import SpeciesValuesStore
+from arkbreedingtool.core.stats import StatMultipliers, compute_wild_levels, extract_stat_multipliers
+from arkbreedingtool.storage.models import Creature
+from arkbreedingtool.storage.repository import delete_creature, list_creatures
+from arkbreedingtool.storage.settings import (
     get_server_settings,
     get_setting,
     set_server_settings,
     set_setting,
 )
-from arkbreeder.ui.dashboard_charts import BarChartWidget, DonutChartWidget
-from arkbreeder.ui.radar_chart import RadarChart
-from arkbreeder.ui.species_image import SpeciesImageWidget
-from arkbreeder.ui.toast import ToastNotification
+from arkbreedingtool.ui.dashboard_charts import BarChartWidget, DonutChartWidget
+from arkbreedingtool.ui.radar_chart import RadarChart
+from arkbreedingtool.ui.species_image import SpeciesImageWidget
+from arkbreedingtool.ui.toast import ToastNotification
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ from pathlib import Path
 import os
 
 APP_NAME = "Ark Breeding Tool"
-APP_SLUG = "ark-breeder"
+APP_SLUG = "ark-breeding-tool"
 DEFAULT_EXPORT_DIR = (
     Path.home()
     / ".steam"
@@ -30,11 +30,11 @@ def ensure_app_dirs() -> Path:
 
 
 def database_path() -> Path:
-    return user_data_dir() / "arkbreeder.db"
+    return user_data_dir() / "arkbreedingtool.db"
 
 
 def export_dir() -> Path:
-    override = os.getenv("ARKBREEDER_EXPORT_DIR")
+    override = os.getenv("ARKBREEDINGTOOL_EXPORT_DIR")
     if override:
         return Path(override).expanduser()
     return DEFAULT_EXPORT_DIR
