@@ -307,7 +307,7 @@ class MainWindow(QtWidgets.QMainWindow):
         hero = QtWidgets.QWidget()
         hero_layout = QtWidgets.QVBoxLayout(hero)
         hero_layout.setContentsMargins(6, 0, 6, 2)
-        hero_title = QtWidgets.QLabel("Welcome to Ark Breeding Tool")
+        hero_title = QtWidgets.QLabel("Welcome to Arc-Breading-Tool")
         hero_title.setStyleSheet("font-size: 21px; font-weight: 700; color: #f8fafc;")
         hero_layout.addWidget(hero_title)
 
@@ -567,15 +567,15 @@ class MainWindow(QtWidgets.QMainWindow):
         widget = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(1)
+        layout.setSpacing(0)
         layout.setAlignment(QtCore.Qt.AlignTop)
 
         toolbar = QtWidgets.QVBoxLayout()
         toolbar.setContentsMargins(0, 0, 0, 0)
-        toolbar.setSpacing(2)
+        toolbar.setSpacing(0)
         toolbar_top = QtWidgets.QHBoxLayout()
         toolbar_top.setContentsMargins(0, 0, 0, 0)
-        toolbar_top.setSpacing(4)
+        toolbar_top.setSpacing(2)
         self._breeding_back_btn = QtWidgets.QPushButton("← Back to overview")
         self._breeding_back_btn.clicked.connect(lambda: self._open_breeding_species_plan("All species"))
         self._breeding_back_btn.setVisible(False)
@@ -584,10 +584,10 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.addLayout(toolbar_top)
 
         self._breeding_scope_label = QtWidgets.QLabel("Overview")
-        self._breeding_scope_label.setStyleSheet("color: #e2e8f0; font-size: 36px; font-weight: 900;")
+        self._breeding_scope_label.setStyleSheet("color: #e2e8f0; font-size: 42px; font-weight: 900;")
         toolbar_scope = QtWidgets.QHBoxLayout()
         toolbar_scope.setContentsMargins(0, 0, 0, 0)
-        toolbar_scope.setSpacing(4)
+        toolbar_scope.setSpacing(2)
         toolbar_scope.addWidget(self._breeding_scope_label)
         toolbar_scope.addStretch(1)
         toolbar.addLayout(toolbar_scope)
@@ -621,15 +621,15 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         overview_layout = QtWidgets.QVBoxLayout(self._breeding_overview_panel)
         overview_layout.setContentsMargins(0, 0, 0, 0)
-        overview_layout.setSpacing(2)
+        overview_layout.setSpacing(1)
         overview_layout.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         overview_title = QtWidgets.QLabel("Breeding actions overview")
-        overview_title.setStyleSheet("color: #cbd5f5; font-size: 20px; font-weight: 800;")
+        overview_title.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 700;")
         overview_layout.addWidget(overview_title)
         self._breeding_overview_grid = QtWidgets.QGridLayout()
         self._breeding_overview_grid.setContentsMargins(0, 0, 0, 0)
-        self._breeding_overview_grid.setHorizontalSpacing(8)
-        self._breeding_overview_grid.setVerticalSpacing(2)
+        self._breeding_overview_grid.setHorizontalSpacing(10)
+        self._breeding_overview_grid.setVerticalSpacing(8)
         self._breeding_overview_grid.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         overview_layout.addLayout(self._breeding_overview_grid)
         self._breeding_overview_panel.setVisible(False)
@@ -1841,25 +1841,48 @@ class MainWindow(QtWidgets.QMainWindow):
                 for rank, (score, male, female) in enumerate(all_pairs[:plan_limit])
             ]
             targets = self._species_target_points(group)
-            sequence, pending = self._build_breeding_plan_sequence(
-                plan_ranked_pairs,
-                targets,
-                use_points=use_points,
+            perfect_candidates: list[Creature] = []
+            for creature in group:
+                points = self._creature_breeding_points(creature, use_points=use_points)
+                if self._is_target_reached(points, targets):
+                    perfect_candidates.append(creature)
+            perfect_candidates.sort(
+                key=lambda creature: self._breeding_creature_score(creature, use_points=use_points),
+                reverse=True,
             )
+            has_perfect = bool(perfect_candidates)
+            if has_perfect:
+                sequence: list[dict[str, object]] = []
+                pending: list[str] = []
+            else:
+                sequence, pending = self._build_breeding_plan_sequence(
+                    plan_ranked_pairs,
+                    targets,
+                    use_points=use_points,
+                )
             if plan_ranked_pairs:
                 lead_male = plan_ranked_pairs[0][2]
                 lead_female = plan_ranked_pairs[0][3]
+                max_stats = self._species_max_stats(species_name, use_points=use_points)
+                perfect_creature = perfect_candidates[0] if perfect_candidates else None
                 overview_items.append(
                     {
                         "species": species_name,
                         "score": plan_ranked_pairs[0][1],
-                        "step_count": max(1, len(sequence)),
+                        "step_count": 0 if has_perfect else max(1, len(sequence)),
                         "pending": pending,
-                        "lead_male_name": lead_male.name or "Male",
-                        "lead_female_name": lead_female.name or "Female",
+                        "lead_male": lead_male,
+                        "lead_female": lead_female,
+                        "targets": targets,
+                        "max_stats": max_stats,
+                        "perfect_creature": perfect_creature,
                         "next_action": (
-                            f"{self._truncate_text(lead_male.name or 'Male', 10)} + "
-                            f"{self._truncate_text(lead_female.name or 'Female', 10)}"
+                            "No action required (perfect available)."
+                            if has_perfect
+                            else (
+                                f"{self._truncate_text(lead_male.name or 'Male', 10)} + "
+                                f"{self._truncate_text(lead_female.name or 'Female', 10)}"
+                            )
                         ),
                     }
                 )
@@ -1918,16 +1941,22 @@ class MainWindow(QtWidgets.QMainWindow):
                 if isinstance(value, str)
             ]
             next_action = str(item.get("next_action", ""))
+            targets = item.get("targets", [])
+            if not isinstance(targets, list):
+                targets = []
+            max_stats = item.get("max_stats", {})
+            if not isinstance(max_stats, dict):
+                max_stats = {}
+            lead_male = item.get("lead_male")
+            lead_female = item.get("lead_female")
+            perfect_creature = item.get("perfect_creature")
+            is_perfect_ready = isinstance(perfect_creature, Creature)
             is_ready = len(pending) == 0
             status_color = "#67e8f9" if is_ready else "#fbbf24"
-            lead_male_name = str(item.get("lead_male_name", "Male"))
-            lead_female_name = str(item.get("lead_female_name", "Female"))
-            lead_male = self._truncate_text(lead_male_name or "Male", 10)
-            lead_female = self._truncate_text(lead_female_name or "Female", 10)
 
             card = QtWidgets.QFrame()
             card.setObjectName("breedingOverviewSpeciesCard")
-            card.setMinimumWidth(560)
+            card.setMinimumWidth(820)
             card.setStyleSheet(
                 """
                 QFrame#breedingOverviewSpeciesCard {
@@ -1938,8 +1967,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 """
             )
             card_layout = QtWidgets.QVBoxLayout(card)
-            card_layout.setContentsMargins(12, 10, 12, 10)
-            card_layout.setSpacing(6)
+            card_layout.setContentsMargins(10, 8, 10, 8)
+            card_layout.setSpacing(5)
 
             title_row = QtWidgets.QHBoxLayout()
             title_row.setContentsMargins(0, 0, 0, 0)
@@ -1953,37 +1982,56 @@ class MainWindow(QtWidgets.QMainWindow):
             title_row.addStretch(1)
             card_layout.addLayout(title_row)
 
-            pair_row = QtWidgets.QHBoxLayout()
-            pair_row.setContentsMargins(0, 0, 0, 0)
-            pair_row.setSpacing(10)
-            pair_row.addWidget(
-                self._overview_mini_breeder_card(
-                    species_name,
-                    lead_male,
-                    "male",
+            if is_perfect_ready:
+                perfect_row = QtWidgets.QHBoxLayout()
+                perfect_row.setContentsMargins(0, 0, 0, 0)
+                perfect_row.setSpacing(6)
+                perfect_row.addWidget(
+                    self._overview_mini_breeder_card(
+                        perfect_creature,
+                        max_stats=max_stats,
+                        targets=targets,
+                        use_points=True,
+                    )
                 )
-            )
-            plus = QtWidgets.QLabel("+")
-            plus.setStyleSheet(
-                "color: #cbd5f5; font-size: 16px; font-weight: 800;"
-                "background: transparent; border: none;"
-            )
-            plus.setAlignment(QtCore.Qt.AlignCenter)
-            pair_row.addWidget(plus)
-            pair_row.addWidget(
-                self._overview_mini_breeder_card(
-                    species_name,
-                    lead_female,
-                    "female",
+                perfect_row.addStretch(1)
+                card_layout.addLayout(perfect_row)
+            elif isinstance(lead_male, Creature) and isinstance(lead_female, Creature):
+                pair_row = QtWidgets.QHBoxLayout()
+                pair_row.setContentsMargins(0, 0, 0, 0)
+                pair_row.setSpacing(6)
+                pair_row.addWidget(
+                    self._overview_mini_breeder_card(
+                        lead_male,
+                        max_stats=max_stats,
+                        targets=targets,
+                        use_points=True,
+                    )
                 )
-            )
-            card_layout.addLayout(pair_row)
+                plus = QtWidgets.QLabel("+")
+                plus.setStyleSheet(
+                    "color: #cbd5f5; font-size: 16px; font-weight: 800;"
+                    "background: transparent; border: none;"
+                )
+                plus.setAlignment(QtCore.Qt.AlignCenter)
+                pair_row.addWidget(plus)
+                pair_row.addWidget(
+                    self._overview_mini_breeder_card(
+                        lead_female,
+                        max_stats=max_stats,
+                        targets=targets,
+                        use_points=True,
+                    )
+                )
+                pair_row.addStretch(1)
+                card_layout.addLayout(pair_row)
 
             next_label = QtWidgets.QLabel(f"Next action: {next_action}")
             next_label.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 700;")
             card_layout.addWidget(next_label)
 
-            steps_label = QtWidgets.QLabel(f"Estimated steps: {step_count}")
+            steps_text = "Estimated steps: 0 (perfect ready)" if is_perfect_ready else f"Estimated steps: {step_count}"
+            steps_label = QtWidgets.QLabel(steps_text)
             steps_label.setStyleSheet("color: #93c5fd; font-size: 12px; font-weight: 600;")
             card_layout.addWidget(steps_label)
 
@@ -2014,37 +2062,22 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _overview_mini_breeder_card(
         self,
-        species_name: str,
-        breeder_name: str,
-        sex: str,
+        creature: Creature,
+        max_stats: dict[str, float],
+        targets: list[tuple[str, int]],
+        use_points: bool,
     ) -> QtWidgets.QWidget:
-        border_color = "#60a5fa" if sex == "male" else "#f472b6"
-        text_color = "#dbeafe" if sex == "male" else "#fce7f3"
-        box = QtWidgets.QFrame()
-        box.setMinimumWidth(248)
-        box.setMaximumWidth(272)
-        box.setStyleSheet(
-            "QFrame {"
-            "background: rgba(11, 19, 36, 0.85);"
-            f"border: 1px solid {border_color};"
-            "border-radius: 14px;"
-            "}"
+        return self._pair_info_box(
+            creature,
+            max_stats=max_stats,
+            use_points=use_points,
+            points_only=True,
+            targets=targets,
+            highlighted=False,
+            min_width=272,
+            max_width=304,
+            avatar_size=124,
         )
-        layout = QtWidgets.QVBoxLayout(box)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
-
-        name = QtWidgets.QLabel(f"{self._sex_icon(sex)} {self._truncate_text(breeder_name, 10)}")
-        name.setAlignment(QtCore.Qt.AlignCenter)
-        name.setStyleSheet(
-            f"color: {text_color}; font-size: 13px; font-weight: 700;"
-            "background: transparent; border: none;"
-        )
-        layout.addWidget(name)
-
-        avatar = self._overview_species_image(species_name, size=112)
-        layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
-        return box
 
     def _overview_species_image(self, species: str, size: int = 48) -> QtWidgets.QLabel:
         label = QtWidgets.QLabel()
@@ -2166,6 +2199,8 @@ class MainWindow(QtWidgets.QMainWindow):
             return 0.0
 
     def _movement_speed_percent(self, creature: Creature) -> float:
+        if self._is_flying_creature(creature):
+            return 100.0
         raw_value = creature.stats.get("MovementSpeed")
         if raw_value is None:
             return 100.0

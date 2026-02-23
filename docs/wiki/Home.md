@@ -1,6 +1,6 @@
-# Ark Breeding Tool Wiki
+# Arc-Breading-Tool Wiki
 
-Ark Breeding Tool helps you manage ARK creature exports, compute stat points, and plan breeding chains.
+Arc-Breading-Tool helps you manage ARK creature exports, compute stat points, and plan breeding chains.
 
 Technical command/module names remain `arkbreedingtool`.
 

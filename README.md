@@ -1,4 +1,4 @@
-# Ark Breeding Tool
+# Arc-Breading-Tool
 
 Local breeding manager for ARK: Survival Evolved.
 
@@ -45,7 +45,7 @@ packaging/build_deb.sh 0.1.0
 ```
 
 ## Naming
-- Product name: **Ark Breeding Tool**
+- Product name: **Arc-Breading-Tool**
 - Technical command/module names stay `arkbreedingtool` for compatibility.
 
 ## Credits

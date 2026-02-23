@@ -33,9 +33,11 @@ def parse_creature_file(path: Path) -> ParsedCreature:
     dino_data = _get_section(sections, "Dino Data")
     stat_section = _get_section(sections, "Max Character Status Values")
 
-    name = dino_data.get("TamedName") or "Unknown"
     dino_class = dino_data.get("DinoClass", "")
     species = _extract_species(dino_class) or "Unknown"
+    tamed_name = (dino_data.get("TamedName") or "").strip()
+    name_tag = (dino_data.get("DinoNameTag") or "").strip()
+    name = tamed_name or name_tag or species or "Unknown"
     sex = _parse_sex(dino_data.get("bIsFemale"))
     level = _parse_int(dino_data.get("CharacterLevel"), default=0)
     imprinting_quality = _parse_float(dino_data.get("DinoImprintingQuality"))
