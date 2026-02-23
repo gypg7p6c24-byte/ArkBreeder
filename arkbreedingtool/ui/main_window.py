@@ -692,6 +692,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self._detail_rank_note.setWordWrap(True)
         layout.addWidget(self._detail_rank_note)
 
+        self._detail_lineage_badge = QtWidgets.QLabel("Lineage pending")
+        self._detail_lineage_badge.setStyleSheet(
+            "QLabel {"
+            "color: #fbbf24;"
+            "background: rgba(251, 191, 36, 0.14);"
+            "border: 1px solid rgba(251, 191, 36, 0.55);"
+            "border-radius: 8px;"
+            "padding: 3px 8px;"
+            "font-size: 11px;"
+            "font-weight: 800;"
+            "}"
+        )
+        self._detail_lineage_badge.setVisible(False)
+        layout.addWidget(self._detail_lineage_badge, alignment=QtCore.Qt.AlignLeft)
+
         self._detail_crown = QtWidgets.QLabel("♛")
         self._detail_crown.setStyleSheet(
             "color: rgba(103, 232, 249, 0.96);"
@@ -3869,6 +3884,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self._detail_title.setText("Select a creature")
             self._detail_subtitle.setText("")
             self._detail_rank_note.setText("")
+            if hasattr(self, "_detail_lineage_badge"):
+                self._detail_lineage_badge.setVisible(False)
             self._detail_crown.setVisible(False)
             self._detail_insights.setText("Select a creature to see insights.")
             self._detail_strengths.setText("Strengths: -")
@@ -3928,6 +3945,11 @@ class MainWindow(QtWidgets.QMainWindow):
         subtitle = f"{self._display_species(creature.species)} • {creature.sex} • L{creature.level}"
         self._detail_subtitle.setText(subtitle)
         self._detail_rank_note.setText(self._build_detail_rank_note(creature))
+        if hasattr(self, "_detail_lineage_badge"):
+            lineage_pending = self._needs_lineage_refresh(creature)
+            self._detail_lineage_badge.setVisible(lineage_pending)
+            if lineage_pending:
+                self._detail_lineage_badge.setText("Lineage pending • open Ancestors and re-export")
         self._detail_image.set_species(self._display_species(creature.species))
 
         species_group = [
