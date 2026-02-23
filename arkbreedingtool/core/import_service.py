@@ -132,6 +132,15 @@ class ExportImportService:
                     f"{action} {saved.name}",
                     kind,
                 )
+                if (
+                    parsed.baby_age is not None
+                    and parsed.baby_age < 1.0
+                    and not (parsed.mother_external_id and parsed.father_external_id)
+                ):
+                    self._on_notify(
+                        "Baby lineage pending: open Ancestors in-game then re-export this dino.",
+                        "info",
+                    )
             if self._delete_after_import:
                 path.unlink(missing_ok=True)
                 self._file_signatures.pop(file_key, None)

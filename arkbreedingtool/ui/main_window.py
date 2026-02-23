@@ -361,7 +361,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._mutation_bar = BarChartWidget()
         self._dashboard_mutation_layout.addWidget(self._mutation_bar, 1)
 
-        points_panel, self._dashboard_points_layout = self._dashboard_panel("Best stat points")
+        points_panel, self._dashboard_points_layout = self._dashboard_panel("Top creatures by stat")
 
         extras.addWidget(mutation_panel, 1)
         extras.addWidget(points_panel, 1)
@@ -1274,32 +1274,35 @@ class MainWindow(QtWidgets.QMainWindow):
         if not hasattr(self, "_dashboard_points_layout"):
             return
         self._clear_layout(self._dashboard_points_layout)
-        if self._values_store.count() == 0:
-            self._dashboard_points_layout.addWidget(
-                self._empty_dashboard_label("Species reference values are missing, stat points disabled.")
-            )
-            return
         if not creatures:
             self._dashboard_points_layout.addWidget(
                 self._empty_dashboard_label("No creatures yet.")
             )
             return
-        entries = []
-        for short, key, label in _POINT_STAT_CONFIG:
-            best_value = -1
+
+        use_points = self._points_available(creatures)
+        dashboard_stats: list[tuple[str, str, str]] = [
+            ("M", "MeleeDamageMultiplier", "Melee"),
+            ("S", "Stamina", "Stamina"),
+            ("H", "Health", "Health"),
+            ("Sp", "MovementSpeed", "Speed"),
+        ]
+        entries: list[tuple[str, str, float, Creature]] = []
+        for short, key, label in dashboard_stats:
+            best_value = -1.0
             best_creature: Creature | None = None
             for creature in creatures:
-                value = self._get_stat_points_value(creature, key)
+                value = self._dashboard_metric_for_stat(creature, key, use_points=use_points)
                 if value is None:
                     continue
                 if value > best_value:
-                    best_value = int(value)
+                    best_value = float(value)
                     best_creature = creature
             if best_creature:
                 entries.append((short, label, best_value, best_creature))
         if not entries:
             self._dashboard_points_layout.addWidget(
-                self._empty_dashboard_label("Stat points unavailable for current creatures.")
+                self._empty_dashboard_label("No top stat candidates available yet.")
             )
             return
         entries.sort(key=lambda item: item[2], reverse=True)
@@ -1316,6 +1319,13 @@ class MainWindow(QtWidgets.QMainWindow):
             species_text = self._display_species(creature.species)
             owner = QtWidgets.QLabel(f"{creature.name} ({species_text})")
             owner.setStyleSheet("color: #e2e8f0; font-size: 11px; font-weight: 600;")
+            owner.setWordWrap(True)
+            avatar = self._small_species_image(species_text, size=48)
+            top_row = QtWidgets.QHBoxLayout()
+            top_row.setContentsMargins(0, 0, 0, 0)
+            top_row.setSpacing(6)
+            top_row.addWidget(avatar, alignment=QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+            top_row.addWidget(owner, 1)
 
             ratio = 0.0 if max_points <= 0 else min(max(float(value) / float(max_points), 0.0), 1.0)
             tier = self._tier_color(ratio)
@@ -1338,7 +1348,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 """
             )
 
-            points = QtWidgets.QLabel(str(value))
+            points = QtWidgets.QLabel(
+                self._dashboard_metric_label(creature, value, key=self._point_key_from_short(short), use_points=use_points)
+            )
             points.setStyleSheet(
                 f"color: {tier}; font-weight: 800; font-size: 12px;"
             )
@@ -1351,10 +1363,51 @@ class MainWindow(QtWidgets.QMainWindow):
             points_row.addWidget(points)
 
             layout.addWidget(title)
-            layout.addWidget(owner)
+            layout.addLayout(top_row)
             layout.addLayout(points_row)
             self._dashboard_points_layout.addWidget(card)
         self._dashboard_points_layout.addStretch(1)
+
+    def _point_key_from_short(self, short: str) -> str:
+        for point_short, key, _title in _POINT_STAT_CONFIG:
+            if point_short == short:
+                return key
+        return ""
+
+    def _dashboard_metric_for_stat(
+        self,
+        creature: Creature,
+        key: str,
+        use_points: bool = False,
+    ) -> float | None:
+        if key == "MovementSpeed":
+            return self._movement_speed_percent(creature)
+        if use_points:
+            points_value = self._get_stat_points_value(creature, key)
+            if points_value is not None:
+                return float(points_value)
+        raw_value = creature.stats.get(key)
+        if raw_value is None:
+            return None
+        try:
+            return float(raw_value)
+        except (TypeError, ValueError):
+            return None
+
+    def _dashboard_metric_label(
+        self,
+        creature: Creature,
+        value: float,
+        key: str,
+        use_points: bool = False,
+    ) -> str:
+        if key == "MovementSpeed":
+            return f"{value:.1f}%"
+        if use_points:
+            points_value = self._get_stat_points_value(creature, key)
+            if points_value is not None:
+                return str(int(points_value))
+        return self._format_stat(creature.stats.get(key), key, creature=creature)
 
     def _update_dashboard_pairs(self, creatures: list[Creature]) -> None:
         if not hasattr(self, "_dashboard_pairs_layout"):
@@ -2081,6 +2134,8 @@ class MainWindow(QtWidgets.QMainWindow):
         use_points: bool = False,
         points_only: bool = False,
     ) -> float:
+        if key == "MovementSpeed":
+            return self._movement_speed_percent(creature)
         if use_points:
             points_value = self._get_stat_points_value(creature, key)
             if points_value is not None:
@@ -2094,6 +2149,18 @@ class MainWindow(QtWidgets.QMainWindow):
             return float(value)
         except (TypeError, ValueError):
             return 0.0
+
+    def _movement_speed_percent(self, creature: Creature) -> float:
+        raw_value = creature.stats.get("MovementSpeed")
+        if raw_value is None:
+            return 100.0
+        try:
+            speed_percent = (float(raw_value) + 1.0) * 100.0
+        except (TypeError, ValueError):
+            return 100.0
+        if speed_percent <= 0:
+            return 100.0
+        return speed_percent
 
     def _format_score(self, value: float) -> str:
         return f"{value:.2f}"
@@ -3758,15 +3825,18 @@ class MainWindow(QtWidgets.QMainWindow):
         key: str | None = None,
         creature: Creature | None = None,
     ) -> str:
-        if key == "MovementSpeed" and value is None:
-            return "100.0%"
+        if key == "MovementSpeed":
+            if creature is not None:
+                return f"{self._movement_speed_percent(creature):.1f}%"
+            if value is None:
+                return "100.0%"
+            try:
+                return f"{(float(value) + 1.0) * 100.0:.1f}%"
+            except (TypeError, ValueError):
+                return "100.0%"
         if value is None:
             return "-"
         if key == "MeleeDamageMultiplier":
-            return f"{(value + 1.0) * 100:.1f}%"
-        if key == "MovementSpeed":
-            if creature is not None and self._is_flying_creature(creature):
-                return "100.0%"
             return f"{(value + 1.0) * 100:.1f}%"
         precision = 3 if key in {"MeleeDamageMultiplier", "MovementSpeed"} else 2
         return QtCore.QLocale.system().toString(float(value), "f", precision)
