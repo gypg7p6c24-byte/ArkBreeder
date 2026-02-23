@@ -1770,7 +1770,11 @@ class MainWindow(QtWidgets.QMainWindow):
             grid.addWidget(empty, 0, 0)
             return
 
-        columns = 2 if len(items) > 2 else 1
+        columns = 1
+        if len(items) >= 2:
+            columns = 2
+        if len(items) >= 5:
+            columns = 3
         for idx, item in enumerate(items):
             species_name = str(item.get("species", "Unknown"))
             step_count = int(item.get("step_count", 1))
@@ -1790,49 +1794,55 @@ class MainWindow(QtWidgets.QMainWindow):
             card = QtWidgets.QFrame()
             card.setStyleSheet(
                 "QFrame {"
-                "background: rgba(15, 23, 42, 0.20);"
-                f"border: 1px solid {status_color}; border-radius: 10px;"
+                "background: rgba(15, 23, 42, 0.24);"
+                f"border: 1px solid {status_color}; border-radius: 12px;"
                 "}"
             )
+            card.setMinimumWidth(320)
             card_layout = QtWidgets.QVBoxLayout(card)
-            card_layout.setContentsMargins(6, 6, 6, 6)
-            card_layout.setSpacing(3)
+            card_layout.setContentsMargins(8, 8, 8, 8)
+            card_layout.setSpacing(6)
 
             title_row = QtWidgets.QHBoxLayout()
             title_row.setContentsMargins(0, 0, 0, 0)
             title_row.setSpacing(4)
             species_label = QtWidgets.QLabel(species_name)
-            species_label.setStyleSheet("color: #f8fafc; font-size: 12px; font-weight: 800;")
+            species_label.setStyleSheet("color: #f8fafc; font-size: 16px; font-weight: 900;")
             title_row.addWidget(species_label)
             title_row.addStretch(1)
             card_layout.addLayout(title_row)
 
-            preview_row = QtWidgets.QHBoxLayout()
-            preview_row.setContentsMargins(0, 0, 0, 0)
-            preview_row.setSpacing(4)
-            male_layout = QtWidgets.QHBoxLayout()
-            male_layout.setContentsMargins(0, 0, 0, 0)
-            male_layout.setSpacing(3)
-            male_layout.addWidget(self._small_species_image(species_name, size=28))
-            male_name_label = QtWidgets.QLabel(f"{self._sex_icon('male')} {lead_male}")
-            male_name_label.setStyleSheet("color: #dbeafe; font-size: 10px; font-weight: 700;")
-            male_layout.addWidget(male_name_label, alignment=QtCore.Qt.AlignVCenter)
-            preview_row.addLayout(male_layout)
-
+            pair_frame = QtWidgets.QFrame()
+            pair_frame.setStyleSheet(
+                "QFrame {"
+                "background: rgba(11, 19, 36, 0.55);"
+                "border: 1px solid #334155;"
+                "border-radius: 10px;"
+                "}"
+            )
+            pair_row = QtWidgets.QHBoxLayout(pair_frame)
+            pair_row.setContentsMargins(6, 6, 6, 6)
+            pair_row.setSpacing(8)
+            pair_row.addWidget(
+                self._overview_mini_breeder_card(
+                    species_name,
+                    lead_male,
+                    "male",
+                )
+            )
             plus = QtWidgets.QLabel("+")
-            plus.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 700;")
-            preview_row.addWidget(plus)
-
-            female_layout = QtWidgets.QHBoxLayout()
-            female_layout.setContentsMargins(0, 0, 0, 0)
-            female_layout.setSpacing(3)
-            female_layout.addWidget(self._small_species_image(species_name, size=28))
-            female_name_label = QtWidgets.QLabel(f"{self._sex_icon('female')} {lead_female}")
-            female_name_label.setStyleSheet("color: #fce7f3; font-size: 10px; font-weight: 700;")
-            female_layout.addWidget(female_name_label, alignment=QtCore.Qt.AlignVCenter)
-            preview_row.addLayout(female_layout)
-            preview_row.addStretch(1)
-            card_layout.addLayout(preview_row)
+            plus.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 800;")
+            plus.setAlignment(QtCore.Qt.AlignCenter)
+            pair_row.addWidget(plus)
+            pair_row.addWidget(
+                self._overview_mini_breeder_card(
+                    species_name,
+                    lead_female,
+                    "female",
+                )
+            )
+            pair_row.addStretch(1)
+            card_layout.addWidget(pair_frame)
 
             next_label = QtWidgets.QLabel(f"Next action: {next_action}")
             next_label.setStyleSheet("color: #cbd5f5; font-size: 10px; font-weight: 600;")
@@ -1864,6 +1874,36 @@ class MainWindow(QtWidgets.QMainWindow):
             row = idx // columns
             col = idx % columns
             grid.addWidget(card, row, col)
+
+    def _overview_mini_breeder_card(
+        self,
+        species_name: str,
+        breeder_name: str,
+        sex: str,
+    ) -> QtWidgets.QWidget:
+        frame = QtWidgets.QFrame()
+        border_color = "#60a5fa" if sex == "male" else "#f472b6"
+        text_color = "#dbeafe" if sex == "male" else "#fce7f3"
+        frame.setStyleSheet(
+            "QFrame {"
+            "background: rgba(15, 23, 42, 0.8);"
+            f"border: 1px solid {border_color};"
+            "border-radius: 8px;"
+            "}"
+        )
+        frame.setMinimumWidth(120)
+        layout = QtWidgets.QVBoxLayout(frame)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(3)
+
+        name = QtWidgets.QLabel(f"{self._sex_icon(sex)} {self._truncate_text(breeder_name, 10)}")
+        name.setAlignment(QtCore.Qt.AlignCenter)
+        name.setStyleSheet(f"color: {text_color}; font-size: 10px; font-weight: 700;")
+        layout.addWidget(name)
+
+        avatar = self._small_species_image(species_name, size=48)
+        layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
+        return frame
 
     def _open_breeding_species_plan(self, species: str) -> None:
         if not hasattr(self, "_breeding_species_filter"):
