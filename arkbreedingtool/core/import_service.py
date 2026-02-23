@@ -174,6 +174,7 @@ class ExportImportService:
             level=parsed.level,
             stats=parsed.stats,
             imprinting_quality=parsed.imprinting_quality,
+            baby_age=parsed.baby_age,
             mutations_maternal=parsed.mutations_maternal or 0,
             mutations_paternal=parsed.mutations_paternal or 0,
             mother_external_id=parsed.mother_external_id,

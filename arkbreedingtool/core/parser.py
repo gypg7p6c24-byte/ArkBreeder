@@ -19,6 +19,7 @@ class ParsedCreature:
     father_external_id: str | None
     blueprint: str | None
     imprinting_quality: float | None
+    baby_age: float | None
     raw_text: str
 
 
@@ -38,6 +39,7 @@ def parse_creature_file(path: Path) -> ParsedCreature:
     sex = _parse_sex(dino_data.get("bIsFemale"))
     level = _parse_int(dino_data.get("CharacterLevel"), default=0)
     imprinting_quality = _parse_float(dino_data.get("DinoImprintingQuality"))
+    baby_age = _parse_float(dino_data.get("BabyAge"))
 
     dino_id_1 = dino_data.get("DinoID1")
     dino_id_2 = dino_data.get("DinoID2")
@@ -56,6 +58,16 @@ def parse_creature_file(path: Path) -> ParsedCreature:
     if ancestors:
         ancestor_line = _first_value(ancestors)
         mother_external_id, father_external_id = _parse_ancestor_line(ancestor_line)
+    if not (mother_external_id and father_external_id):
+        for section_name in ("DinoAncestorsMale", "DinoAncestorsFemale"):
+            section = _get_section(sections, section_name)
+            if not section:
+                continue
+            fallback_mother, fallback_father = _parse_ancestor_line(_first_value(section))
+            mother_external_id = mother_external_id or fallback_mother
+            father_external_id = father_external_id or fallback_father
+            if mother_external_id and father_external_id:
+                break
 
     stats: Dict[str, float] = {}
     for key, value in stat_section.items():
@@ -79,6 +91,7 @@ def parse_creature_file(path: Path) -> ParsedCreature:
         father_external_id=father_external_id,
         blueprint=dino_class or None,
         imprinting_quality=imprinting_quality,
+        baby_age=baby_age,
         raw_text=text,
     )
 

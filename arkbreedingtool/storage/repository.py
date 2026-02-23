@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from typing import Optional
 
@@ -17,6 +18,7 @@ def creature_from_row(row) -> Creature:
         level=row["level"],
         stats=json.loads(row["stats_json"]) if row["stats_json"] else {},
         imprinting_quality=row["imprinting_quality"] if "imprinting_quality" in row.keys() else None,
+        baby_age=row["baby_age"] if "baby_age" in row.keys() else None,
         mutations_maternal=row["mutations_maternal"],
         mutations_paternal=row["mutations_paternal"],
         mother_id=row["mother_id"],
@@ -32,10 +34,10 @@ def add_creature(conn, creature: Creature) -> Creature:
         '''
         INSERT INTO creatures (
             external_id, blueprint, name, species, sex, level, stats_json,
-            imprinting_quality, mutations_maternal, mutations_paternal, mother_id, father_id,
+            imprinting_quality, baby_age, mutations_maternal, mutations_paternal, mother_id, father_id,
             mother_external_id, father_external_id, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ''',
         (
             creature.external_id,
@@ -46,6 +48,7 @@ def add_creature(conn, creature: Creature) -> Creature:
             creature.level,
             json.dumps(creature.stats),
             creature.imprinting_quality,
+            creature.baby_age,
             creature.mutations_maternal,
             creature.mutations_paternal,
             creature.mother_id,
@@ -69,6 +72,7 @@ def update_creature(conn, creature: Creature) -> Creature:
             level = ?,
             stats_json = ?,
             imprinting_quality = ?,
+            baby_age = ?,
             mutations_maternal = ?,
             mutations_paternal = ?,
             mother_id = ?,
@@ -87,6 +91,7 @@ def update_creature(conn, creature: Creature) -> Creature:
             creature.level,
             json.dumps(creature.stats),
             creature.imprinting_quality,
+            creature.baby_age,
             creature.mutations_maternal,
             creature.mutations_paternal,
             creature.mother_id,
@@ -106,7 +111,14 @@ def upsert_creature(conn, creature: Creature) -> Creature:
             (creature.external_id,),
         ).fetchone()
         if row is not None:
-            return update_creature(conn, creature.with_id(row["id"]))
+            existing = creature_from_row(row)
+            merged = creature
+            # Keep known lineage when a fresh export is partial/missing ancestry.
+            if not merged.mother_external_id and existing.mother_external_id:
+                merged = replace(merged, mother_external_id=existing.mother_external_id)
+            if not merged.father_external_id and existing.father_external_id:
+                merged = replace(merged, father_external_id=existing.father_external_id)
+            return update_creature(conn, merged.with_id(row["id"]))
     return add_creature(conn, creature)
 
 

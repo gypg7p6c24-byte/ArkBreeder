@@ -3642,6 +3642,24 @@ class MainWindow(QtWidgets.QMainWindow):
         species = self._pedigree_species_filter.currentText()
         candidates = self._pedigree_candidates(species)
         if not candidates:
+            filtered = [
+                c
+                for c in self._creature_cache
+                if species == "All species" or self._display_species(c.species) == species
+            ]
+            pending_lineage = [c for c in filtered if self._needs_lineage_refresh(c)]
+            if pending_lineage:
+                count = len(pending_lineage)
+                noun = "baby" if count == 1 else "babies"
+                self._pedigree_empty.setText(
+                    "No creatures with known mother and father found for this filter.\n"
+                    f"{count} maturing {noun} may not expose lineage on first export. "
+                    "Open the Ancestors view in-game and re-export."
+                )
+            else:
+                self._pedigree_empty.setText(
+                    "No creatures with known mother and father found for this filter."
+                )
             self._pedigree_tree.setVisible(False)
             self._pedigree_empty.setVisible(True)
             if self._pedigree_subject:
@@ -3660,6 +3678,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._pedigree_father_meta.setText("")
             self._set_pedigree_avatar(self._pedigree_father_avatar, None)
             return
+        self._pedigree_empty.setText(
+            "No creatures with known mother and father found for this filter."
+        )
         self._pedigree_tree.setVisible(True)
         self._pedigree_empty.setVisible(False)
         selected = self._pedigree_creature_picker.currentData()
@@ -3944,10 +3965,32 @@ class MainWindow(QtWidgets.QMainWindow):
             role = f"Primary {creature.sex.lower()} breeder candidate."
         else:
             role = f"Backup {creature.sex.lower()} breeder (rank #{rank})."
+        maturation_note = ""
+        if self._needs_lineage_refresh(creature):
+            maturation_note = (
+                "<br/><span style='color:#fbbf24;'><b>Maturation:</b> "
+                "Lineage may be missing while this baby is still growing. "
+                "Re-export after opening Ancestors in-game to refresh parents.</span>"
+            )
         return (
             f"<b>Top points:</b> {top_stats}<br/>"
             f"<b>Role:</b> {role}"
+            f"{maturation_note}"
         )
+
+    def _is_maturing_baby(self, creature: Creature) -> bool:
+        if creature.baby_age is None:
+            return False
+        try:
+            age = float(creature.baby_age)
+        except (TypeError, ValueError):
+            return False
+        return 0.0 <= age < 1.0
+
+    def _needs_lineage_refresh(self, creature: Creature) -> bool:
+        if not self._is_maturing_baby(creature):
+            return False
+        return not (creature.mother_external_id and creature.father_external_id)
 
     def _species_sex_rank(self, creature: Creature) -> tuple[int | None, int]:
         species_group = [
