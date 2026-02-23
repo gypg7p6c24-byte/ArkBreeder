@@ -564,7 +564,7 @@ class MainWindow(QtWidgets.QMainWindow):
         toolbar.addWidget(self._breeding_back_btn)
 
         self._breeding_scope_label = QtWidgets.QLabel("Overview")
-        self._breeding_scope_label.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 700;")
+        self._breeding_scope_label.setStyleSheet("color: #e2e8f0; font-size: 17px; font-weight: 800;")
         toolbar.addWidget(self._breeding_scope_label)
 
         self._breeding_species_filter = QtWidgets.QComboBox()
@@ -585,22 +585,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self._breeding_overview_panel.setStyleSheet(
             """
             #breedingOverviewPanel {
-                background: rgba(15, 23, 42, 0.22);
-                border: 1px solid #334155;
-                border-radius: 12px;
+                background: transparent;
+                border: none;
             }
             """
         )
         overview_layout = QtWidgets.QVBoxLayout(self._breeding_overview_panel)
-        overview_layout.setContentsMargins(6, 6, 6, 6)
-        overview_layout.setSpacing(4)
+        overview_layout.setContentsMargins(0, 0, 0, 0)
+        overview_layout.setSpacing(2)
         overview_title = QtWidgets.QLabel("Breeding actions overview")
-        overview_title.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 800;")
+        overview_title.setStyleSheet("color: #cbd5f5; font-size: 19px; font-weight: 900;")
         overview_layout.addWidget(overview_title)
         self._breeding_overview_grid = QtWidgets.QGridLayout()
         self._breeding_overview_grid.setContentsMargins(0, 0, 0, 0)
         self._breeding_overview_grid.setHorizontalSpacing(6)
         self._breeding_overview_grid.setVerticalSpacing(6)
+        self._breeding_overview_grid.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         overview_layout.addLayout(self._breeding_overview_grid)
         self._breeding_overview_panel.setVisible(False)
         layout.addWidget(self._breeding_overview_panel)
@@ -1798,16 +1798,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 f"border: 1px solid {status_color}; border-radius: 12px;"
                 "}"
             )
-            card.setMinimumWidth(320)
+            card.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Maximum)
             card_layout = QtWidgets.QVBoxLayout(card)
-            card_layout.setContentsMargins(8, 8, 8, 8)
-            card_layout.setSpacing(6)
+            card_layout.setContentsMargins(6, 6, 6, 6)
+            card_layout.setSpacing(4)
 
             title_row = QtWidgets.QHBoxLayout()
             title_row.setContentsMargins(0, 0, 0, 0)
             title_row.setSpacing(4)
             species_label = QtWidgets.QLabel(species_name)
-            species_label.setStyleSheet("color: #f8fafc; font-size: 16px; font-weight: 900;")
+            species_label.setStyleSheet("color: #f8fafc; font-size: 15px; font-weight: 900;")
             title_row.addWidget(species_label)
             title_row.addStretch(1)
             card_layout.addLayout(title_row)
@@ -1815,14 +1815,14 @@ class MainWindow(QtWidgets.QMainWindow):
             pair_frame = QtWidgets.QFrame()
             pair_frame.setStyleSheet(
                 "QFrame {"
-                "background: rgba(11, 19, 36, 0.55);"
+                "background: rgba(11, 19, 36, 0.42);"
                 "border: 1px solid #334155;"
                 "border-radius: 10px;"
                 "}"
             )
             pair_row = QtWidgets.QHBoxLayout(pair_frame)
-            pair_row.setContentsMargins(6, 6, 6, 6)
-            pair_row.setSpacing(8)
+            pair_row.setContentsMargins(5, 5, 5, 5)
+            pair_row.setSpacing(6)
             pair_row.addWidget(
                 self._overview_mini_breeder_card(
                     species_name,
@@ -1841,7 +1841,6 @@ class MainWindow(QtWidgets.QMainWindow):
                     "female",
                 )
             )
-            pair_row.addStretch(1)
             card_layout.addWidget(pair_frame)
 
             next_label = QtWidgets.QLabel(f"Next action: {next_action}")
@@ -1881,19 +1880,11 @@ class MainWindow(QtWidgets.QMainWindow):
         breeder_name: str,
         sex: str,
     ) -> QtWidgets.QWidget:
-        frame = QtWidgets.QFrame()
-        border_color = "#60a5fa" if sex == "male" else "#f472b6"
         text_color = "#dbeafe" if sex == "male" else "#fce7f3"
-        frame.setStyleSheet(
-            "QFrame {"
-            "background: rgba(15, 23, 42, 0.8);"
-            f"border: 1px solid {border_color};"
-            "border-radius: 8px;"
-            "}"
-        )
-        frame.setMinimumWidth(120)
-        layout = QtWidgets.QVBoxLayout(frame)
-        layout.setContentsMargins(5, 5, 5, 5)
+        box = QtWidgets.QWidget()
+        box.setMinimumWidth(112)
+        layout = QtWidgets.QVBoxLayout(box)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(3)
 
         name = QtWidgets.QLabel(f"{self._sex_icon(sex)} {self._truncate_text(breeder_name, 10)}")
@@ -1901,9 +1892,29 @@ class MainWindow(QtWidgets.QMainWindow):
         name.setStyleSheet(f"color: {text_color}; font-size: 10px; font-weight: 700;")
         layout.addWidget(name)
 
-        avatar = self._small_species_image(species_name, size=48)
+        avatar = self._overview_species_image(species_name, size=48)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
-        return frame
+        return box
+
+    def _overview_species_image(self, species: str, size: int = 48) -> QtWidgets.QLabel:
+        label = QtWidgets.QLabel()
+        label.setFixedSize(size, int(size * 0.75))
+        label.setAlignment(QtCore.Qt.AlignCenter)
+        label.setStyleSheet("background: transparent; border: none; color: #94a3b8;")
+        cache_path = self._species_cache_path(species)
+        if cache_path.exists():
+            pixmap = QtGui.QPixmap(str(cache_path))
+            if not pixmap.isNull():
+                label.setPixmap(
+                    pixmap.scaled(
+                        label.size(),
+                        QtCore.Qt.KeepAspectRatio,
+                        QtCore.Qt.SmoothTransformation,
+                    )
+                )
+                return label
+        label.setText(species[:1].upper() if species else "?")
+        return label
 
     def _open_breeding_species_plan(self, species: str) -> None:
         if not hasattr(self, "_breeding_species_filter"):
@@ -2258,16 +2269,13 @@ class MainWindow(QtWidgets.QMainWindow):
             target_values[title] = target_value
             axis_max[title] = max(current_value, target_value, 1.0)
 
-        wrapper = QtWidgets.QFrame()
-        wrapper.setStyleSheet(
-            "QFrame { background: rgba(15, 23, 42, 0.28); border: 1px solid #334155; border-radius: 12px; }"
-        )
+        wrapper = QtWidgets.QWidget()
         wrapper_layout = QtWidgets.QVBoxLayout(wrapper)
-        wrapper_layout.setContentsMargins(8, 8, 8, 8)
+        wrapper_layout.setContentsMargins(0, 0, 0, 0)
         wrapper_layout.setSpacing(6)
 
         title = QtWidgets.QLabel("Current best vs target")
-        title.setStyleSheet("color: #93c5fd; font-size: 13px; font-weight: 800;")
+        title.setStyleSheet("color: #93c5fd; font-size: 14px; font-weight: 800;")
         wrapper_layout.addWidget(title)
 
         charts_row = QtWidgets.QHBoxLayout()
@@ -2288,6 +2296,19 @@ class MainWindow(QtWidgets.QMainWindow):
         current_label.setAlignment(QtCore.Qt.AlignCenter)
         current_label.setStyleSheet("color: #cbd5f5; font-size: 11px; font-weight: 700;")
         current_col.addWidget(current_label)
+        current_badges = QtWidgets.QHBoxLayout()
+        current_badges.setContentsMargins(0, 0, 0, 0)
+        current_badges.setSpacing(4)
+        current_badges.addStretch(1)
+        for short, key, _title in _BREEDING_POINT_STAT_CONFIG:
+            chip = QtWidgets.QLabel(f"{self._point_icon(short)} {int(round(best_points.get(key, 0.0)))}")
+            chip.setStyleSheet(
+                "color: #cbd5f5; font-size: 10px; font-weight: 700;"
+                "border: none; background: transparent;"
+            )
+            current_badges.addWidget(chip)
+        current_badges.addStretch(1)
+        current_col.addLayout(current_badges)
         charts_row.addLayout(current_col, 1)
 
         target_col = QtWidgets.QVBoxLayout()
@@ -2302,24 +2323,22 @@ class MainWindow(QtWidgets.QMainWindow):
         target_label.setAlignment(QtCore.Qt.AlignCenter)
         target_label.setStyleSheet("color: #67e8f9; font-size: 11px; font-weight: 800;")
         target_col.addWidget(target_label)
+        target_badges = QtWidgets.QHBoxLayout()
+        target_badges.setContentsMargins(0, 0, 0, 0)
+        target_badges.setSpacing(4)
+        target_badges.addStretch(1)
+        for short, value in targets:
+            chip = QtWidgets.QLabel(f"{self._point_icon(short)} {value}")
+            chip.setStyleSheet(
+                "color: #67e8f9; font-size: 10px; font-weight: 700;"
+                "border: none; background: transparent;"
+            )
+            target_badges.addWidget(chip)
+        target_badges.addStretch(1)
+        target_col.addLayout(target_badges)
         charts_row.addLayout(target_col, 1)
 
         wrapper_layout.addLayout(charts_row)
-
-        badges_row = QtWidgets.QHBoxLayout()
-        badges_row.setContentsMargins(0, 0, 0, 0)
-        badges_row.setSpacing(6)
-        badges_row.addStretch(1)
-        for short, value in targets:
-            badge = QtWidgets.QLabel(f"{self._point_icon(short)} {value}")
-            badge.setStyleSheet(
-                "color: #67e8f9; font-size: 11px; font-weight: 700;"
-                "background: rgba(103, 232, 249, 26); border: 1px solid #67e8f9; border-radius: 7px;"
-                "padding: 1px 6px;"
-            )
-            badges_row.addWidget(badge)
-        badges_row.addStretch(1)
-        wrapper_layout.addLayout(badges_row)
 
         return wrapper
 
