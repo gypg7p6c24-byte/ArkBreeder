@@ -570,22 +570,32 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.setSpacing(1)
         layout.setAlignment(QtCore.Qt.AlignTop)
 
-        toolbar = QtWidgets.QHBoxLayout()
+        toolbar = QtWidgets.QVBoxLayout()
         toolbar.setContentsMargins(0, 0, 0, 0)
-        toolbar.setSpacing(4)
+        toolbar.setSpacing(2)
+        toolbar_top = QtWidgets.QHBoxLayout()
+        toolbar_top.setContentsMargins(0, 0, 0, 0)
+        toolbar_top.setSpacing(4)
         self._breeding_back_btn = QtWidgets.QPushButton("← Back to overview")
         self._breeding_back_btn.clicked.connect(lambda: self._open_breeding_species_plan("All species"))
         self._breeding_back_btn.setVisible(False)
-        toolbar.addWidget(self._breeding_back_btn)
+        toolbar_top.addWidget(self._breeding_back_btn)
+        toolbar_top.addStretch(1)
+        toolbar.addLayout(toolbar_top)
 
         self._breeding_scope_label = QtWidgets.QLabel("Overview")
         self._breeding_scope_label.setStyleSheet("color: #e2e8f0; font-size: 36px; font-weight: 900;")
-        toolbar.addWidget(self._breeding_scope_label)
+        toolbar_scope = QtWidgets.QHBoxLayout()
+        toolbar_scope.setContentsMargins(0, 0, 0, 0)
+        toolbar_scope.setSpacing(4)
+        toolbar_scope.addWidget(self._breeding_scope_label)
+        toolbar_scope.addStretch(1)
+        toolbar.addLayout(toolbar_scope)
 
         self._breeding_species_filter = QtWidgets.QComboBox()
         self._breeding_species_filter.currentIndexChanged.connect(self._update_breeding_pairs)
         self._breeding_species_filter.setVisible(False)
-        toolbar.addStretch(1)
+        toolbar_top.addWidget(self._breeding_species_filter)
         layout.addLayout(toolbar)
 
         self._breeding_points_info = QtWidgets.QLabel(
@@ -2169,20 +2179,46 @@ class MainWindow(QtWidgets.QMainWindow):
             row_layout.setSpacing(6)
             row_layout.setContentsMargins(0, 0, 0, 12)
 
-            header = QtWidgets.QHBoxLayout()
-            header.setContentsMargins(0, 0, 0, 0)
-            species_label = QtWidgets.QLabel(species_name)
-            species_label.setStyleSheet("color: #cbd5f5; font-weight: 800; font-size: 16px;")
-            header.addWidget(species_label)
-            header.addStretch(1)
-            row_layout.addLayout(header)
+            if not show_ranking:
+                header = QtWidgets.QHBoxLayout()
+                header.setContentsMargins(0, 0, 0, 0)
+                species_label = QtWidgets.QLabel(species_name)
+                species_label.setStyleSheet("color: #cbd5f5; font-weight: 800; font-size: 16px;")
+                header.addWidget(species_label)
+                header.addStretch(1)
+                row_layout.addLayout(header)
+
+            species_creatures = [
+                creature
+                for creature in self._creature_cache
+                if self._display_species(creature.species) == species_name
+            ]
+            perfect_candidates: list[Creature] = []
+            if targets and show_ranking:
+                for creature in species_creatures:
+                    points = self._creature_breeding_points(creature, use_points=use_points)
+                    if self._is_target_reached(points, targets):
+                        perfect_candidates.append(creature)
+                perfect_candidates.sort(
+                    key=lambda creature: self._breeding_creature_score(creature, use_points=use_points),
+                    reverse=True,
+                )
 
             if targets and show_ranking:
-                compare_widget = self._build_breeding_target_compare(
-                    species_name,
-                    targets,
-                    use_points=use_points,
-                )
+                if perfect_candidates:
+                    max_stats = self._species_max_stats(species_name, use_points=use_points)
+                    self._render_perfect_species_cards(
+                        row_layout,
+                        species_name,
+                        perfect_candidates,
+                        targets,
+                        max_stats=max_stats,
+                        use_points=use_points,
+                    )
+                    layout.addWidget(row_card, row_index, 0)
+                    row_index += 1
+                    continue
+                compare_widget = self._build_breeding_target_compare(species_name, targets, use_points=use_points)
                 if compare_widget is not None:
                     row_layout.addWidget(compare_widget)
             elif targets:
@@ -2299,6 +2335,50 @@ class MainWindow(QtWidgets.QMainWindow):
                 row_layout.addLayout(pair_layout)
             layout.addWidget(row_card, row_index, 0)
             row_index += 1
+
+    def _render_perfect_species_cards(
+        self,
+        parent_layout: QtWidgets.QVBoxLayout,
+        species_name: str,
+        perfect_candidates: list[Creature],
+        targets: list[tuple[str, int]],
+        max_stats: dict[str, float],
+        use_points: bool = False,
+    ) -> None:
+        title = QtWidgets.QLabel("Perfect creatures already available")
+        title.setStyleSheet("color: #67e8f9; font-size: 18px; font-weight: 900;")
+        parent_layout.addWidget(title)
+
+        subtitle = QtWidgets.QLabel(
+            f"{species_name}: target already reached. No additional breeding step required."
+        )
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 600;")
+        parent_layout.addWidget(subtitle)
+
+        grid = QtWidgets.QGridLayout()
+        grid.setContentsMargins(0, 4, 0, 0)
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(12)
+        columns = 2 if len(perfect_candidates) <= 4 else 3
+
+        for idx, creature in enumerate(perfect_candidates[:9]):
+            card = self._pair_info_box(
+                creature,
+                max_stats=max_stats,
+                use_points=use_points,
+                points_only=True,
+                targets=targets,
+                highlighted=True,
+                min_width=318,
+                max_width=362,
+                avatar_size=170,
+            )
+            row = idx // columns
+            col = idx % columns
+            grid.addWidget(card, row, col)
+        grid.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        parent_layout.addLayout(grid)
 
     def _build_breeding_target_compare(
         self,
@@ -2425,6 +2505,9 @@ class MainWindow(QtWidgets.QMainWindow):
         points_only: bool = False,
         targets: list[tuple[str, int]] | None = None,
         highlighted: bool = False,
+        min_width: int = 168,
+        max_width: int = 184,
+        avatar_size: int = 100,
     ) -> QtWidgets.QWidget:
         sex_lower = creature.sex.lower() if creature.sex else ""
         accent = "#94a3b8"
@@ -2441,8 +2524,8 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         box = QtWidgets.QFrame()
         box.setObjectName("pairCard")
-        box.setMinimumWidth(168)
-        box.setMaximumWidth(184)
+        box.setMinimumWidth(min_width)
+        box.setMaximumWidth(max_width)
         border_width = 2 if highlighted or reached_target else 1
         if reached_target:
             accent = "#67e8f9"
@@ -2502,7 +2585,7 @@ class MainWindow(QtWidgets.QMainWindow):
             crown_glow.setColor(QtGui.QColor(103, 232, 249, 240))
             crown_label.setGraphicsEffect(crown_glow)
 
-        avatar = self._small_species_image(self._display_species(creature.species), size=100)
+        avatar = self._small_species_image(self._display_species(creature.species), size=avatar_size)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
 
         colors = {
