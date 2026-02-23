@@ -305,14 +305,15 @@ class MainWindow(QtWidgets.QMainWindow):
         charts.setSpacing(8)
 
         left = QtWidgets.QFrame()
+        left.setObjectName("dashboardTile")
         left.setStyleSheet(
-            "QFrame { background: rgba(30, 41, 59, 0.52); border: 1px solid #3b82f6; border-radius: 16px; }"
+            "#dashboardTile { background: rgba(15, 23, 42, 0.44); border: 1px solid #334155; border-radius: 16px; }"
         )
         left_layout = QtWidgets.QVBoxLayout(left)
         left_layout.setContentsMargins(10, 6, 10, 6)
         left_layout.setSpacing(2)
         left_title = QtWidgets.QLabel("Species distribution")
-        left_title.setStyleSheet("color: #dbeafe; font-weight: 800; font-size: 16px;")
+        left_title.setStyleSheet("color: #e2e8f0; font-weight: 700; font-size: 16px;")
         left_layout.addWidget(left_title)
         self._species_donut = DonutChartWidget()
         self._species_donut.setMinimumSize(96, 96)
@@ -327,8 +328,9 @@ class MainWindow(QtWidgets.QMainWindow):
         left_layout.addLayout(self._species_legend)
 
         right = QtWidgets.QFrame()
+        right.setObjectName("dashboardTile")
         right.setStyleSheet(
-            "QFrame { background: rgba(15, 23, 42, 0.44); border: 1px solid #334155; border-radius: 16px; }"
+            "#dashboardTile { background: rgba(15, 23, 42, 0.44); border: 1px solid #334155; border-radius: 16px; }"
         )
         right_layout = QtWidgets.QVBoxLayout(right)
         right_layout.setContentsMargins(10, 6, 10, 6)
@@ -399,8 +401,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _dashboard_panel(self, title: str) -> tuple[QtWidgets.QFrame, QtWidgets.QVBoxLayout]:
         panel = QtWidgets.QFrame()
+        panel.setObjectName("dashboardPanel")
         panel.setStyleSheet(
-            "QFrame { background: rgba(15, 23, 42, 0.44); border: 1px solid #334155; border-radius: 16px; }"
+            "#dashboardPanel { background: rgba(15, 23, 42, 0.44); border: 1px solid #334155; border-radius: 16px; }"
         )
         layout = QtWidgets.QVBoxLayout(panel)
         layout.setContentsMargins(10, 6, 10, 6)
@@ -656,12 +659,15 @@ class MainWindow(QtWidgets.QMainWindow):
             row_layout.addWidget(value_label)
             row_layout.addStretch(1)
             stat_rows.addWidget(row_widget)
-        layout.addLayout(stat_rows)
+        stat_rows.addStretch(1)
+        stats_container = QtWidgets.QWidget()
+        stats_container.setLayout(stat_rows)
 
         insights_card = QtWidgets.QFrame()
         insights_card.setStyleSheet(
             "QFrame { background: rgba(15, 23, 42, 0.38); border: 1px solid #334155; border-radius: 10px; }"
         )
+        insights_card.setMinimumWidth(210)
         insights_layout = QtWidgets.QVBoxLayout(insights_card)
         insights_layout.setContentsMargins(8, 6, 8, 6)
         insights_layout.setSpacing(4)
@@ -672,7 +678,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self._detail_insights.setWordWrap(True)
         insights_layout.addWidget(insights_title)
         insights_layout.addWidget(self._detail_insights)
-        layout.addWidget(insights_card)
+        insights_layout.addStretch(1)
+
+        stats_insights_row = QtWidgets.QHBoxLayout()
+        stats_insights_row.setContentsMargins(0, 0, 0, 0)
+        stats_insights_row.setSpacing(10)
+        stats_insights_row.addWidget(stats_container, 3)
+        stats_insights_row.addWidget(insights_card, 2)
+        layout.addLayout(stats_insights_row)
 
         self._points_info = QtWidgets.QLabel(
             "Stat points unavailable — import values.json in Settings."
@@ -1135,12 +1148,9 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         max_points = max(value for _short, _label, value, _creature in entries)
         for short, label, value, creature in entries:
-            card = QtWidgets.QFrame()
-            card.setStyleSheet(
-                "QFrame { background: rgba(11, 19, 36, 0.8); border-radius: 12px; }"
-            )
+            card = QtWidgets.QWidget()
             layout = QtWidgets.QVBoxLayout(card)
-            layout.setContentsMargins(8, 6, 8, 6)
+            layout.setContentsMargins(2, 2, 2, 2)
             layout.setSpacing(4)
             title = QtWidgets.QLabel(f"{self._point_icon(short)} {label}")
             title.setStyleSheet("color: #93c5fd; font-weight: 700; font-size: 13px;")
@@ -2134,7 +2144,7 @@ class MainWindow(QtWidgets.QMainWindow):
         chain_title.setStyleSheet("color: #93c5fd; font-size: 14px; font-weight: 800;")
         parent_layout.addWidget(chain_title)
 
-        for step_info in sequence:
+        for idx, step_info in enumerate(sequence):
             step = int(step_info["step"])
             male = step_info["male"]
             female = step_info["female"]
@@ -2148,9 +2158,17 @@ class MainWindow(QtWidgets.QMainWindow):
             if not isinstance(gains, list):
                 gains = []
 
+            step_box = QtWidgets.QFrame()
+            step_box.setStyleSheet(
+                "QFrame { background: rgba(15, 23, 42, 0.38); border: 1px solid #334155; border-radius: 12px; }"
+            )
+            step_layout = QtWidgets.QVBoxLayout(step_box)
+            step_layout.setContentsMargins(8, 8, 8, 8)
+            step_layout.setSpacing(6)
+
             step_label = QtWidgets.QLabel(f"Step {step}")
             step_label.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 800;")
-            parent_layout.addWidget(step_label)
+            step_layout.addWidget(step_label)
 
             pair_layout = QtWidgets.QHBoxLayout()
             pair_layout.setSpacing(12)
@@ -2195,19 +2213,26 @@ class MainWindow(QtWidgets.QMainWindow):
                     targets,
                     use_points=use_points,
                     override_points={key: float(value) for key, value in result_points.items()},
-                    title_override=f"C{step} expected",
+                    title_override=self._expected_child_title(step),
                 )
             )
             pair_layout.addStretch(1)
-            parent_layout.addLayout(pair_layout)
+            step_layout.addLayout(pair_layout)
 
             gains_text = ", ".join(str(item) for item in gains) if gains else "-"
             note = "Start chain with this pair."
             if step > 1:
-                note = f"Breed {from_child} with this donor child • gains: {gains_text}"
+                note = f"Breed {from_child} with this donor child, then keep gains: {gains_text}"
             note_label = QtWidgets.QLabel(note)
             note_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
-            parent_layout.addWidget(note_label)
+            step_layout.addWidget(note_label)
+
+            parent_layout.addWidget(step_box)
+            if idx < len(sequence) - 1:
+                chain_arrow = QtWidgets.QLabel("↓")
+                chain_arrow.setAlignment(QtCore.Qt.AlignCenter)
+                chain_arrow.setStyleSheet("color: #93c5fd; font-size: 16px; font-weight: 800;")
+                parent_layout.addWidget(chain_arrow)
 
         if pending:
             pending_label = QtWidgets.QLabel(f"Missing target stats: {', '.join(pending)}")
@@ -2280,6 +2305,17 @@ class MainWindow(QtWidgets.QMainWindow):
             step_index += 1
 
         return sequence, pending
+
+    def _expected_child_title(self, step: int) -> str:
+        names = {
+            1: "One",
+            2: "Two",
+            3: "Three",
+            4: "Four",
+            5: "Five",
+        }
+        suffix = names.get(step, str(step))
+        return f"{self._sex_icon('male')}/{self._sex_icon('female')} Expected {suffix}"
 
     def _build_breeding_plan_steps(
         self,
@@ -3099,6 +3135,17 @@ class MainWindow(QtWidgets.QMainWindow):
             dialog.setText(f"Delete '{creature.name}'?")
             dialog.setInformativeText("This action removes the creature from local data.")
             dialog.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            dialog.setStyleSheet(
+                "QMessageBox { background: #0f172a; color: #e5e7eb; }"
+                "QLabel { color: #e5e7eb; }"
+                "QPushButton { background: #1e293b; color: #e5e7eb; border: 1px solid #334155;"
+                "padding: 6px 10px; border-radius: 6px; min-width: 92px; }"
+                "QPushButton:hover { background: #243247; }"
+                "QCheckBox { color: #cbd5f5; spacing: 6px; }"
+                "QCheckBox::indicator { width: 14px; height: 14px; border: 1px solid #334155;"
+                "background: #111827; border-radius: 3px; }"
+                "QCheckBox::indicator:checked { background: #38bdf8; border: 1px solid #38bdf8; }"
+            )
             checkbox = QtWidgets.QCheckBox("Don't ask me again")
             dialog.setCheckBox(checkbox)
             result = dialog.exec()
