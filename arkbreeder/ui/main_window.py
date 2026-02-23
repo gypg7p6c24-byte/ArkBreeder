@@ -600,7 +600,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._breeding_overview_grid = QtWidgets.QGridLayout()
         self._breeding_overview_grid.setContentsMargins(0, 0, 0, 0)
         self._breeding_overview_grid.setHorizontalSpacing(6)
-        self._breeding_overview_grid.setVerticalSpacing(6)
+        self._breeding_overview_grid.setVerticalSpacing(4)
         self._breeding_overview_grid.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         overview_layout.addLayout(self._breeding_overview_grid)
         self._breeding_overview_panel.setVisible(False)
@@ -1792,24 +1792,24 @@ class MainWindow(QtWidgets.QMainWindow):
             lead_male = self._truncate_text(lead_male_name or "Male", 10)
             lead_female = self._truncate_text(lead_female_name or "Female", 10)
 
-            card = QtWidgets.QFrame()
-            card.setStyleSheet(
-                "QFrame {"
-                "background: rgba(15, 23, 42, 0.24);"
-                f"border: 1px solid {status_color}; border-radius: 12px;"
-                "}"
-            )
+            card = QtWidgets.QWidget()
             card.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Maximum)
             card_layout = QtWidgets.QVBoxLayout(card)
-            card_layout.setContentsMargins(6, 6, 6, 6)
-            card_layout.setSpacing(4)
+            card_layout.setContentsMargins(2, 2, 2, 2)
+            card_layout.setSpacing(3)
 
             title_row = QtWidgets.QHBoxLayout()
             title_row.setContentsMargins(0, 0, 0, 0)
             title_row.setSpacing(4)
             species_label = QtWidgets.QLabel(species_name)
-            species_label.setStyleSheet("color: #f8fafc; font-size: 15px; font-weight: 900;")
-            title_row.addWidget(species_label)
+            species_label.setStyleSheet(
+                "color: #f8fafc; font-size: 15px; font-weight: 900;"
+                "background: rgba(15, 23, 42, 0.24);"
+                "border: 1px solid #334155;"
+                "border-radius: 9px;"
+                "padding: 2px 7px;"
+            )
+            title_row.addWidget(species_label, alignment=QtCore.Qt.AlignLeft)
             title_row.addStretch(1)
             card_layout.addLayout(title_row)
 
@@ -1822,8 +1822,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 "}"
             )
             pair_row = QtWidgets.QHBoxLayout(pair_frame)
-            pair_row.setContentsMargins(5, 5, 5, 5)
-            pair_row.setSpacing(6)
+            pair_row.setContentsMargins(4, 4, 4, 4)
+            pair_row.setSpacing(5)
             pair_row.addWidget(
                 self._overview_mini_breeder_card(
                     species_name,
@@ -1832,7 +1832,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
             )
             plus = QtWidgets.QLabel("+")
-            plus.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 800;")
+            plus.setStyleSheet(
+                "color: #cbd5f5; font-size: 16px; font-weight: 800;"
+                "background: transparent; border: none;"
+            )
             plus.setAlignment(QtCore.Qt.AlignCenter)
             pair_row.addWidget(plus)
             pair_row.addWidget(
@@ -1881,19 +1884,30 @@ class MainWindow(QtWidgets.QMainWindow):
         breeder_name: str,
         sex: str,
     ) -> QtWidgets.QWidget:
+        border_color = "#60a5fa" if sex == "male" else "#f472b6"
         text_color = "#dbeafe" if sex == "male" else "#fce7f3"
-        box = QtWidgets.QWidget()
-        box.setMinimumWidth(112)
+        box = QtWidgets.QFrame()
+        box.setMinimumWidth(106)
+        box.setStyleSheet(
+            "QFrame {"
+            "background: rgba(15, 23, 42, 0.36);"
+            f"border: 1px solid {border_color};"
+            "border-radius: 8px;"
+            "}"
+        )
         layout = QtWidgets.QVBoxLayout(box)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(3)
+        layout.setContentsMargins(3, 3, 3, 3)
+        layout.setSpacing(2)
 
         name = QtWidgets.QLabel(f"{self._sex_icon(sex)} {self._truncate_text(breeder_name, 10)}")
         name.setAlignment(QtCore.Qt.AlignCenter)
-        name.setStyleSheet(f"color: {text_color}; font-size: 10px; font-weight: 700;")
+        name.setStyleSheet(
+            f"color: {text_color}; font-size: 10px; font-weight: 700;"
+            "background: transparent; border: none;"
+        )
         layout.addWidget(name)
 
-        avatar = self._overview_species_image(species_name, size=48)
+        avatar = self._overview_species_image(species_name, size=42)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
         return box
 
@@ -2221,13 +2235,19 @@ class MainWindow(QtWidgets.QMainWindow):
                 plus = QtWidgets.QLabel("+")
                 plus.setAlignment(QtCore.Qt.AlignCenter)
                 plus.setFixedWidth(18)
-                plus.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 700;")
+                plus.setStyleSheet(
+                    "color: #cbd5f5; font-size: 16px; font-weight: 700;"
+                    "background: transparent; border: none;"
+                )
                 pair_layout.addWidget(plus)
                 pair_layout.addWidget(female_box)
                 arrow = QtWidgets.QLabel("⟶")
                 arrow.setAlignment(QtCore.Qt.AlignCenter)
                 arrow.setFixedWidth(28)
-                arrow.setStyleSheet("color: #93c5fd; font-size: 20px; font-weight: 700;")
+                arrow.setStyleSheet(
+                    "color: #93c5fd; font-size: 20px; font-weight: 700;"
+                    "background: transparent; border: none;"
+                )
                 pair_layout.addWidget(arrow)
                 pair_layout.addWidget(child_box)
                 pair_layout.addStretch(1)
@@ -2276,7 +2296,10 @@ class MainWindow(QtWidgets.QMainWindow):
         wrapper_layout.setSpacing(6)
 
         title = QtWidgets.QLabel("Current best vs target")
-        title.setStyleSheet("color: #93c5fd; font-size: 14px; font-weight: 800;")
+        title.setStyleSheet(
+            "color: #93c5fd; font-size: 14px; font-weight: 800;"
+            "background: transparent; border: none;"
+        )
         wrapper_layout.addWidget(title)
 
         charts_row = QtWidgets.QHBoxLayout()
@@ -2295,7 +2318,10 @@ class MainWindow(QtWidgets.QMainWindow):
             f"Current best: {self._sex_icon(best_creature.sex)} {self._truncate_text(best_creature.name or 'Unknown', 16)}"
         )
         current_label.setAlignment(QtCore.Qt.AlignCenter)
-        current_label.setStyleSheet("color: #cbd5f5; font-size: 11px; font-weight: 700;")
+        current_label.setStyleSheet(
+            "color: #cbd5f5; font-size: 11px; font-weight: 700;"
+            "background: transparent; border: none;"
+        )
         current_col.addWidget(current_label)
         current_badges = QtWidgets.QHBoxLayout()
         current_badges.setContentsMargins(0, 0, 0, 0)
@@ -2322,7 +2348,10 @@ class MainWindow(QtWidgets.QMainWindow):
         target_col.addWidget(target_chart, alignment=QtCore.Qt.AlignCenter)
         target_label = QtWidgets.QLabel("Target")
         target_label.setAlignment(QtCore.Qt.AlignCenter)
-        target_label.setStyleSheet("color: #67e8f9; font-size: 11px; font-weight: 800;")
+        target_label.setStyleSheet(
+            "color: #67e8f9; font-size: 11px; font-weight: 800;"
+            "background: transparent; border: none;"
+        )
         target_col.addWidget(target_label)
         target_badges = QtWidgets.QHBoxLayout()
         target_badges.setContentsMargins(0, 0, 0, 0)
@@ -2648,7 +2677,10 @@ class MainWindow(QtWidgets.QMainWindow):
             plus = QtWidgets.QLabel("+")
             plus.setAlignment(QtCore.Qt.AlignCenter)
             plus.setFixedWidth(18)
-            plus.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 700;")
+            plus.setStyleSheet(
+                "color: #cbd5f5; font-size: 16px; font-weight: 700;"
+                "background: transparent; border: none;"
+            )
             pair_layout.addWidget(plus)
             pair_layout.addWidget(
                 self._pair_info_box(
@@ -2663,7 +2695,10 @@ class MainWindow(QtWidgets.QMainWindow):
             arrow = QtWidgets.QLabel("⟶")
             arrow.setAlignment(QtCore.Qt.AlignCenter)
             arrow.setFixedWidth(28)
-            arrow.setStyleSheet("color: #93c5fd; font-size: 20px; font-weight: 700;")
+            arrow.setStyleSheet(
+                "color: #93c5fd; font-size: 20px; font-weight: 700;"
+                "background: transparent; border: none;"
+            )
             pair_layout.addWidget(arrow)
             pair_layout.addWidget(
                 self._pair_child_box(
@@ -2736,7 +2771,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 plus_label = QtWidgets.QLabel("+")
                 plus_label.setAlignment(QtCore.Qt.AlignCenter)
                 plus_label.setFixedWidth(18)
-                plus_label.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 700;")
+                plus_label.setStyleSheet(
+                    "color: #cbd5f5; font-size: 16px; font-weight: 700;"
+                    "background: transparent; border: none;"
+                )
                 merge_row.addWidget(plus_label)
                 merge_row.addWidget(
                     self._pair_child_box(
@@ -2752,7 +2790,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 merge_arrow = QtWidgets.QLabel("⟶")
                 merge_arrow.setAlignment(QtCore.Qt.AlignCenter)
                 merge_arrow.setFixedWidth(28)
-                merge_arrow.setStyleSheet("color: #93c5fd; font-size: 20px; font-weight: 700;")
+                merge_arrow.setStyleSheet(
+                    "color: #93c5fd; font-size: 20px; font-weight: 700;"
+                    "background: transparent; border: none;"
+                )
                 merge_row.addWidget(merge_arrow)
                 merge_row.addWidget(
                     self._pair_child_box(
