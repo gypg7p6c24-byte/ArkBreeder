@@ -1555,7 +1555,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
             )
 
-            limit = 1 if not show_ranking else min(12, len(all_pairs))
+            limit = 1 if not show_ranking else min(30, len(all_pairs))
             ranked_pairs = [
                 (rank + 1, score, male, female)
                 for rank, (score, male, female) in enumerate(all_pairs[:limit])
@@ -1761,7 +1761,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 target_row = QtWidgets.QHBoxLayout()
                 target_row.setContentsMargins(0, 0, 0, 0)
                 target_row.setSpacing(6)
-                target_label = QtWidgets.QLabel("🎯 Target")
+                target_label = QtWidgets.QLabel("◉ Target")
                 target_label.setStyleSheet("color: #94a3b8; font-size: 12px; font-weight: 700;")
                 target_row.addWidget(target_label)
                 for short, value in targets:
@@ -1774,14 +1774,6 @@ class MainWindow(QtWidgets.QMainWindow):
                     target_row.addWidget(chip)
                 target_row.addStretch(1)
                 row_layout.addLayout(target_row)
-
-            if show_ranking:
-                self._render_breeding_plan_chain(
-                    row_layout,
-                    ranked_pairs,
-                    targets,
-                    use_points=use_points,
-                )
 
             max_stats = self._species_max_stats(species_name, use_points=use_points)
             male_candidates: dict[str, Creature] = {}
@@ -1810,6 +1802,20 @@ class MainWindow(QtWidgets.QMainWindow):
                         use_points=use_points,
                     ),
                 )
+
+            if show_ranking:
+                self._render_breeding_plan_chain(
+                    row_layout,
+                    ranked_pairs,
+                    targets,
+                    max_stats=max_stats,
+                    use_points=use_points,
+                    best_male_key=best_male_key,
+                    best_female_key=best_female_key,
+                )
+                layout.addWidget(row_card, row_index, 0)
+                row_index += 1
+                continue
 
             for rank, _score, male, female in ranked_pairs:
                 pair_layout = QtWidgets.QHBoxLayout()
@@ -1875,12 +1881,22 @@ class MainWindow(QtWidgets.QMainWindow):
             accent = "#60a5fa"
         elif sex_lower == "female":
             accent = "#f472b6"
+        reached_target = bool(
+            targets
+            and self._is_target_reached(
+                self._creature_breeding_points(creature, use_points=use_points),
+                targets,
+            )
+        )
         box = QtWidgets.QFrame()
         box.setObjectName("pairCard")
         box.setMinimumWidth(168)
         box.setMaximumWidth(184)
-        border_width = 2 if highlighted else 1
-        if not highlighted:
+        border_width = 2 if highlighted or reached_target else 1
+        if reached_target:
+            accent = "#67e8f9"
+            box_bg = "rgba(103, 232, 249, 0.14)"
+        elif not highlighted:
             box_bg = "rgba(11, 19, 36, 0.85)"
         elif sex_lower == "male":
             box_bg = "rgba(96, 165, 250, 0.14)"
@@ -1899,22 +1915,29 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.setContentsMargins(7, 7, 7, 7)
         layout.setSpacing(2)
         title_text = f"{self._sex_icon(creature.sex)} {creature.name}"
-        if targets and self._is_target_reached(self._creature_breeding_points(creature, use_points=use_points), targets):
-            title_text += " ♛"
+        if reached_target:
+            title_text += ' <span style="color:#67e8f9;font-size:15px;">♛</span>'
         name_label = QtWidgets.QLabel(title_text)
+        name_label.setTextFormat(QtCore.Qt.RichText)
         name_label.setStyleSheet(
             f"color: {accent}; font-weight: 700; font-size: 13px; background: transparent; border: none;"
         )
         layout.addWidget(name_label)
 
-        if highlighted:
+        if highlighted or reached_target:
             glow = QtWidgets.QGraphicsDropShadowEffect(box)
-            glow.setBlurRadius(24)
+            glow.setBlurRadius(28 if reached_target else 24)
             glow.setOffset(0, 0)
             color = QtGui.QColor(accent)
-            color.setAlpha(220)
+            color.setAlpha(235 if reached_target else 220)
             glow.setColor(color)
             box.setGraphicsEffect(glow)
+        if reached_target:
+            text_glow = QtWidgets.QGraphicsDropShadowEffect(name_label)
+            text_glow.setBlurRadius(8)
+            text_glow.setOffset(0, 0)
+            text_glow.setColor(QtGui.QColor(255, 255, 255, 180))
+            name_label.setGraphicsEffect(text_glow)
 
         avatar = self._small_species_image(self._display_species(creature.species), size=100)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
@@ -1949,6 +1972,8 @@ class MainWindow(QtWidgets.QMainWindow):
         max_stats: dict[str, float],
         targets: list[tuple[str, int]],
         use_points: bool = False,
+        override_points: dict[str, float] | None = None,
+        title_override: str | None = None,
     ) -> QtWidgets.QWidget:
         box = QtWidgets.QFrame()
         box.setObjectName("pairCardChild")
@@ -1964,12 +1989,17 @@ class MainWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(box)
         layout.setContentsMargins(7, 7, 7, 7)
         layout.setSpacing(2)
-        child_points = self._expected_child_points(male, female, use_points=use_points)
+        child_points = (
+            dict(override_points)
+            if override_points is not None
+            else self._expected_child_points(male, female, use_points=use_points)
+        )
         is_perfect = self._is_target_reached(child_points, targets)
-        expected_title = "♂/♀ Expected"
+        expected_title = title_override or "♂/♀ Expected"
         if is_perfect:
-            expected_title = "♂/♀ Expected ♛"
+            expected_title += ' <span style="color:#67e8f9;font-size:15px;">♛</span>'
         name_label = QtWidgets.QLabel(expected_title)
+        name_label.setTextFormat(QtCore.Qt.RichText)
         name_label.setStyleSheet(
             "color: #cbd5f5; font-weight: 700; font-size: 13px; background: transparent; border: none;"
         )
@@ -1981,16 +2011,21 @@ class MainWindow(QtWidgets.QMainWindow):
         if is_perfect:
             box.setStyleSheet(
                 "#pairCardChild {"
-                "background: rgba(11, 19, 36, 0.92);"
+                "background: rgba(103, 232, 249, 0.14);"
                 "border: 2px solid #67e8f9;"
                 "border-radius: 14px;"
                 "}"
             )
             glow = QtWidgets.QGraphicsDropShadowEffect(box)
-            glow.setBlurRadius(18)
+            glow.setBlurRadius(22)
             glow.setOffset(0, 0)
-            glow.setColor(QtGui.QColor("#67e8f9"))
+            glow.setColor(QtGui.QColor(103, 232, 249, 235))
             box.setGraphicsEffect(glow)
+            text_glow = QtWidgets.QGraphicsDropShadowEffect(name_label)
+            text_glow.setBlurRadius(8)
+            text_glow.setOffset(0, 0)
+            text_glow.setColor(QtGui.QColor(255, 255, 255, 170))
+            name_label.setGraphicsEffect(text_glow)
 
         colors = {
             "Health": "#22c55e",
@@ -2048,76 +2083,176 @@ class MainWindow(QtWidgets.QMainWindow):
         parent_layout: QtWidgets.QVBoxLayout,
         ranked_pairs: list[tuple[int, float, Creature, Creature]],
         targets: list[tuple[str, int]],
+        max_stats: dict[str, float],
         use_points: bool = False,
+        best_male_key: str | None = None,
+        best_female_key: str | None = None,
     ) -> None:
-        if not ranked_pairs:
-            return
-        _base_points, steps, pending = self._build_breeding_plan_steps(
+        sequence, pending = self._build_breeding_plan_sequence(
             ranked_pairs,
             targets,
             use_points=use_points,
         )
+        if not sequence:
+            return
 
         chain_title = QtWidgets.QLabel("Breeding plan")
-        chain_title.setStyleSheet("color: #93c5fd; font-size: 13px; font-weight: 800;")
+        chain_title.setStyleSheet("color: #93c5fd; font-size: 14px; font-weight: 800;")
         parent_layout.addWidget(chain_title)
 
-        chain_layout = QtWidgets.QHBoxLayout()
-        chain_layout.setContentsMargins(0, 0, 0, 0)
-        chain_layout.setSpacing(12)
-        start_male = ranked_pairs[0][2]
-        start_female = ranked_pairs[0][3]
-        chain_layout.addWidget(
-            self._plan_card(
-                "Step 1",
-                f"{self._sex_icon(start_male.sex)} {start_male.name} + {self._sex_icon(start_female.sex)} {start_female.name}",
-                "Create child C1",
-                "#22c55e",
+        for step_info in sequence:
+            step = int(step_info["step"])
+            rank = int(step_info["rank"])
+            male = step_info["male"]
+            female = step_info["female"]
+            if not isinstance(male, Creature) or not isinstance(female, Creature):
+                continue
+            result_points = step_info["result_points"]
+            if not isinstance(result_points, dict):
+                continue
+            from_child = str(step_info.get("from_child", ""))
+            gains = step_info.get("gains", [])
+            if not isinstance(gains, list):
+                gains = []
+
+            header_row = QtWidgets.QHBoxLayout()
+            header_row.setContentsMargins(0, 0, 0, 0)
+            header_row.setSpacing(8)
+            header_row.addWidget(self._rank_badge(step))
+            step_label = QtWidgets.QLabel(f"Step {step} • pair rank #{rank}")
+            step_label.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 700;")
+            header_row.addWidget(step_label)
+            header_row.addStretch(1)
+            parent_layout.addLayout(header_row)
+
+            pair_layout = QtWidgets.QHBoxLayout()
+            pair_layout.setSpacing(12)
+            pair_layout.setContentsMargins(0, 0, 0, 0)
+            male_key = male.external_id or f"male:{male.id}"
+            female_key = female.external_id or f"female:{female.id}"
+            pair_layout.addWidget(
+                self._pair_info_box(
+                    male,
+                    max_stats,
+                    use_points=use_points,
+                    points_only=True,
+                    targets=targets,
+                    highlighted=(best_male_key == male_key),
+                )
             )
+            plus = QtWidgets.QLabel("+")
+            plus.setAlignment(QtCore.Qt.AlignCenter)
+            plus.setFixedWidth(18)
+            plus.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 700;")
+            pair_layout.addWidget(plus)
+            pair_layout.addWidget(
+                self._pair_info_box(
+                    female,
+                    max_stats,
+                    use_points=use_points,
+                    points_only=True,
+                    targets=targets,
+                    highlighted=(best_female_key == female_key),
+                )
+            )
+            arrow = QtWidgets.QLabel("⟶")
+            arrow.setAlignment(QtCore.Qt.AlignCenter)
+            arrow.setFixedWidth(28)
+            arrow.setStyleSheet("color: #93c5fd; font-size: 20px; font-weight: 700;")
+            pair_layout.addWidget(arrow)
+            pair_layout.addWidget(
+                self._pair_child_box(
+                    male,
+                    female,
+                    max_stats,
+                    targets,
+                    use_points=use_points,
+                    override_points={key: float(value) for key, value in result_points.items()},
+                    title_override=f"C{step} expected",
+                )
+            )
+            pair_layout.addStretch(1)
+            parent_layout.addLayout(pair_layout)
+
+            gains_text = ", ".join(str(item) for item in gains) if gains else "-"
+            note = "Start chain with this pair."
+            if step > 1:
+                note = f"Breed {from_child} with this donor child • gains: {gains_text}"
+            note_label = QtWidgets.QLabel(note)
+            note_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
+            parent_layout.addWidget(note_label)
+
+        if pending:
+            pending_label = QtWidgets.QLabel(f"Missing target stats: {', '.join(pending)}")
+            pending_label.setStyleSheet("color: #fbbf24; font-size: 11px; font-weight: 600;")
+            parent_layout.addWidget(pending_label)
+        else:
+            complete_label = QtWidgets.QLabel("Target reached: this chain covers current best points.")
+            complete_label.setStyleSheet("color: #67e8f9; font-size: 11px; font-weight: 700;")
+            parent_layout.addWidget(complete_label)
+
+    def _build_breeding_plan_sequence(
+        self,
+        ranked_pairs: list[tuple[int, float, Creature, Creature]],
+        targets: list[tuple[str, int]],
+        use_points: bool = False,
+    ) -> tuple[list[dict[str, object]], list[str]]:
+        if not ranked_pairs:
+            return [], []
+
+        rank_lookup = {rank: (score, male, female) for rank, score, male, female in ranked_pairs}
+        base_points, steps, pending = self._build_breeding_plan_steps(
+            ranked_pairs,
+            targets,
+            use_points=use_points,
+        )
+        sequence: list[dict[str, object]] = []
+        start_rank, _start_score, start_male, start_female = ranked_pairs[0]
+        sequence.append(
+            {
+                "step": 1,
+                "rank": start_rank,
+                "male": start_male,
+                "female": start_female,
+                "result_points": dict(base_points),
+                "gains": [],
+                "from_child": "",
+            }
         )
 
-        current_child = "C1"
-        for index, step in enumerate(steps, start=1):
-            chain_layout.addWidget(self._plan_arrow_label())
-            gained = ", ".join(step["gains"]) if step["gains"] else "-"
-            chain_layout.addWidget(
-                self._plan_card(
-                    f"Step {index + 1}",
-                    (
-                        f"Use donor #{step['donor_rank']}: "
-                        f"{self._sex_icon('male')} {step['donor_male']} + "
-                        f"{self._sex_icon('female')} {step['donor_female']}"
-                    ),
-                    f"Breed {current_child} + donor child → gain {gained}",
-                    "#22c55e",
-                )
+        current_points = dict(base_points)
+        step_index = 2
+        for step in steps:
+            donor_rank = int(step["donor_rank"])
+            donor = rank_lookup.get(donor_rank)
+            if donor is None:
+                continue
+            _score, male, female = donor
+            donor_points = self._expected_child_points(male, female, use_points=use_points)
+            merged_points = {
+                key: max(current_points.get(key, 0.0), donor_points.get(key, 0.0))
+                for _short, key, _title in _BREEDING_POINT_STAT_CONFIG
+            }
+            gains = [
+                short
+                for short, key, _title in _BREEDING_POINT_STAT_CONFIG
+                if merged_points.get(key, 0.0) > current_points.get(key, 0.0) + 0.001
+            ]
+            sequence.append(
+                {
+                    "step": step_index,
+                    "rank": donor_rank,
+                    "male": male,
+                    "female": female,
+                    "result_points": dict(merged_points),
+                    "gains": gains,
+                    "from_child": f"C{step_index - 1}",
+                }
             )
-            current_child = f"C{index + 1}"
+            current_points = merged_points
+            step_index += 1
 
-        chain_layout.addWidget(self._plan_arrow_label())
-        if pending:
-            chain_layout.addWidget(
-                self._plan_card(
-                    "Next target",
-                    "Need extra donor",
-                    f"Missing: {', '.join(pending)}",
-                    "#22c55e",
-                )
-            )
-        else:
-            chain_layout.addWidget(
-                self._plan_card(
-                    "Target reached",
-                    "Current chain hits max targets",
-                    "Ready for stabilisation",
-                    "#22c55e",
-                )
-            )
-
-        chain_layout.addStretch(1)
-        chain_widget = QtWidgets.QWidget()
-        chain_widget.setLayout(chain_layout)
-        parent_layout.addWidget(chain_widget)
+        return sequence, pending
 
     def _build_breeding_plan_steps(
         self,
@@ -2212,36 +2347,6 @@ class MainWindow(QtWidgets.QMainWindow):
             if key in target_by_key and current_points.get(key, 0.0) + 0.001 < target_by_key[key]
         ]
         return base_points, steps, pending_shorts
-
-    def _plan_arrow_label(self) -> QtWidgets.QLabel:
-        arrow = QtWidgets.QLabel("→")
-        arrow.setAlignment(QtCore.Qt.AlignCenter)
-        arrow.setFixedWidth(16)
-        arrow.setStyleSheet("color: #93c5fd; font-size: 16px; font-weight: 700;")
-        return arrow
-
-    def _plan_card(self, title: str, subtitle: str, detail: str, border_color: str) -> QtWidgets.QFrame:
-        card = QtWidgets.QFrame()
-        card.setMinimumWidth(190)
-        card.setMaximumWidth(260)
-        card.setStyleSheet(
-            f"QFrame {{ background: rgba(11, 19, 36, 0.86); border: 2px solid {border_color}; border-radius: 12px; }}"
-        )
-        layout = QtWidgets.QVBoxLayout(card)
-        layout.setContentsMargins(8, 5, 8, 5)
-        layout.setSpacing(2)
-        title_label = QtWidgets.QLabel(title)
-        title_label.setStyleSheet("color: #e2e8f0; font-size: 11px; font-weight: 700;")
-        subtitle_label = QtWidgets.QLabel(subtitle)
-        subtitle_label.setStyleSheet("color: #cbd5f5; font-size: 10px;")
-        subtitle_label.setWordWrap(True)
-        detail_label = QtWidgets.QLabel(detail)
-        detail_label.setStyleSheet("color: #94a3b8; font-size: 10px;")
-        detail_label.setWordWrap(True)
-        layout.addWidget(title_label)
-        layout.addWidget(subtitle_label)
-        layout.addWidget(detail_label)
-        return card
 
     def _rank_badge(self, rank: int) -> QtWidgets.QLabel:
         label = QtWidgets.QLabel()
