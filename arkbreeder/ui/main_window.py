@@ -554,18 +554,22 @@ class MainWindow(QtWidgets.QMainWindow):
     def _build_breeding_page(self) -> QtWidgets.QWidget:
         widget = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(widget)
-        layout.setSpacing(6)
+        layout.setSpacing(4)
 
         toolbar = QtWidgets.QHBoxLayout()
-        toolbar.setSpacing(8)
+        toolbar.setSpacing(6)
         self._breeding_back_btn = QtWidgets.QPushButton("← Back to overview")
         self._breeding_back_btn.clicked.connect(lambda: self._open_breeding_species_plan("All species"))
         self._breeding_back_btn.setVisible(False)
         toolbar.addWidget(self._breeding_back_btn)
 
+        self._breeding_scope_label = QtWidgets.QLabel("Overview")
+        self._breeding_scope_label.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 700;")
+        toolbar.addWidget(self._breeding_scope_label)
+
         self._breeding_species_filter = QtWidgets.QComboBox()
         self._breeding_species_filter.currentIndexChanged.connect(self._update_breeding_pairs)
-        toolbar.addWidget(self._breeding_species_filter)
+        self._breeding_species_filter.setVisible(False)
         toolbar.addStretch(1)
         layout.addLayout(toolbar)
 
@@ -581,22 +585,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self._breeding_overview_panel.setStyleSheet(
             """
             #breedingOverviewPanel {
-                background: rgba(15, 23, 42, 0.34);
+                background: rgba(15, 23, 42, 0.22);
                 border: 1px solid #334155;
                 border-radius: 12px;
             }
             """
         )
         overview_layout = QtWidgets.QVBoxLayout(self._breeding_overview_panel)
-        overview_layout.setContentsMargins(10, 10, 10, 10)
-        overview_layout.setSpacing(8)
+        overview_layout.setContentsMargins(6, 6, 6, 6)
+        overview_layout.setSpacing(4)
         overview_title = QtWidgets.QLabel("Breeding actions overview")
-        overview_title.setStyleSheet("color: #cbd5f5; font-size: 14px; font-weight: 800;")
+        overview_title.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 800;")
         overview_layout.addWidget(overview_title)
         self._breeding_overview_grid = QtWidgets.QGridLayout()
         self._breeding_overview_grid.setContentsMargins(0, 0, 0, 0)
-        self._breeding_overview_grid.setHorizontalSpacing(10)
-        self._breeding_overview_grid.setVerticalSpacing(8)
+        self._breeding_overview_grid.setHorizontalSpacing(6)
+        self._breeding_overview_grid.setVerticalSpacing(6)
         overview_layout.addLayout(self._breeding_overview_grid)
         self._breeding_overview_panel.setVisible(False)
         layout.addWidget(self._breeding_overview_panel)
@@ -697,14 +701,16 @@ class MainWindow(QtWidgets.QMainWindow):
             row_widget = QtWidgets.QWidget()
             row_layout = QtWidgets.QHBoxLayout(row_widget)
             row_layout.setContentsMargins(0, 0, 0, 0)
-            row_layout.setSpacing(6)
+            row_layout.setSpacing(4)
             name_label = QtWidgets.QLabel(f"{label}:")
             name_label.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 600;")
-            name_label.setMinimumWidth(86)
+            name_label.setMinimumWidth(74)
+            name_label.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
             value_label = QtWidgets.QLabel("-")
             value_label.setStyleSheet("color: #f8fafc; font-weight: 600; font-family: 'DejaVu Sans Mono';")
-            value_label.setMinimumWidth(108)
+            value_label.setMinimumWidth(96)
             value_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+            value_label.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
             self._detail_stat_values[key] = value_label
             row_layout.addWidget(name_label)
             row_layout.addStretch(1)
@@ -716,7 +722,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         insights_card = QtWidgets.QWidget()
         insights_layout = QtWidgets.QVBoxLayout(insights_card)
-        insights_layout.setContentsMargins(8, 0, 0, 0)
+        insights_layout.setContentsMargins(6, 0, 0, 0)
         insights_layout.setSpacing(4)
         insights_title = QtWidgets.QLabel("Breeding insights")
         insights_title.setStyleSheet("color: #93c5fd; font-size: 12px; font-weight: 700;")
@@ -730,7 +736,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         stats_insights_row = QtWidgets.QHBoxLayout()
         stats_insights_row.setContentsMargins(0, 0, 0, 0)
-        stats_insights_row.setSpacing(8)
+        stats_insights_row.setSpacing(6)
+        stats_container.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        insights_card.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
         stats_insights_row.addWidget(stats_container, 1)
         separator = QtWidgets.QFrame()
         separator.setFixedWidth(1)
@@ -1649,6 +1657,10 @@ class MainWindow(QtWidgets.QMainWindow):
         show_ranking = species != "All species"
         if hasattr(self, "_breeding_back_btn"):
             self._breeding_back_btn.setVisible(show_ranking)
+        if hasattr(self, "_breeding_scope_label"):
+            self._breeding_scope_label.setText(
+                f"Detailed plan: {species}" if show_ranking else "Overview"
+            )
         if hasattr(self, "_breeding_cards_scroll"):
             self._breeding_cards_scroll.setVisible(show_ranking)
         creatures = [
@@ -1758,7 +1770,7 @@ class MainWindow(QtWidgets.QMainWindow):
             grid.addWidget(empty, 0, 0)
             return
 
-        columns = 2 if len(items) > 1 else 1
+        columns = 2 if len(items) > 2 else 1
         for idx, item in enumerate(items):
             species_name = str(item.get("species", "Unknown"))
             step_count = int(item.get("step_count", 1))
@@ -1770,7 +1782,6 @@ class MainWindow(QtWidgets.QMainWindow):
             next_action = str(item.get("next_action", ""))
             is_ready = len(pending) == 0
             status_color = "#67e8f9" if is_ready else "#fbbf24"
-            status_text = "Ready" if is_ready else "Missing stats"
             lead_male_name = str(item.get("lead_male_name", "Male"))
             lead_female_name = str(item.get("lead_female_name", "Female"))
             lead_male = self._truncate_text(lead_male_name or "Male", 10)
@@ -1779,81 +1790,64 @@ class MainWindow(QtWidgets.QMainWindow):
             card = QtWidgets.QFrame()
             card.setStyleSheet(
                 "QFrame {"
-                f"background: {'rgba(103, 232, 249, 0.08)' if is_ready else 'rgba(251, 191, 36, 0.08)'};"
+                "background: rgba(15, 23, 42, 0.20);"
                 f"border: 1px solid {status_color}; border-radius: 10px;"
                 "}"
             )
             card_layout = QtWidgets.QVBoxLayout(card)
-            card_layout.setContentsMargins(8, 8, 8, 8)
-            card_layout.setSpacing(4)
+            card_layout.setContentsMargins(6, 6, 6, 6)
+            card_layout.setSpacing(3)
 
             title_row = QtWidgets.QHBoxLayout()
             title_row.setContentsMargins(0, 0, 0, 0)
-            title_row.setSpacing(6)
+            title_row.setSpacing(4)
             species_label = QtWidgets.QLabel(species_name)
-            species_label.setStyleSheet("color: #f8fafc; font-size: 13px; font-weight: 800;")
+            species_label.setStyleSheet("color: #f8fafc; font-size: 12px; font-weight: 800;")
             title_row.addWidget(species_label)
             title_row.addStretch(1)
-            status_chip = QtWidgets.QLabel(status_text)
-            status_chip.setStyleSheet(
-                "QLabel {"
-                f"color: {status_color}; background: rgba(15, 23, 42, 0.92);"
-                f"border: 1px solid {status_color}; border-radius: 6px;"
-                "padding: 1px 6px; font-size: 10px; font-weight: 700;"
-                "}"
-            )
-            title_row.addWidget(status_chip)
             card_layout.addLayout(title_row)
 
             preview_row = QtWidgets.QHBoxLayout()
             preview_row.setContentsMargins(0, 0, 0, 0)
-            preview_row.setSpacing(6)
-            male_chip = QtWidgets.QFrame()
-            male_chip.setStyleSheet(
-                "QFrame { background: rgba(96, 165, 250, 0.12); border: 1px solid #60a5fa; border-radius: 8px; }"
-            )
-            male_layout = QtWidgets.QHBoxLayout(male_chip)
-            male_layout.setContentsMargins(5, 4, 5, 4)
-            male_layout.setSpacing(4)
-            male_layout.addWidget(self._small_species_image(species_name, size=30))
+            preview_row.setSpacing(4)
+            male_layout = QtWidgets.QHBoxLayout()
+            male_layout.setContentsMargins(0, 0, 0, 0)
+            male_layout.setSpacing(3)
+            male_layout.addWidget(self._small_species_image(species_name, size=28))
             male_name_label = QtWidgets.QLabel(f"{self._sex_icon('male')} {lead_male}")
             male_name_label.setStyleSheet("color: #dbeafe; font-size: 10px; font-weight: 700;")
-            male_layout.addWidget(male_name_label)
-            preview_row.addWidget(male_chip)
+            male_layout.addWidget(male_name_label, alignment=QtCore.Qt.AlignVCenter)
+            preview_row.addLayout(male_layout)
 
             plus = QtWidgets.QLabel("+")
-            plus.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 700;")
+            plus.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 700;")
             preview_row.addWidget(plus)
 
-            female_chip = QtWidgets.QFrame()
-            female_chip.setStyleSheet(
-                "QFrame { background: rgba(244, 114, 182, 0.12); border: 1px solid #f472b6; border-radius: 8px; }"
-            )
-            female_layout = QtWidgets.QHBoxLayout(female_chip)
-            female_layout.setContentsMargins(5, 4, 5, 4)
-            female_layout.setSpacing(4)
-            female_layout.addWidget(self._small_species_image(species_name, size=30))
+            female_layout = QtWidgets.QHBoxLayout()
+            female_layout.setContentsMargins(0, 0, 0, 0)
+            female_layout.setSpacing(3)
+            female_layout.addWidget(self._small_species_image(species_name, size=28))
             female_name_label = QtWidgets.QLabel(f"{self._sex_icon('female')} {lead_female}")
             female_name_label.setStyleSheet("color: #fce7f3; font-size: 10px; font-weight: 700;")
-            female_layout.addWidget(female_name_label)
-            preview_row.addWidget(female_chip)
+            female_layout.addWidget(female_name_label, alignment=QtCore.Qt.AlignVCenter)
+            preview_row.addLayout(female_layout)
             preview_row.addStretch(1)
             card_layout.addLayout(preview_row)
 
             next_label = QtWidgets.QLabel(f"Next action: {next_action}")
-            next_label.setStyleSheet("color: #cbd5f5; font-size: 11px; font-weight: 600;")
+            next_label.setStyleSheet("color: #cbd5f5; font-size: 10px; font-weight: 600;")
             card_layout.addWidget(next_label)
 
             steps_label = QtWidgets.QLabel(f"Estimated steps: {step_count}")
-            steps_label.setStyleSheet("color: #93c5fd; font-size: 11px;")
+            steps_label.setStyleSheet("color: #93c5fd; font-size: 10px;")
             card_layout.addWidget(steps_label)
 
             if pending:
                 pending_label = QtWidgets.QLabel(f"Missing: {', '.join(pending)}")
-                pending_label.setStyleSheet("color: #fbbf24; font-size: 11px;")
+                pending_label.setStyleSheet("color: #fbbf24; font-size: 10px;")
             else:
                 pending_label = QtWidgets.QLabel("All target stats currently coverable.")
-                pending_label.setStyleSheet("color: #67e8f9; font-size: 11px;")
+                pending_label.setStyleSheet("color: #67e8f9; font-size: 10px;")
             pending_label.setWordWrap(True)
             card_layout.addWidget(pending_label)
 
@@ -2072,7 +2066,15 @@ class MainWindow(QtWidgets.QMainWindow):
             header.addStretch(1)
             row_layout.addLayout(header)
 
-            if targets:
+            if targets and show_ranking:
+                compare_widget = self._build_breeding_target_compare(
+                    species_name,
+                    targets,
+                    use_points=use_points,
+                )
+                if compare_widget is not None:
+                    row_layout.addWidget(compare_widget)
+            elif targets:
                 target_row = QtWidgets.QHBoxLayout()
                 target_row.setContentsMargins(0, 0, 0, 0)
                 target_row.setSpacing(6)
@@ -2180,6 +2182,106 @@ class MainWindow(QtWidgets.QMainWindow):
                 row_layout.addLayout(pair_layout)
             layout.addWidget(row_card, row_index, 0)
             row_index += 1
+
+    def _build_breeding_target_compare(
+        self,
+        species_name: str,
+        targets: list[tuple[str, int]],
+        use_points: bool = False,
+    ) -> QtWidgets.QWidget | None:
+        if not targets:
+            return None
+
+        candidates = [
+            creature
+            for creature in self._creature_cache
+            if self._display_species(creature.species) == species_name
+        ]
+        if not candidates:
+            return None
+
+        best_creature = max(
+            candidates,
+            key=lambda creature: self._breeding_creature_score(creature, use_points=use_points),
+        )
+        best_points = self._creature_breeding_points(best_creature, use_points=use_points)
+        target_by_short = {short: float(value) for short, value in targets}
+
+        axes = [title for _short, _key, title in _BREEDING_POINT_STAT_CONFIG]
+        current_values: dict[str, float] = {}
+        target_values: dict[str, float] = {}
+        axis_max: dict[str, float] = {}
+        for short, key, title in _BREEDING_POINT_STAT_CONFIG:
+            current_value = float(best_points.get(key, 0.0))
+            target_value = float(target_by_short.get(short, 0.0))
+            current_values[title] = current_value
+            target_values[title] = target_value
+            axis_max[title] = max(current_value, target_value, 1.0)
+
+        wrapper = QtWidgets.QFrame()
+        wrapper.setStyleSheet(
+            "QFrame { background: rgba(15, 23, 42, 0.28); border: 1px solid #334155; border-radius: 12px; }"
+        )
+        wrapper_layout = QtWidgets.QVBoxLayout(wrapper)
+        wrapper_layout.setContentsMargins(8, 8, 8, 8)
+        wrapper_layout.setSpacing(6)
+
+        title = QtWidgets.QLabel("Current best vs target")
+        title.setStyleSheet("color: #93c5fd; font-size: 13px; font-weight: 800;")
+        wrapper_layout.addWidget(title)
+
+        charts_row = QtWidgets.QHBoxLayout()
+        charts_row.setContentsMargins(0, 0, 0, 0)
+        charts_row.setSpacing(10)
+
+        current_col = QtWidgets.QVBoxLayout()
+        current_col.setContentsMargins(0, 0, 0, 0)
+        current_col.setSpacing(4)
+        current_chart = RadarChart(axes)
+        current_chart.setMinimumSize(180, 180)
+        current_chart.setMaximumSize(220, 220)
+        current_chart.set_values(current_values, axis_max)
+        current_col.addWidget(current_chart, alignment=QtCore.Qt.AlignCenter)
+        current_label = QtWidgets.QLabel(
+            f"Current best: {self._sex_icon(best_creature.sex)} {self._truncate_text(best_creature.name or 'Unknown', 16)}"
+        )
+        current_label.setAlignment(QtCore.Qt.AlignCenter)
+        current_label.setStyleSheet("color: #cbd5f5; font-size: 11px; font-weight: 700;")
+        current_col.addWidget(current_label)
+        charts_row.addLayout(current_col, 1)
+
+        target_col = QtWidgets.QVBoxLayout()
+        target_col.setContentsMargins(0, 0, 0, 0)
+        target_col.setSpacing(4)
+        target_chart = RadarChart(axes)
+        target_chart.setMinimumSize(180, 180)
+        target_chart.setMaximumSize(220, 220)
+        target_chart.set_values(target_values, axis_max)
+        target_col.addWidget(target_chart, alignment=QtCore.Qt.AlignCenter)
+        target_label = QtWidgets.QLabel("Target")
+        target_label.setAlignment(QtCore.Qt.AlignCenter)
+        target_label.setStyleSheet("color: #67e8f9; font-size: 11px; font-weight: 800;")
+        target_col.addWidget(target_label)
+        charts_row.addLayout(target_col, 1)
+
+        wrapper_layout.addLayout(charts_row)
+
+        badges_row = QtWidgets.QHBoxLayout()
+        badges_row.setContentsMargins(0, 0, 0, 0)
+        badges_row.setSpacing(6)
+        badges_row.addStretch(1)
+        for short, value in targets:
+            badge = QtWidgets.QLabel(f"{self._point_icon(short)} {value}")
+            badge.setStyleSheet(
+                "color: #67e8f9; font-size: 11px; font-weight: 700;"
+                "background: rgba(103, 232, 249, 26); border: 1px solid #67e8f9; border-radius: 7px;"
+                "padding: 1px 6px;"
+            )
+            badges_row.addWidget(badge)
+        badges_row.addStretch(1)
+        wrapper_layout.addLayout(badges_row)
+
+        return wrapper
 
     def _pair_info_box(
         self,
@@ -3391,8 +3493,8 @@ class MainWindow(QtWidgets.QMainWindow):
         size = self._detail_crown.sizeHint()
         self._detail_crown.resize(size)
         margins = self._detail_panel.contentsMargins()
-        x = max(0, self._detail_panel.width() - size.width() - margins.right() - 8)
-        y = max(0, margins.top() - 3)
+        x = max(0, self._detail_panel.width() - size.width() - margins.right() - 4)
+        y = 0
         self._detail_crown.move(x, y)
 
     def _update_creature_detail(self, creature: Creature) -> None:
@@ -3612,14 +3714,14 @@ class MainWindow(QtWidgets.QMainWindow):
             glow = QtGui.QColor(103, 232, 249, 230)
         self._detail_panel.setStyleSheet(
             "#detailPanel {"
-            f"background: rgba(15, 23, 42, {'0.58' if spotlight else '0.44'}); border: 2px solid {accent};"
+            f"background: rgba(15, 23, 42, {'0.62' if spotlight else '0.44'}); border: {3 if spotlight else 2}px solid {accent};"
             "border-radius: 16px;"
             "}"
         )
         effect = QtWidgets.QGraphicsDropShadowEffect(self._detail_panel)
-        effect.setBlurRadius(34 if spotlight else 14)
+        effect.setBlurRadius(42 if spotlight else 14)
         effect.setOffset(0, 0)
-        glow.setAlpha(245 if spotlight else 100)
+        glow.setAlpha(255 if spotlight else 100)
         effect.setColor(glow)
         self._detail_panel.setGraphicsEffect(effect)
 
