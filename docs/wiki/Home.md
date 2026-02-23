@@ -4,6 +4,8 @@ Ark Breeding Tool helps you manage ARK creature exports, compute stat points, an
 
 Technical command/module names remain `arkbreedingtool`.
 
+Developed with OpenAI Codex.
+
 ## Sections
 - [Getting Started](Getting-Started)
 - [Creature Import](Creature-Import)

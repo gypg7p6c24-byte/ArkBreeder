@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS creatures (
     level INTEGER NOT NULL,
     stats_json TEXT NOT NULL,
     imprinting_quality REAL,
+    baby_age REAL,
     mutations_maternal INTEGER NOT NULL DEFAULT 0,
     mutations_paternal INTEGER NOT NULL DEFAULT 0,
     mother_id INTEGER,
@@ -50,6 +51,7 @@ def init_db(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "creatures", "blueprint", "TEXT")
     _ensure_column(conn, "creatures", "updated_at", "TEXT")
     _ensure_column(conn, "creatures", "imprinting_quality", "REAL")
+    _ensure_column(conn, "creatures", "baby_age", "REAL")
     _ensure_column(conn, "creatures", "mother_external_id", "TEXT")
     _ensure_column(conn, "creatures", "father_external_id", "TEXT")
     conn.execute(

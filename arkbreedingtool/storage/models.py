@@ -15,6 +15,7 @@ class Creature:
     blueprint: Optional[str] = None
     stats: Dict[str, float] = field(default_factory=dict)
     imprinting_quality: Optional[float] = None
+    baby_age: Optional[float] = None
     mutations_maternal: int = 0
     mutations_paternal: int = 0
     mother_id: Optional[int] = None
