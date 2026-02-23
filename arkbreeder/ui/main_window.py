@@ -79,6 +79,13 @@ _STAT_INDEX_BY_POINT_KEY: dict[str, int] = {
     "MovementSpeed": 9,
 }
 
+_MANUAL_MULTIPLIER_COLUMNS: list[tuple[str, str]] = [
+    ("wild", "Wild"),
+    ("tamed", "Tamed"),
+    ("add", "Add"),
+    ("affinity", "Affinity"),
+]
+
 _FLYING_SPECIES = {
     "argentavis",
     "pteranodon",
@@ -125,6 +132,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._values_store = SpeciesValuesStore()
         self._values_path: str | None = None
         self._values_from_bundle = False
+        self._manual_multiplier_inputs: dict[tuple[str, str], QtWidgets.QDoubleSpinBox] = {}
+        self._manual_imprint_input: QtWidgets.QDoubleSpinBox | None = None
         self._stat_multipliers = StatMultipliers()
         self._stat_points: dict[str, dict[str, int]] = {}
         self._creature_cache: list[Creature] = []
@@ -575,7 +584,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addLayout(toolbar)
 
         self._breeding_points_info = QtWidgets.QLabel(
-            "Stat points unavailable — import values.json in Settings."
+            "Stat points unavailable — species reference values are missing."
         )
         self._breeding_points_info.setStyleSheet("color: #fbbf24;")
         self._breeding_points_info.setWordWrap(True)
@@ -751,7 +760,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addLayout(stats_insights_row)
 
         self._points_info = QtWidgets.QLabel(
-            "Stat points unavailable — import values.json in Settings."
+            "Stat points unavailable — species reference values are missing."
         )
         self._points_info.setStyleSheet("color: #fbbf24;")
         self._points_info.setWordWrap(True)
@@ -936,6 +945,76 @@ class MainWindow(QtWidgets.QMainWindow):
         actions.addStretch(1)
         layout.addLayout(actions)
 
+        manual_header = QtWidgets.QLabel("Manual multiplier overrides")
+        manual_header.setStyleSheet("font-size: 16px; font-weight: 700; margin-top: 6px;")
+        layout.addWidget(manual_header)
+
+        manual_helper = QtWidgets.QLabel(
+            "Use this only if imported creatures look inconsistent with official defaults."
+        )
+        manual_helper.setWordWrap(True)
+        manual_helper.setStyleSheet("color: #cbd5f5;")
+        layout.addWidget(manual_helper)
+
+        imprint_row = QtWidgets.QHBoxLayout()
+        imprint_label = QtWidgets.QLabel("Imprinting scale")
+        imprint_label.setStyleSheet("color: #cbd5f5;")
+        imprint_row.addWidget(imprint_label)
+        imprint_spin = QtWidgets.QDoubleSpinBox()
+        imprint_spin.setDecimals(4)
+        imprint_spin.setRange(0.0, 1000.0)
+        imprint_spin.setSingleStep(0.05)
+        imprint_spin.setValue(1.0)
+        imprint_spin.setFixedWidth(120)
+        imprint_spin.setStyleSheet(
+            "QDoubleSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 4px; }"
+        )
+        self._manual_imprint_input = imprint_spin
+        imprint_row.addWidget(imprint_spin)
+        imprint_row.addStretch(1)
+        layout.addLayout(imprint_row)
+
+        manual_grid = QtWidgets.QGridLayout()
+        manual_grid.setHorizontalSpacing(8)
+        manual_grid.setVerticalSpacing(6)
+        manual_grid.addWidget(QtWidgets.QLabel("Stat"), 0, 0)
+        for col, (_kind, title) in enumerate(_MANUAL_MULTIPLIER_COLUMNS, start=1):
+            title_label = QtWidgets.QLabel(title)
+            title_label.setStyleSheet("color: #cbd5f5; font-weight: 600;")
+            manual_grid.addWidget(title_label, 0, col)
+        for row, (_short, key, title) in enumerate(_POINT_STAT_CONFIG, start=1):
+            stat_label = QtWidgets.QLabel(title)
+            stat_label.setStyleSheet("color: #cbd5f5;")
+            manual_grid.addWidget(stat_label, row, 0)
+            for col, (kind, _col_title) in enumerate(_MANUAL_MULTIPLIER_COLUMNS, start=1):
+                spin = QtWidgets.QDoubleSpinBox()
+                spin.setDecimals(4)
+                spin.setRange(0.0, 1000.0)
+                spin.setSingleStep(0.05)
+                spin.setValue(1.0)
+                spin.setFixedWidth(94)
+                spin.setStyleSheet(
+                    "QDoubleSpinBox { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 2px; }"
+                )
+                self._manual_multiplier_inputs[(kind, key)] = spin
+                manual_grid.addWidget(spin, row, col)
+        layout.addLayout(manual_grid)
+
+        manual_actions = QtWidgets.QHBoxLayout()
+        self._manual_apply_btn = QtWidgets.QPushButton("Apply manual overrides")
+        self._manual_apply_btn.clicked.connect(self._apply_manual_overrides)
+        manual_actions.addWidget(self._manual_apply_btn)
+        self._manual_reset_btn = QtWidgets.QPushButton("Reset overrides")
+        self._manual_reset_btn.clicked.connect(self._reset_manual_overrides)
+        manual_actions.addWidget(self._manual_reset_btn)
+        manual_actions.addStretch(1)
+        layout.addLayout(manual_actions)
+
+        self._settings_warning = QtWidgets.QLabel("")
+        self._settings_warning.setWordWrap(True)
+        self._settings_warning.setStyleSheet("color: #fbbf24;")
+        layout.addWidget(self._settings_warning)
+
         self._settings_summary = QtWidgets.QLabel("Using official defaults (x1).")
         self._settings_summary.setWordWrap(True)
         self._settings_summary.setStyleSheet("color: #94a3b8;")
@@ -945,73 +1024,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._settings_details.setWordWrap(True)
         self._settings_details.setStyleSheet("color: #94a3b8;")
         layout.addWidget(self._settings_details)
-
-        diagnostics_header = QtWidgets.QLabel("Import diagnostics")
-        diagnostics_header.setStyleSheet("font-size: 16px; font-weight: 700; margin-top: 6px;")
-        layout.addWidget(diagnostics_header)
-
-        self._settings_log_output = QtWidgets.QPlainTextEdit()
-        self._settings_log_output.setReadOnly(True)
-        self._settings_log_output.setMinimumHeight(140)
-        self._settings_log_output.setMaximumHeight(220)
-        self._settings_log_output.setStyleSheet(
-            "QPlainTextEdit {"
-            "background: rgba(11, 19, 36, 0.9);"
-            "border: 1px solid #334155;"
-            "border-radius: 10px;"
-            "color: #cbd5f5;"
-            "padding: 8px;"
-            "font-family: 'DejaVu Sans Mono';"
-            "font-size: 11px;"
-            "}"
-        )
-        layout.addWidget(self._settings_log_output)
-
-        diagnostics_actions = QtWidgets.QHBoxLayout()
-        self._settings_copy_log_btn = QtWidgets.QPushButton("Copy diagnostics")
-        self._settings_copy_log_btn.clicked.connect(self._copy_settings_log)
-        diagnostics_actions.addWidget(self._settings_copy_log_btn)
-        self._settings_clear_log_btn = QtWidgets.QPushButton("Clear")
-        self._settings_clear_log_btn.clicked.connect(self._clear_settings_log)
-        diagnostics_actions.addWidget(self._settings_clear_log_btn)
-        diagnostics_actions.addStretch(1)
-        layout.addLayout(diagnostics_actions)
-
-        values_header = QtWidgets.QLabel("Creature values")
-        values_header.setStyleSheet("font-size: 18px; font-weight: 700; margin-top: 12px;")
-        layout.addWidget(values_header)
-
-        values_helper = QtWidgets.QLabel(
-            "Import values.json from ARKStatsExtractor to calculate stat point distribution."
-        )
-        values_helper.setWordWrap(True)
-        values_helper.setStyleSheet("color: #cbd5f5;")
-        layout.addWidget(values_helper)
-
-        values_hint = QtWidgets.QLabel(
-            "Hint: values.json usually lives in the ARKStatsExtractor data folder "
-            "(for example: %APPDATA%/ARKStatsExtractor or ~/.config/ARKStatsExtractor)."
-        )
-        values_hint.setWordWrap(True)
-        values_hint.setStyleSheet("color: #94a3b8; font-size: 12px;")
-        layout.addWidget(values_hint)
-
-        values_actions = QtWidgets.QHBoxLayout()
-        self._import_values_btn = QtWidgets.QPushButton("Import values.json")
-        self._import_values_btn.clicked.connect(self._import_values_json)
-        values_actions.addWidget(self._import_values_btn)
-        values_actions.addStretch(1)
-        layout.addLayout(values_actions)
-
-        self._values_summary = QtWidgets.QLabel("No values.json loaded.")
-        self._values_summary.setWordWrap(True)
-        self._values_summary.setStyleSheet("color: #94a3b8;")
-        layout.addWidget(self._values_summary)
-
-        self._values_details = QtWidgets.QLabel("")
-        self._values_details.setWordWrap(True)
-        self._values_details.setStyleSheet("color: #94a3b8;")
-        layout.addWidget(self._values_details)
 
         layout.addStretch(1)
         return widget
@@ -1057,6 +1069,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creature_cache = list(list_creatures(self._conn))
         self._recompute_stat_points()
         self._update_points_info_labels()
+        self._update_settings_view()
         self._update_dashboard(self._creature_cache)
         self._update_species_filters()
         self._apply_creature_filters()
@@ -1214,7 +1227,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._clear_layout(self._dashboard_points_layout)
         if self._values_store.count() == 0:
             self._dashboard_points_layout.addWidget(
-                self._empty_dashboard_label("Import values.json to compute stat points.")
+                self._empty_dashboard_label("Species reference values are missing, stat points disabled.")
             )
             return
         if not creatures:
@@ -1380,7 +1393,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 items.append(f"{species}: only {count} {suffix}")
 
         if self._values_store.count() == 0:
-            items.insert(0, "Import values.json to enable stat points.")
+            items.insert(0, "Species reference values missing: stat points are disabled.")
 
         if not items:
             self._dashboard_attention_layout.addWidget(
@@ -3962,9 +3975,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def _load_server_settings(self) -> None:
         self._server_settings = get_server_settings(self._conn)
         self._stat_multipliers = extract_stat_multipliers(self._server_settings)
+        self._load_manual_overrides_inputs()
         self._update_settings_view()
 
     def _update_settings_view(self) -> None:
+        if hasattr(self, "_settings_warning"):
+            self._settings_warning.setText(self._official_consistency_warning())
         if not self._server_settings:
             self._settings_summary.setText("Using official defaults (x1).")
             self._settings_details.setText("Stat calculation: official defaults.")
@@ -4033,64 +4049,117 @@ class MainWindow(QtWidgets.QMainWindow):
         lines.insert(1, f"- Non-default inputs detected: {non_default_count}")
         return lines
 
+    def _official_consistency_warning(self) -> str:
+        if not self._creature_cache:
+            return ""
+        over_level = [c for c in self._creature_cache if c.level > 450]
+        over_points: list[Creature] = []
+        inconsistent_bred: list[Creature] = []
+        for creature in self._creature_cache:
+            points = self._get_stat_points(creature)
+            if not points:
+                continue
+            if any(int(value) > 255 for value in points.values()):
+                over_points.append(creature)
+            if creature.mother_external_id or creature.father_external_id:
+                point_total = 0
+                for _short, key, _title in _POINT_STAT_CONFIG:
+                    value = points.get(key)
+                    if value is None:
+                        continue
+                    point_total += int(value)
+                expected = max(0, int(creature.level) - 1)
+                if abs(point_total - expected) > 6:
+                    inconsistent_bred.append(creature)
+        flagged = {id(c): c for c in over_level + over_points + inconsistent_bred}
+        if not flagged:
+            return ""
+        return (
+            f"Official baseline check: {len(flagged)} creature(s) exceed official caps "
+            "or have inconsistent point budgets (level > 450, stat points > 255, or bred budget mismatch). "
+            "Import server INI files or set manual overrides above."
+        )
+
     def _fmt_multiplier(self, value: float) -> str:
         formatted = f"{value:.4f}".rstrip("0").rstrip(".")
         return formatted or "0"
 
-    def _append_settings_log(self, message: str) -> None:
-        if not hasattr(self, "_settings_log_output"):
-            return
-        stamp = QtCore.QDateTime.currentDateTime().toString("HH:mm:ss")
-        self._settings_log_output.appendPlainText(f"[{stamp}] {message}")
-        bar = self._settings_log_output.verticalScrollBar()
-        if bar is not None:
-            bar.setValue(bar.maximum())
+    def _manual_overrides_payload(self) -> dict[str, object]:
+        payload: dict[str, object] = {"stats": {}}
+        if self._manual_imprint_input is not None:
+            payload["imprinting"] = float(self._manual_imprint_input.value())
+        stats: dict[str, dict[str, float]] = {}
+        for _short, key, _title in _POINT_STAT_CONFIG:
+            row: dict[str, float] = {}
+            for kind, _label in _MANUAL_MULTIPLIER_COLUMNS:
+                spin = self._manual_multiplier_inputs.get((kind, key))
+                if spin is None:
+                    continue
+                row[kind] = float(spin.value())
+            stats[key] = row
+        payload["stats"] = stats
+        return payload
 
-    def _copy_settings_log(self) -> None:
-        if not hasattr(self, "_settings_log_output"):
+    def _load_manual_overrides_inputs(self) -> None:
+        if not self._manual_multiplier_inputs and self._manual_imprint_input is None:
             return
-        text = self._settings_log_output.toPlainText().strip()
-        if not text:
-            self.show_toast("No diagnostics to copy.", "info")
-            return
-        QtGui.QGuiApplication.clipboard().setText(text)
-        self.show_toast("Diagnostics copied.", "success")
+        defaults = {"imprinting": 1.0, "stats": {}}
+        if self._server_settings:
+            raw = self._server_settings.get("manual_overrides")
+            if isinstance(raw, dict):
+                defaults = raw
+        imprint_value = float(defaults.get("imprinting", 1.0))
+        if self._manual_imprint_input is not None:
+            self._manual_imprint_input.setValue(imprint_value)
+        stat_data = defaults.get("stats", {})
+        if not isinstance(stat_data, dict):
+            stat_data = {}
+        for _short, key, _title in _POINT_STAT_CONFIG:
+            row = stat_data.get(key, {})
+            if not isinstance(row, dict):
+                row = {}
+            for kind, _label in _MANUAL_MULTIPLIER_COLUMNS:
+                spin = self._manual_multiplier_inputs.get((kind, key))
+                if spin is None:
+                    continue
+                value = float(row.get(kind, 1.0))
+                spin.setValue(value)
 
-    def _clear_settings_log(self) -> None:
-        if not hasattr(self, "_settings_log_output"):
-            return
-        self._settings_log_output.clear()
-        self._append_settings_log("Diagnostics cleared.")
+    def _apply_manual_overrides(self) -> None:
+        payload = self._ensure_server_settings_payload()
+        payload["manual_overrides"] = self._manual_overrides_payload()
+        self._save_server_settings(payload, "Manual overrides applied.")
+
+    def _reset_manual_overrides(self) -> None:
+        if self._manual_imprint_input is not None:
+            self._manual_imprint_input.setValue(1.0)
+        for spin in self._manual_multiplier_inputs.values():
+            spin.setValue(1.0)
+        payload = self._ensure_server_settings_payload()
+        payload["manual_overrides"] = self._manual_overrides_payload()
+        self._save_server_settings(payload, "Manual overrides reset.")
 
     def _load_species_values(self) -> None:
         self._values_store = SpeciesValuesStore()
         self._values_from_bundle = False
-        self._values_path = get_setting(self._conn, "values_json_path")
+        default_path = bundled_values_path()
+        self._values_path = str(default_path)
         loaded = False
-        if self._values_path:
-            custom_path = Path(self._values_path)
-            if custom_path.exists():
-                try:
-                    self._values_store.load_values_file(custom_path)
-                    loaded = self._values_store.count() > 0
-                except Exception:
-                    logger.exception("Failed to load values.json from %s", custom_path)
-        if not loaded:
-            default_path = bundled_values_path()
-            if default_path.exists():
-                try:
-                    self._values_store.load_values_file(default_path)
-                    loaded = self._values_store.count() > 0
-                except Exception:
-                    logger.exception("Failed to load bundled values from %s", default_path)
-                if loaded:
-                    self._values_from_bundle = True
-                    self._values_path = str(default_path)
+        if default_path.exists():
+            try:
+                self._values_store.load_values_file(default_path)
+                loaded = self._values_store.count() > 0
+            except Exception:
+                logger.exception("Failed to load bundled values from %s", default_path)
+            if loaded:
+                self._values_from_bundle = True
         self._update_values_view()
         self._update_points_info_labels()
         self._recompute_stat_points()
 
     def _update_values_view(self) -> None:
+        if not hasattr(self, "_values_summary") or not hasattr(self, "_values_details"):
+            return
         count = self._values_store.count()
         if count == 0:
             self._values_summary.setText("No values.json loaded.")
@@ -4110,18 +4179,10 @@ class MainWindow(QtWidgets.QMainWindow):
         path = self._select_ini_file("Select GameUserSettings.ini")
         if not path:
             return
-        self._append_settings_log(f"Import requested: GameUserSettings.ini from {path}")
         parsed = parse_ini_file(Path(path))
-        section_count = len(parsed)
-        key_count = sum(len(values) for values in parsed.values())
-        self._append_settings_log(
-            f"Parsed GameUserSettings.ini -> {section_count} sections, {key_count} keys."
-        )
         if not self._is_valid_game_user_settings_ini(parsed, path):
             self.show_toast("Fichier non conforme (GameUserSettings.ini attendu).", "error")
-            self._append_settings_log("Validation failed for GameUserSettings.ini (file rejected).")
             return
-        self._append_settings_log("Validation passed for GameUserSettings.ini.")
         payload = self._ensure_server_settings_payload()
         payload["game_user_settings"] = parsed
         payload["sources"]["game_user_settings"] = path
@@ -4131,16 +4192,10 @@ class MainWindow(QtWidgets.QMainWindow):
         path = self._select_ini_file("Select Game.ini")
         if not path:
             return
-        self._append_settings_log(f"Import requested: Game.ini from {path}")
         parsed = parse_ini_file(Path(path))
-        section_count = len(parsed)
-        key_count = sum(len(values) for values in parsed.values())
-        self._append_settings_log(f"Parsed Game.ini -> {section_count} sections, {key_count} keys.")
         if not self._is_valid_game_ini(parsed, path):
             self.show_toast("Fichier non conforme (Game.ini attendu).", "error")
-            self._append_settings_log("Validation failed for Game.ini (file rejected).")
             return
-        self._append_settings_log("Validation passed for Game.ini.")
         payload = self._ensure_server_settings_payload()
         payload["game_ini"] = parsed
         payload["sources"]["game_ini"] = path
@@ -4194,30 +4249,6 @@ class MainWindow(QtWidgets.QMainWindow):
             for key in keys
         )
 
-    def _import_values_json(self) -> None:
-        path = self._select_values_file("Select values.json")
-        if not path:
-            return
-        store = SpeciesValuesStore()
-        try:
-            store.load_values_file(Path(path))
-        except Exception:
-            logger.exception("Failed to load values.json from %s", path)
-            self.show_toast("Failed to import values.json.", "error")
-            return
-        if store.count() == 0:
-            self.show_toast("values.json did not contain species data.", "error")
-            return
-        self._values_store = store
-        self._values_path = path
-        self._values_from_bundle = False
-        set_setting(self._conn, "values_json_path", path)
-        self._update_values_view()
-        self._update_points_info_labels()
-        self._recompute_stat_points()
-        self.refresh_data()
-        self.show_toast("values.json imported.", "success")
-
     def _select_ini_file(self, title: str) -> str | None:
         start_dir = str(Path.home())
         selected, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -4228,19 +4259,6 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         if not selected:
             self.show_toast("No settings file selected.", "info")
-            return None
-        return selected
-
-    def _select_values_file(self, title: str) -> str | None:
-        start_dir = str(Path.home())
-        selected, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self,
-            title,
-            start_dir,
-            "JSON files (*.json);;All files (*)",
-        )
-        if not selected:
-            self.show_toast("No values.json selected.", "info")
             return None
         return selected
 
@@ -4260,9 +4278,7 @@ class MainWindow(QtWidgets.QMainWindow):
         set_server_settings(self._conn, payload)
         self._server_settings = payload
         self._stat_multipliers = extract_stat_multipliers(self._server_settings)
-        self._append_settings_log(
-            f"Server settings saved. Multipliers tracked: {len(self._calc_multiplier_lines()) - 1}."
-        )
+        self._load_manual_overrides_inputs()
         self._update_settings_view()
         self._recompute_stat_points()
         self.refresh_data()

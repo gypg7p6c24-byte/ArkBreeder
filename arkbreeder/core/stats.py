@@ -67,6 +67,7 @@ def extract_stat_multipliers(server_settings: dict | None) -> StatMultipliers:
     for key in ("game_user_settings", "game_ini"):
         data = server_settings.get(key)
         _apply_multiplier_data(data, multipliers)
+    _apply_manual_overrides(server_settings.get("manual_overrides"), multipliers)
 
     return multipliers
 
@@ -111,6 +112,36 @@ def _safe_float(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _apply_manual_overrides(data: object, multipliers: StatMultipliers) -> None:
+    if not isinstance(data, dict):
+        return
+    imprint = _safe_float(data.get("imprinting"))
+    if imprint is not None:
+        multipliers.imprinting = imprint
+
+    stats = data.get("stats")
+    if not isinstance(stats, dict):
+        return
+    for stat_key, row in stats.items():
+        if not isinstance(stat_key, str) or not isinstance(row, dict):
+            continue
+        index = STAT_INDEX_BY_KEY.get(stat_key)
+        if index is None:
+            continue
+        wild = _safe_float(row.get("wild"))
+        if wild is not None:
+            multipliers.wild[index] = wild
+        tamed = _safe_float(row.get("tamed"))
+        if tamed is not None:
+            multipliers.tamed[index] = tamed
+        tamed_add = _safe_float(row.get("add"))
+        if tamed_add is not None:
+            multipliers.tamed_add[index] = tamed_add
+        affinity = _safe_float(row.get("affinity"))
+        if affinity is not None:
+            multipliers.tamed_affinity[index] = affinity
 
 
 def compute_wild_levels(
