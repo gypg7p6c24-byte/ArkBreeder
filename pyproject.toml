@@ -26,4 +26,4 @@ where = ["."]
 include = ["arkbreeder*"]
 
 [tool.setuptools.package-data]
-arkbreeder = ["resources/*.json"]
+arkbreeder = ["resources/*.json", "resources/*.svg"]

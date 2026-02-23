@@ -501,6 +501,8 @@ class MainWindow(QtWidgets.QMainWindow):
         header.setStretchLastSection(False)
         header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self._creatures_table.setSortingEnabled(True)
+        header.setSortIndicatorShown(False)
+        self._creatures_table.setCornerButtonEnabled(False)
         self._creatures_table.itemSelectionChanged.connect(self._on_creature_selected)
 
         table_shell = QtWidgets.QFrame()
@@ -612,19 +614,36 @@ class MainWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(panel)
         layout.setSpacing(12)
 
+        header_row = QtWidgets.QHBoxLayout()
+        header_row.setContentsMargins(0, 0, 0, 0)
+        header_row.setSpacing(8)
+        header_left = QtWidgets.QVBoxLayout()
+        header_left.setContentsMargins(0, 0, 0, 0)
+        header_left.setSpacing(2)
+
         self._detail_title = QtWidgets.QLabel("Select a creature")
         self._detail_title.setStyleSheet("font-size: 16px; font-weight: 600; color: #f8fafc;")
-        layout.addWidget(self._detail_title)
+        header_left.addWidget(self._detail_title)
 
         self._detail_subtitle = QtWidgets.QLabel("")
         self._detail_subtitle.setStyleSheet("color: #94a3b8;")
         self._detail_subtitle.setWordWrap(True)
-        layout.addWidget(self._detail_subtitle)
+        header_left.addWidget(self._detail_subtitle)
 
         self._detail_rank_note = QtWidgets.QLabel("")
         self._detail_rank_note.setStyleSheet("color: #93c5fd; font-size: 12px; font-weight: 600;")
         self._detail_rank_note.setWordWrap(True)
-        layout.addWidget(self._detail_rank_note)
+        header_left.addWidget(self._detail_rank_note)
+        header_row.addLayout(header_left, 1)
+
+        self._detail_crown = QtWidgets.QLabel("♛")
+        self._detail_crown.setStyleSheet(
+            "color: rgba(103, 232, 249, 0.92); font-size: 44px; font-weight: 800; padding-right: 2px;"
+        )
+        self._detail_crown.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignRight)
+        self._detail_crown.setVisible(False)
+        header_row.addWidget(self._detail_crown, alignment=QtCore.Qt.AlignTop | QtCore.Qt.AlignRight)
+        layout.addLayout(header_row)
 
         self._detail_image = SpeciesImageWidget()
         self._detail_image.setStyleSheet("border: none;")
@@ -657,19 +676,21 @@ class MainWindow(QtWidgets.QMainWindow):
             row_layout.setSpacing(6)
             name_label = QtWidgets.QLabel(f"{label}:")
             name_label.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 600;")
+            name_label.setMinimumWidth(86)
             value_label = QtWidgets.QLabel("-")
             value_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
+            value_label.setMinimumWidth(108)
+            value_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
             self._detail_stat_values[key] = value_label
             row_layout.addWidget(name_label)
-            row_layout.addWidget(value_label)
             row_layout.addStretch(1)
+            row_layout.addWidget(value_label)
             stat_rows.addWidget(row_widget)
         stat_rows.addStretch(1)
         stats_container = QtWidgets.QWidget()
         stats_container.setLayout(stat_rows)
 
         insights_card = QtWidgets.QWidget()
-        insights_card.setMinimumWidth(210)
         insights_layout = QtWidgets.QVBoxLayout(insights_card)
         insights_layout.setContentsMargins(0, 0, 0, 0)
         insights_layout.setSpacing(4)
@@ -682,16 +703,15 @@ class MainWindow(QtWidgets.QMainWindow):
         insights_layout.addWidget(self._detail_insights)
         insights_layout.addStretch(1)
 
-        stats_insights_row = QtWidgets.QHBoxLayout()
-        stats_insights_row.setContentsMargins(0, 0, 0, 0)
-        stats_insights_row.setSpacing(10)
-        stats_insights_row.addWidget(stats_container, 3)
-        separator = QtWidgets.QFrame()
-        separator.setFixedWidth(1)
-        separator.setStyleSheet("QFrame { background: #334155; border-radius: 0px; }")
-        stats_insights_row.addWidget(separator)
-        stats_insights_row.addWidget(insights_card, 2)
-        layout.addLayout(stats_insights_row)
+        stats_split = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        stats_split.setChildrenCollapsible(False)
+        stats_split.setHandleWidth(1)
+        stats_split.setStyleSheet("QSplitter::handle { background: #334155; }")
+        stats_split.addWidget(stats_container)
+        stats_split.addWidget(insights_card)
+        stats_split.setStretchFactor(0, 3)
+        stats_split.setStretchFactor(1, 2)
+        layout.addWidget(stats_split)
 
         self._points_info = QtWidgets.QLabel(
             "Stat points unavailable — import values.json in Settings."
@@ -1811,8 +1831,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 target_row = QtWidgets.QHBoxLayout()
                 target_row.setContentsMargins(0, 0, 0, 0)
                 target_row.setSpacing(6)
-                target_label = QtWidgets.QLabel("◉ Target")
-                target_label.setStyleSheet("color: #94a3b8; font-size: 12px; font-weight: 700;")
+                target_label = QtWidgets.QLabel("⌖ Target")
+                target_label.setStyleSheet("color: #67e8f9; font-size: 13px; font-weight: 800;")
                 target_row.addWidget(target_label)
                 for short, value in targets:
                     chip = QtWidgets.QLabel(f"{self._point_icon(short)} {value}")
@@ -2150,8 +2170,7 @@ class MainWindow(QtWidgets.QMainWindow):
         chain_title.setStyleSheet("color: #93c5fd; font-size: 14px; font-weight: 800;")
         parent_layout.addWidget(chain_title)
 
-        previous_chain_points: dict[str, float] | None = None
-        previous_chain_title = ""
+        # Stage 1: explicit donor pairs per step.
         for idx, step_info in enumerate(sequence):
             step = int(step_info["step"])
             male = step_info["male"]
@@ -2171,15 +2190,18 @@ class MainWindow(QtWidgets.QMainWindow):
                 for key, value in expected_points_raw.items()
                 if isinstance(key, str)
             }
-            merged_points = {
-                key: float(value)
-                for key, value in merged_points_raw.items()
-                if isinstance(key, str)
-            }
+
+            step_box = QtWidgets.QFrame()
+            step_box.setStyleSheet(
+                "QFrame { background: rgba(15, 23, 42, 0.28); border: 1px solid #334155; border-radius: 12px; }"
+            )
+            step_layout = QtWidgets.QVBoxLayout(step_box)
+            step_layout.setContentsMargins(8, 8, 8, 8)
+            step_layout.setSpacing(6)
 
             step_label = QtWidgets.QLabel(f"Step {step}")
             step_label.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 800;")
-            parent_layout.addWidget(step_label)
+            step_layout.addWidget(step_label)
 
             pair_layout = QtWidgets.QHBoxLayout()
             pair_layout.setSpacing(12)
@@ -2228,31 +2250,76 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
             )
             pair_layout.addStretch(1)
-            parent_layout.addLayout(pair_layout)
+            step_layout.addLayout(pair_layout)
 
             gains_text = ", ".join(str(item) for item in gains) if gains else "-"
             note = "Start chain with this pair."
-            if step > 1 and previous_chain_points is not None:
-                merge_layout = QtWidgets.QHBoxLayout()
-                merge_layout.setSpacing(12)
-                merge_layout.setContentsMargins(0, 0, 0, 0)
-                merge_layout.addWidget(
+            if step > 1:
+                note = f"Combine with {from_child} to gain: {gains_text}"
+            note_label = QtWidgets.QLabel(note)
+            note_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
+            step_layout.addWidget(note_label)
+
+            parent_layout.addWidget(step_box)
+            if idx < len(sequence) - 1:
+                parent_layout.addWidget(self._plan_down_arrow())
+
+        # Stage 2: expected merge chain (E1 + E2 -> C2 -> ...).
+        if len(sequence) >= 2:
+            parent_layout.addWidget(self._plan_down_arrow())
+            merge_title = QtWidgets.QLabel("Expected merge path")
+            merge_title.setStyleSheet("color: #93c5fd; font-size: 13px; font-weight: 800;")
+            parent_layout.addWidget(merge_title)
+
+            first_points_raw = sequence[0].get("merged_points")
+            if not isinstance(first_points_raw, dict):
+                first_points_raw = {}
+            current_points = {
+                key: float(value)
+                for key, value in first_points_raw.items()
+                if isinstance(key, str)
+            }
+            current_title = self._expected_child_title(1)
+
+            for idx, step_info in enumerate(sequence[1:], start=2):
+                male = step_info["male"]
+                female = step_info["female"]
+                if not isinstance(male, Creature) or not isinstance(female, Creature):
+                    continue
+                expected_points_raw = step_info.get("expected_points")
+                merged_points_raw = step_info.get("merged_points")
+                if not isinstance(expected_points_raw, dict) or not isinstance(merged_points_raw, dict):
+                    continue
+                expected_points = {
+                    key: float(value)
+                    for key, value in expected_points_raw.items()
+                    if isinstance(key, str)
+                }
+                merged_points = {
+                    key: float(value)
+                    for key, value in merged_points_raw.items()
+                    if isinstance(key, str)
+                }
+                merge_row = QtWidgets.QHBoxLayout()
+                merge_row.setSpacing(12)
+                merge_row.setContentsMargins(0, 0, 0, 0)
+                merge_row.addWidget(
                     self._pair_child_box(
                         male,
                         female,
                         max_stats,
                         targets,
                         use_points=use_points,
-                        override_points=previous_chain_points,
-                        title_override=previous_chain_title,
+                        override_points=current_points,
+                        title_override=current_title,
                     )
                 )
-                plus_merge = QtWidgets.QLabel("+")
-                plus_merge.setAlignment(QtCore.Qt.AlignCenter)
-                plus_merge.setFixedWidth(18)
-                plus_merge.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 700;")
-                merge_layout.addWidget(plus_merge)
-                merge_layout.addWidget(
+                plus_label = QtWidgets.QLabel("+")
+                plus_label.setAlignment(QtCore.Qt.AlignCenter)
+                plus_label.setFixedWidth(18)
+                plus_label.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 700;")
+                merge_row.addWidget(plus_label)
+                merge_row.addWidget(
                     self._pair_child_box(
                         male,
                         female,
@@ -2260,15 +2327,15 @@ class MainWindow(QtWidgets.QMainWindow):
                         targets,
                         use_points=use_points,
                         override_points=expected_points,
-                        title_override=self._expected_child_title(step),
+                        title_override=self._expected_child_title(idx),
                     )
                 )
                 merge_arrow = QtWidgets.QLabel("⟶")
                 merge_arrow.setAlignment(QtCore.Qt.AlignCenter)
                 merge_arrow.setFixedWidth(28)
                 merge_arrow.setStyleSheet("color: #93c5fd; font-size: 20px; font-weight: 700;")
-                merge_layout.addWidget(merge_arrow)
-                merge_layout.addWidget(
+                merge_row.addWidget(merge_arrow)
+                merge_row.addWidget(
                     self._pair_child_box(
                         male,
                         female,
@@ -2276,22 +2343,15 @@ class MainWindow(QtWidgets.QMainWindow):
                         targets,
                         use_points=use_points,
                         override_points=merged_points,
-                        title_override=self._combined_child_title(step),
+                        title_override=self._combined_child_title(idx),
                     )
                 )
-                merge_layout.addStretch(1)
-                parent_layout.addLayout(merge_layout)
-                note = f"Breed {from_child} with this donor child, then keep gains: {gains_text}"
-            note_label = QtWidgets.QLabel(note)
-            note_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
-            parent_layout.addWidget(note_label)
-            previous_chain_points = merged_points
-            previous_chain_title = self._combined_child_title(step)
-            if idx < len(sequence) - 1:
-                chain_arrow = QtWidgets.QLabel("↓")
-                chain_arrow.setAlignment(QtCore.Qt.AlignCenter)
-                chain_arrow.setStyleSheet("color: #93c5fd; font-size: 16px; font-weight: 800;")
-                parent_layout.addWidget(chain_arrow)
+                merge_row.addStretch(1)
+                parent_layout.addLayout(merge_row)
+                current_points = merged_points
+                current_title = self._combined_child_title(idx)
+                if idx < len(sequence):
+                    parent_layout.addWidget(self._plan_down_arrow())
 
         if pending:
             pending_label = QtWidgets.QLabel(f"Missing target stats: {', '.join(pending)}")
@@ -2388,6 +2448,19 @@ class MainWindow(QtWidgets.QMainWindow):
         }
         suffix = names.get(step, str(step))
         return f"{self._sex_icon('male')}/{self._sex_icon('female')} Combined {suffix}"
+
+    def _plan_down_arrow(self) -> QtWidgets.QWidget:
+        container = QtWidgets.QWidget()
+        row = QtWidgets.QHBoxLayout(container)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(0)
+        row.addStretch(1)
+        arrow = QtWidgets.QLabel("↓")
+        arrow.setAlignment(QtCore.Qt.AlignCenter)
+        arrow.setStyleSheet("color: #93c5fd; font-size: 16px; font-weight: 800;")
+        row.addWidget(arrow)
+        row.addStretch(1)
+        return container
 
     def _build_breeding_plan_steps(
         self,
@@ -3019,6 +3092,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._detail_title.setText("Select a creature")
             self._detail_subtitle.setText("")
             self._detail_rank_note.setText("")
+            self._detail_crown.setVisible(False)
             self._detail_insights.setText("Select a creature to see insights.")
             self._detail_strengths.setText("Strengths: -")
             self._detail_weaknesses.setText("Weaknesses: -")
@@ -3052,6 +3126,15 @@ class MainWindow(QtWidgets.QMainWindow):
         if is_top_candidate:
             title += " ♛"
         self._detail_title.setText(title)
+        self._detail_crown.setVisible(is_top_candidate)
+        if is_top_candidate:
+            crown_glow = QtWidgets.QGraphicsDropShadowEffect(self._detail_crown)
+            crown_glow.setBlurRadius(16)
+            crown_glow.setOffset(0, 0)
+            crown_glow.setColor(QtGui.QColor(103, 232, 249, 215))
+            self._detail_crown.setGraphicsEffect(crown_glow)
+        else:
+            self._detail_crown.setGraphicsEffect(None)
         subtitle = f"{self._display_species(creature.species)} • {creature.sex} • L{creature.level}"
         self._detail_subtitle.setText(subtitle)
         self._detail_rank_note.setText(self._build_detail_rank_note(creature))

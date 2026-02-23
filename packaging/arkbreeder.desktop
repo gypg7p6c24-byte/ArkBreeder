@@ -1,7 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=ARK Breeder
-Exec=ark-breeder
+Exec=arkbreeder
 Icon=arkbreeder
+StartupWMClass=arkbreeder
 Terminal=false
 Categories=Game;Utility;
