@@ -482,6 +482,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 padding: 6px 8px;
                 font-weight: 700;
             }
+            QHeaderView::section:first {
+                border-top-left-radius: 8px;
+            }
+            QHeaderView::section:last {
+                border-top-right-radius: 8px;
+            }
             QTableCornerButton::section {
                 background: rgba(30, 41, 59, 0.75);
                 border: none;
@@ -509,13 +515,13 @@ class MainWindow(QtWidgets.QMainWindow):
         table_shell.setObjectName("creaturesTableShell")
         table_shell.setStyleSheet(
             "#creaturesTableShell {"
-            "background: rgba(15, 23, 42, 0.36);"
+            "background: rgba(30, 41, 59, 0.75);"
             "border: 1px solid #334155;"
             "border-radius: 10px;"
             "}"
         )
         table_shell_layout = QtWidgets.QVBoxLayout(table_shell)
-        table_shell_layout.setContentsMargins(0, 0, 0, 0)
+        table_shell_layout.setContentsMargins(1, 1, 1, 1)
         table_shell_layout.setSpacing(0)
         table_shell_layout.addWidget(self._creatures_table)
         left_layout.addWidget(table_shell)
@@ -638,7 +644,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._detail_crown = QtWidgets.QLabel("♛")
         self._detail_crown.setStyleSheet(
-            "color: rgba(103, 232, 249, 0.92); font-size: 44px; font-weight: 800; padding-right: 2px;"
+            "color: rgba(103, 232, 249, 0.92); font-size: 86px; font-weight: 800; padding-right: 2px;"
         )
         self._detail_crown.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignRight)
         self._detail_crown.setVisible(False)
@@ -678,7 +684,7 @@ class MainWindow(QtWidgets.QMainWindow):
             name_label.setStyleSheet("color: #cbd5f5; font-size: 12px; font-weight: 600;")
             name_label.setMinimumWidth(86)
             value_label = QtWidgets.QLabel("-")
-            value_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
+            value_label.setStyleSheet("color: #f8fafc; font-weight: 600; font-family: 'DejaVu Sans Mono';")
             value_label.setMinimumWidth(108)
             value_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
             self._detail_stat_values[key] = value_label
@@ -692,12 +698,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         insights_card = QtWidgets.QWidget()
         insights_layout = QtWidgets.QVBoxLayout(insights_card)
-        insights_layout.setContentsMargins(0, 0, 0, 0)
+        insights_layout.setContentsMargins(12, 0, 0, 0)
         insights_layout.setSpacing(4)
         insights_title = QtWidgets.QLabel("Breeding insights")
         insights_title.setStyleSheet("color: #93c5fd; font-size: 12px; font-weight: 700;")
         self._detail_insights = QtWidgets.QLabel("Select a creature to see insights.")
         self._detail_insights.setStyleSheet("color: #cbd5f5; font-size: 11px;")
+        self._detail_insights.setTextFormat(QtCore.Qt.RichText)
         self._detail_insights.setWordWrap(True)
         insights_layout.addWidget(insights_title)
         insights_layout.addWidget(self._detail_insights)
@@ -709,8 +716,9 @@ class MainWindow(QtWidgets.QMainWindow):
         stats_split.setStyleSheet("QSplitter::handle { background: #334155; }")
         stats_split.addWidget(stats_container)
         stats_split.addWidget(insights_card)
-        stats_split.setStretchFactor(0, 3)
-        stats_split.setStretchFactor(1, 2)
+        stats_split.setStretchFactor(0, 1)
+        stats_split.setStretchFactor(1, 1)
+        stats_split.setSizes([1, 1])
         layout.addWidget(stats_split)
 
         self._points_info = QtWidgets.QLabel(
@@ -1831,8 +1839,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 target_row = QtWidgets.QHBoxLayout()
                 target_row.setContentsMargins(0, 0, 0, 0)
                 target_row.setSpacing(6)
-                target_label = QtWidgets.QLabel("⌖ Target")
-                target_label.setStyleSheet("color: #67e8f9; font-size: 13px; font-weight: 800;")
+                target_label = QtWidgets.QLabel("⦿ Target")
+                target_label.setStyleSheet("color: #67e8f9; font-size: 14px; font-weight: 800;")
                 target_row.addWidget(target_label)
                 for short, value in targets:
                     chip = QtWidgets.QLabel(f"{self._point_icon(short)} {value}")
@@ -2181,27 +2189,24 @@ class MainWindow(QtWidgets.QMainWindow):
             merged_points_raw = step_info.get("merged_points")
             if not isinstance(expected_points_raw, dict) or not isinstance(merged_points_raw, dict):
                 continue
-            from_child = str(step_info.get("from_child", ""))
-            gains = step_info.get("gains", [])
-            if not isinstance(gains, list):
-                gains = []
             expected_points = {
                 key: float(value)
                 for key, value in expected_points_raw.items()
                 if isinstance(key, str)
             }
 
+            step_label = QtWidgets.QLabel(f"Step {step}")
+            step_label.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 800;")
+            parent_layout.addWidget(step_label)
+
             step_box = QtWidgets.QFrame()
             step_box.setStyleSheet(
                 "QFrame { background: rgba(15, 23, 42, 0.28); border: 1px solid #334155; border-radius: 12px; }"
             )
+            step_box.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Maximum)
             step_layout = QtWidgets.QVBoxLayout(step_box)
             step_layout.setContentsMargins(8, 8, 8, 8)
-            step_layout.setSpacing(6)
-
-            step_label = QtWidgets.QLabel(f"Step {step}")
-            step_label.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 800;")
-            step_layout.addWidget(step_label)
+            step_layout.setSpacing(0)
 
             pair_layout = QtWidgets.QHBoxLayout()
             pair_layout.setSpacing(12)
@@ -2218,11 +2223,6 @@ class MainWindow(QtWidgets.QMainWindow):
                     highlighted=(best_male_key == male_key),
                 )
             )
-            plus = QtWidgets.QLabel("+")
-            plus.setAlignment(QtCore.Qt.AlignCenter)
-            plus.setFixedWidth(18)
-            plus.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 700;")
-            pair_layout.addWidget(plus)
             pair_layout.addWidget(
                 self._pair_info_box(
                     female,
@@ -2233,11 +2233,6 @@ class MainWindow(QtWidgets.QMainWindow):
                     highlighted=(best_female_key == female_key),
                 )
             )
-            arrow = QtWidgets.QLabel("⟶")
-            arrow.setAlignment(QtCore.Qt.AlignCenter)
-            arrow.setFixedWidth(28)
-            arrow.setStyleSheet("color: #93c5fd; font-size: 20px; font-weight: 700;")
-            pair_layout.addWidget(arrow)
             pair_layout.addWidget(
                 self._pair_child_box(
                     male,
@@ -2249,18 +2244,9 @@ class MainWindow(QtWidgets.QMainWindow):
                     title_override=self._expected_child_title(step),
                 )
             )
-            pair_layout.addStretch(1)
             step_layout.addLayout(pair_layout)
 
-            gains_text = ", ".join(str(item) for item in gains) if gains else "-"
-            note = "Start chain with this pair."
-            if step > 1:
-                note = f"Combine with {from_child} to gain: {gains_text}"
-            note_label = QtWidgets.QLabel(note)
-            note_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
-            step_layout.addWidget(note_label)
-
-            parent_layout.addWidget(step_box)
+            parent_layout.addWidget(step_box, alignment=QtCore.Qt.AlignHCenter)
             if idx < len(sequence) - 1:
                 parent_layout.addWidget(self._plan_down_arrow())
 
@@ -2346,8 +2332,10 @@ class MainWindow(QtWidgets.QMainWindow):
                         title_override=self._combined_child_title(idx),
                     )
                 )
-                merge_row.addStretch(1)
-                parent_layout.addLayout(merge_row)
+                merge_container = QtWidgets.QWidget()
+                merge_container.setLayout(merge_row)
+                merge_container.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Maximum)
+                parent_layout.addWidget(merge_container, alignment=QtCore.Qt.AlignHCenter)
                 current_points = merged_points
                 current_title = self._combined_child_title(idx)
                 if idx < len(sequence):
@@ -3122,9 +3110,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._apply_detail_panel_accent(creature.sex, spotlight=is_top_candidate)
         if hasattr(self, "_detail_delete_btn"):
             self._detail_delete_btn.setEnabled(creature.id is not None)
-        title = creature.name or "Unknown"
-        if is_top_candidate:
-            title += " ♛"
+        title = f"{self._sex_icon(creature.sex)} {creature.name or 'Unknown'}"
         self._detail_title.setText(title)
         self._detail_crown.setVisible(is_top_candidate)
         if is_top_candidate:
@@ -3226,16 +3212,29 @@ class MainWindow(QtWidgets.QMainWindow):
         weaknesses: list[str],
     ) -> str:
         rank, ranked_count = self._species_sex_rank(creature)
-        points_items: list[tuple[str, int]] = []
+        max_by_key: dict[str, int] = {}
+        for _short, key, _title in _DETAIL_POINT_STAT_CONFIG:
+            values = [
+                int(value)
+                for candidate in species_group
+                if (value := self._get_stat_points_value(candidate, key)) is not None
+            ]
+            if values:
+                max_by_key[key] = max(values)
+
+        top_stats_items: list[str] = []
         for short, key, _title in _DETAIL_POINT_STAT_CONFIG:
             value = self._get_stat_points_value(creature, key)
             if value is None:
                 continue
-            points_items.append((short, int(value)))
-        points_items.sort(key=lambda item: item[1], reverse=True)
-        top_stats = ", ".join(
-            f"{self._point_icon(short)} {value}" for short, value in points_items[:3]
-        ) or "n/a"
+            int_value = int(value)
+            species_max = max_by_key.get(key)
+            if species_max is None:
+                continue
+            if int_value >= species_max:
+                top_stats_items.append(f"{self._point_icon(short)} {int_value}")
+        top_stats = ", ".join(top_stats_items) if top_stats_items else "n/a"
+
         role: str
         if ranked_count < 2 or rank is None:
             role = "Need more same-species creatures for full ranking."
@@ -3243,12 +3242,9 @@ class MainWindow(QtWidgets.QMainWindow):
             role = f"Primary {creature.sex.lower()} breeder candidate."
         else:
             role = f"Backup {creature.sex.lower()} breeder (rank #{rank})."
-        strengths_text = ", ".join(strengths[:3]) if strengths else "-"
-        weakness_text = ", ".join(weaknesses[:3]) if weaknesses else "-"
         return (
-            f"Top points: {top_stats}\n"
-            f"Role: {role}\n"
-            f"Strong: {strengths_text} • Weak: {weakness_text}"
+            f"<b>Top points:</b> {top_stats}<br/>"
+            f"<b>Role:</b> {role}"
         )
 
     def _species_sex_rank(self, creature: Creature) -> tuple[int | None, int]:
@@ -3321,27 +3317,18 @@ class MainWindow(QtWidgets.QMainWindow):
         if not hasattr(self, "_detail_panel"):
             return
         accent = "rgba(148, 163, 184, 0.25)"
-        glow = QtGui.QColor(148, 163, 184, 90)
         lowered = (sex or "").lower()
         if lowered == "male":
             accent = "#60a5fa"
-            glow = QtGui.QColor(96, 165, 250, 120)
         elif lowered == "female":
             accent = "#f472b6"
-            glow = QtGui.QColor(244, 114, 182, 120)
         self._detail_panel.setStyleSheet(
             "#detailPanel {"
             f"background: rgba(15, 23, 42, {'0.52' if spotlight else '0.44'}); border: 2px solid {accent};"
             "border-radius: 16px;"
             "}"
         )
-        effect = QtWidgets.QGraphicsDropShadowEffect(self._detail_panel)
-        effect.setBlurRadius(26 if spotlight else 18)
-        effect.setOffset(0, 0)
-        if spotlight:
-            glow.setAlpha(220)
-        effect.setColor(glow)
-        self._detail_panel.setGraphicsEffect(effect)
+        self._detail_panel.setGraphicsEffect(None)
 
     def _compute_strengths_weaknesses(
         self,
