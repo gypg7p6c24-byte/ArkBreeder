@@ -584,6 +584,31 @@ class MainWindow(QtWidgets.QMainWindow):
         self._breeding_points_info.setWordWrap(True)
         layout.addWidget(self._breeding_points_info)
 
+        self._breeding_overview_panel = QtWidgets.QFrame()
+        self._breeding_overview_panel.setObjectName("breedingOverviewPanel")
+        self._breeding_overview_panel.setStyleSheet(
+            """
+            #breedingOverviewPanel {
+                background: rgba(15, 23, 42, 0.34);
+                border: 1px solid #334155;
+                border-radius: 12px;
+            }
+            """
+        )
+        overview_layout = QtWidgets.QVBoxLayout(self._breeding_overview_panel)
+        overview_layout.setContentsMargins(10, 10, 10, 10)
+        overview_layout.setSpacing(8)
+        overview_title = QtWidgets.QLabel("Breeding actions overview")
+        overview_title.setStyleSheet("color: #cbd5f5; font-size: 14px; font-weight: 800;")
+        overview_layout.addWidget(overview_title)
+        self._breeding_overview_grid = QtWidgets.QGridLayout()
+        self._breeding_overview_grid.setContentsMargins(0, 0, 0, 0)
+        self._breeding_overview_grid.setHorizontalSpacing(10)
+        self._breeding_overview_grid.setVerticalSpacing(8)
+        overview_layout.addLayout(self._breeding_overview_grid)
+        self._breeding_overview_panel.setVisible(False)
+        layout.addWidget(self._breeding_overview_panel)
+
         self._breeding_cards_container = QtWidgets.QWidget()
         self._breeding_cards_container.setSizePolicy(
             QtWidgets.QSizePolicy.Expanding,
@@ -626,36 +651,30 @@ class MainWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(panel)
         layout.setSpacing(12)
 
-        header_row = QtWidgets.QHBoxLayout()
-        header_row.setContentsMargins(0, 0, 0, 0)
-        header_row.setSpacing(8)
-        header_left = QtWidgets.QVBoxLayout()
-        header_left.setContentsMargins(0, 0, 0, 0)
-        header_left.setSpacing(2)
-
         self._detail_title = QtWidgets.QLabel("Select a creature")
         self._detail_title.setStyleSheet("font-size: 16px; font-weight: 600; color: #f8fafc;")
-        header_left.addWidget(self._detail_title)
+        layout.addWidget(self._detail_title)
 
         self._detail_subtitle = QtWidgets.QLabel("")
         self._detail_subtitle.setStyleSheet("color: #94a3b8;")
         self._detail_subtitle.setWordWrap(True)
-        header_left.addWidget(self._detail_subtitle)
+        layout.addWidget(self._detail_subtitle)
 
         self._detail_rank_note = QtWidgets.QLabel("")
         self._detail_rank_note.setStyleSheet("color: #93c5fd; font-size: 12px; font-weight: 600;")
         self._detail_rank_note.setWordWrap(True)
-        header_left.addWidget(self._detail_rank_note)
-        header_row.addLayout(header_left, 1)
+        layout.addWidget(self._detail_rank_note)
 
         self._detail_crown = QtWidgets.QLabel("♛")
         self._detail_crown.setStyleSheet(
             "color: rgba(103, 232, 249, 0.92); font-size: 86px; font-weight: 800; padding-right: 2px;"
         )
         self._detail_crown.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignRight)
+        self._detail_crown.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+        self._detail_crown.setParent(panel)
+        self._detail_crown.raise_()
         self._detail_crown.setVisible(False)
-        header_row.addWidget(self._detail_crown, alignment=QtCore.Qt.AlignTop | QtCore.Qt.AlignRight)
-        layout.addLayout(header_row)
+        panel.installEventFilter(self)
 
         self._detail_image = SpeciesImageWidget()
         self._detail_image.setStyleSheet("border: none;")
@@ -716,16 +735,16 @@ class MainWindow(QtWidgets.QMainWindow):
         insights_layout.addWidget(self._detail_insights)
         insights_layout.addStretch(1)
 
-        stats_split = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
-        stats_split.setChildrenCollapsible(False)
-        stats_split.setHandleWidth(1)
-        stats_split.setStyleSheet("QSplitter::handle { background: #334155; }")
-        stats_split.addWidget(stats_container)
-        stats_split.addWidget(insights_card)
-        stats_split.setStretchFactor(0, 1)
-        stats_split.setStretchFactor(1, 1)
-        stats_split.setSizes([1, 1])
-        layout.addWidget(stats_split)
+        stats_insights_row = QtWidgets.QHBoxLayout()
+        stats_insights_row.setContentsMargins(0, 0, 0, 0)
+        stats_insights_row.setSpacing(10)
+        stats_insights_row.addWidget(stats_container, 1)
+        separator = QtWidgets.QFrame()
+        separator.setFixedWidth(1)
+        separator.setStyleSheet("QFrame { background: #334155; border-radius: 0px; }")
+        stats_insights_row.addWidget(separator)
+        stats_insights_row.addWidget(insights_card, 1)
+        layout.addLayout(stats_insights_row)
 
         self._points_info = QtWidgets.QLabel(
             "Stat points unavailable — import values.json in Settings."
@@ -1612,6 +1631,7 @@ class MainWindow(QtWidgets.QMainWindow):
             key = self._display_species(creature.species)
             grouped.setdefault(key, []).append(creature)
         use_points = True
+        overview_items: list[dict[str, object]] = []
         rows: list[tuple[str, list[tuple[str, int]], list[tuple[int, float, Creature, Creature]]]] = []
         for species_name, group in grouped.items():
             males = [c for c in group if c.sex.lower() == "male"]
@@ -1639,16 +1659,150 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
             )
 
-            limit = 1 if not show_ranking else min(30, len(all_pairs))
-            ranked_pairs = [
+            plan_limit = min(30, len(all_pairs))
+            plan_ranked_pairs = [
                 (rank + 1, score, male, female)
-                for rank, (score, male, female) in enumerate(all_pairs[:limit])
+                for rank, (score, male, female) in enumerate(all_pairs[:plan_limit])
             ]
             targets = self._species_target_points(group)
+            sequence, pending = self._build_breeding_plan_sequence(
+                plan_ranked_pairs,
+                targets,
+                use_points=use_points,
+            )
+            if plan_ranked_pairs:
+                lead_male = plan_ranked_pairs[0][2]
+                lead_female = plan_ranked_pairs[0][3]
+                overview_items.append(
+                    {
+                        "species": species_name,
+                        "score": plan_ranked_pairs[0][1],
+                        "step_count": max(1, len(sequence)),
+                        "pending": pending,
+                        "next_action": (
+                            f"{self._truncate_text(lead_male.name or 'Male', 10)} + "
+                            f"{self._truncate_text(lead_female.name or 'Female', 10)}"
+                        ),
+                    }
+                )
+            limit = 1 if not show_ranking else plan_limit
+            ranked_pairs = plan_ranked_pairs[:limit]
             rows.append((species_name, targets, ranked_pairs))
 
         rows.sort(key=lambda item: item[2][0][1] if item[2] else -1.0, reverse=True)
+        overview_items.sort(
+            key=lambda item: (
+                int(item.get("pending") is not None and len(item.get("pending", [])) > 0),
+                len(item.get("pending", [])),
+                -float(item.get("score", 0.0)),
+            ),
+            reverse=False,
+        )
+        self._render_breeding_overview(
+            overview_items,
+            show_overview=(species == "All species"),
+        )
         self._render_breeding_cards(rows, focus, use_points, show_ranking=show_ranking)
+
+    def _render_breeding_overview(
+        self,
+        items: list[dict[str, object]],
+        show_overview: bool,
+    ) -> None:
+        if not hasattr(self, "_breeding_overview_panel"):
+            return
+        self._breeding_overview_panel.setVisible(show_overview)
+        grid = self._breeding_overview_grid
+        self._clear_layout(grid)
+        if not show_overview:
+            return
+
+        if not items:
+            empty = QtWidgets.QLabel("No species with valid male/female pairs yet.")
+            empty.setStyleSheet("color: #94a3b8;")
+            grid.addWidget(empty, 0, 0)
+            return
+
+        columns = 2 if len(items) > 1 else 1
+        for idx, item in enumerate(items):
+            species_name = str(item.get("species", "Unknown"))
+            step_count = int(item.get("step_count", 1))
+            pending = [
+                str(value)
+                for value in item.get("pending", [])
+                if isinstance(value, str)
+            ]
+            next_action = str(item.get("next_action", ""))
+            is_ready = len(pending) == 0
+            status_color = "#67e8f9" if is_ready else "#fbbf24"
+            status_text = "Ready" if is_ready else "Missing stats"
+
+            card = QtWidgets.QFrame()
+            card.setStyleSheet(
+                "QFrame {"
+                f"background: {'rgba(103, 232, 249, 0.08)' if is_ready else 'rgba(251, 191, 36, 0.08)'};"
+                f"border: 1px solid {status_color}; border-radius: 10px;"
+                "}"
+            )
+            card_layout = QtWidgets.QVBoxLayout(card)
+            card_layout.setContentsMargins(8, 8, 8, 8)
+            card_layout.setSpacing(4)
+
+            title_row = QtWidgets.QHBoxLayout()
+            title_row.setContentsMargins(0, 0, 0, 0)
+            title_row.setSpacing(6)
+            species_label = QtWidgets.QLabel(species_name)
+            species_label.setStyleSheet("color: #f8fafc; font-size: 13px; font-weight: 800;")
+            title_row.addWidget(species_label)
+            title_row.addStretch(1)
+            status_chip = QtWidgets.QLabel(status_text)
+            status_chip.setStyleSheet(
+                "QLabel {"
+                f"color: {status_color}; background: rgba(15, 23, 42, 0.92);"
+                f"border: 1px solid {status_color}; border-radius: 6px;"
+                "padding: 1px 6px; font-size: 10px; font-weight: 700;"
+                "}"
+            )
+            title_row.addWidget(status_chip)
+            card_layout.addLayout(title_row)
+
+            next_label = QtWidgets.QLabel(f"Next: {next_action}")
+            next_label.setStyleSheet("color: #cbd5f5; font-size: 11px; font-weight: 600;")
+            card_layout.addWidget(next_label)
+
+            steps_label = QtWidgets.QLabel(f"Estimated steps: {step_count}")
+            steps_label.setStyleSheet("color: #93c5fd; font-size: 11px;")
+            card_layout.addWidget(steps_label)
+
+            if pending:
+                pending_label = QtWidgets.QLabel(f"Missing: {', '.join(pending)}")
+                pending_label.setStyleSheet("color: #fbbf24; font-size: 11px;")
+            else:
+                pending_label = QtWidgets.QLabel("All target stats currently coverable.")
+                pending_label.setStyleSheet("color: #67e8f9; font-size: 11px;")
+            pending_label.setWordWrap(True)
+            card_layout.addWidget(pending_label)
+
+            open_btn = QtWidgets.QPushButton("Open detailed plan")
+            open_btn.setStyleSheet(
+                "QPushButton { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; }"
+                "QPushButton:hover { background: #243247; }"
+            )
+            open_btn.clicked.connect(
+                lambda _checked=False, sp=species_name: self._open_breeding_species_plan(sp)
+            )
+            card_layout.addWidget(open_btn, alignment=QtCore.Qt.AlignLeft)
+
+            row = idx // columns
+            col = idx % columns
+            grid.addWidget(card, row, col)
+
+    def _open_breeding_species_plan(self, species: str) -> None:
+        if not hasattr(self, "_breeding_species_filter"):
+            return
+        index = self._breeding_species_filter.findText(species)
+        if index >= 0:
+            self._breeding_species_filter.setCurrentIndex(index)
 
     def _species_target_points(self, group: list[Creature]) -> list[tuple[str, int]]:
         targets: list[tuple[str, int]] = []
@@ -1998,15 +2152,22 @@ class MainWindow(QtWidgets.QMainWindow):
         layout = QtWidgets.QVBoxLayout(box)
         layout.setContentsMargins(7, 7, 7, 7)
         layout.setSpacing(2)
-        title_text = f"{self._sex_icon(creature.sex)} {creature.name}"
-        if reached_target:
-            title_text += ' <span style="color:#67e8f9;font-size:15px;">♛</span>'
+        title_row = QtWidgets.QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(4)
+        display_name = self._truncate_text(creature.name or "Unknown", 10)
+        title_text = f"{self._sex_icon(creature.sex)} {display_name}"
         name_label = QtWidgets.QLabel(title_text)
-        name_label.setTextFormat(QtCore.Qt.RichText)
         name_label.setStyleSheet(
             f"color: {accent}; font-weight: 700; font-size: 13px; background: transparent; border: none;"
         )
-        layout.addWidget(name_label)
+        title_row.addWidget(name_label)
+        title_row.addStretch(1)
+        crown_label = QtWidgets.QLabel("♛")
+        crown_label.setStyleSheet("color: #67e8f9; font-size: 18px; font-weight: 800;")
+        crown_label.setVisible(reached_target)
+        title_row.addWidget(crown_label, alignment=QtCore.Qt.AlignTop | QtCore.Qt.AlignRight)
+        layout.addLayout(title_row)
 
         if highlighted or reached_target:
             glow = QtWidgets.QGraphicsDropShadowEffect(box)
@@ -2022,6 +2183,11 @@ class MainWindow(QtWidgets.QMainWindow):
             text_glow.setOffset(0, 0)
             text_glow.setColor(QtGui.QColor(255, 255, 255, 180))
             name_label.setGraphicsEffect(text_glow)
+            crown_glow = QtWidgets.QGraphicsDropShadowEffect(crown_label)
+            crown_glow.setBlurRadius(10)
+            crown_glow.setOffset(0, 0)
+            crown_glow.setColor(QtGui.QColor(103, 232, 249, 220))
+            crown_label.setGraphicsEffect(crown_glow)
 
         avatar = self._small_species_image(self._display_species(creature.species), size=100)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
@@ -2080,14 +2246,20 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         is_perfect = self._is_target_reached(child_points, targets)
         expected_title = title_override or "♂/♀ Expected"
-        if is_perfect:
-            expected_title += ' <span style="color:#67e8f9;font-size:15px;">♛</span>'
+        title_row = QtWidgets.QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(4)
         name_label = QtWidgets.QLabel(expected_title)
-        name_label.setTextFormat(QtCore.Qt.RichText)
         name_label.setStyleSheet(
             "color: #cbd5f5; font-weight: 700; font-size: 13px; background: transparent; border: none;"
         )
-        layout.addWidget(name_label)
+        title_row.addWidget(name_label)
+        title_row.addStretch(1)
+        crown_label = QtWidgets.QLabel("♛")
+        crown_label.setStyleSheet("color: #67e8f9; font-size: 18px; font-weight: 800;")
+        crown_label.setVisible(is_perfect)
+        title_row.addWidget(crown_label, alignment=QtCore.Qt.AlignTop | QtCore.Qt.AlignRight)
+        layout.addLayout(title_row)
         species_label = self._display_species(male.species or female.species)
         avatar = self._small_species_image(species_label, size=100)
         layout.addWidget(avatar, alignment=QtCore.Qt.AlignCenter)
@@ -2110,6 +2282,11 @@ class MainWindow(QtWidgets.QMainWindow):
             text_glow.setOffset(0, 0)
             text_glow.setColor(QtGui.QColor(255, 255, 255, 170))
             name_label.setGraphicsEffect(text_glow)
+            crown_glow = QtWidgets.QGraphicsDropShadowEffect(crown_label)
+            crown_glow.setBlurRadius(10)
+            crown_glow.setOffset(0, 0)
+            crown_glow.setColor(QtGui.QColor(103, 232, 249, 220))
+            crown_label.setGraphicsEffect(crown_glow)
 
         colors = {
             "Health": "#22c55e",
@@ -2192,8 +2369,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if not isinstance(male, Creature) or not isinstance(female, Creature):
                 continue
             expected_points_raw = step_info.get("expected_points")
-            merged_points_raw = step_info.get("merged_points")
-            if not isinstance(expected_points_raw, dict) or not isinstance(merged_points_raw, dict):
+            if not isinstance(expected_points_raw, dict):
                 continue
             expected_points = {
                 key: float(value)
@@ -2202,7 +2378,8 @@ class MainWindow(QtWidgets.QMainWindow):
             }
 
             step_label = QtWidgets.QLabel(f"Step {step}")
-            step_label.setStyleSheet("color: #cbd5f5; font-size: 13px; font-weight: 800;")
+            step_label.setAlignment(QtCore.Qt.AlignCenter)
+            step_label.setStyleSheet("color: #cbd5f5; font-size: 15px; font-weight: 800;")
             parent_layout.addWidget(step_label)
 
             step_box = QtWidgets.QFrame()
@@ -2229,6 +2406,11 @@ class MainWindow(QtWidgets.QMainWindow):
                     highlighted=(best_male_key == male_key),
                 )
             )
+            plus = QtWidgets.QLabel("+")
+            plus.setAlignment(QtCore.Qt.AlignCenter)
+            plus.setFixedWidth(18)
+            plus.setStyleSheet("color: #cbd5f5; font-size: 16px; font-weight: 700;")
+            pair_layout.addWidget(plus)
             pair_layout.addWidget(
                 self._pair_info_box(
                     female,
@@ -2239,6 +2421,11 @@ class MainWindow(QtWidgets.QMainWindow):
                     highlighted=(best_female_key == female_key),
                 )
             )
+            arrow = QtWidgets.QLabel("⟶")
+            arrow.setAlignment(QtCore.Qt.AlignCenter)
+            arrow.setFixedWidth(28)
+            arrow.setStyleSheet("color: #93c5fd; font-size: 20px; font-weight: 700;")
+            pair_layout.addWidget(arrow)
             pair_layout.addWidget(
                 self._pair_child_box(
                     male,
@@ -2260,7 +2447,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if len(sequence) >= 2:
             parent_layout.addWidget(self._plan_down_arrow())
             merge_title = QtWidgets.QLabel("Expected merge path")
-            merge_title.setStyleSheet("color: #93c5fd; font-size: 13px; font-weight: 800;")
+            merge_title.setAlignment(QtCore.Qt.AlignCenter)
+            merge_title.setStyleSheet("color: #93c5fd; font-size: 15px; font-weight: 800;")
             parent_layout.addWidget(merge_title)
 
             first_points_raw = sequence[0].get("merged_points")
@@ -2742,6 +2930,11 @@ class MainWindow(QtWidgets.QMainWindow):
         }
         return icons.get(code, code)
 
+    def _truncate_text(self, text: str, limit: int) -> str:
+        if len(text) <= limit:
+            return text
+        return text[:limit] + "..."
+
     def _small_species_image(self, species: str, size: int = 48) -> QtWidgets.QLabel:
         label = QtWidgets.QLabel()
         label.setFixedSize(size, int(size * 0.75))
@@ -3110,6 +3303,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self._selected_creature = creature
         self._update_creature_detail(creature)
 
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        if watched is getattr(self, "_detail_panel", None) and event.type() == QtCore.QEvent.Resize:
+            self._position_detail_crown()
+        return super().eventFilter(watched, event)
+
+    def _position_detail_crown(self) -> None:
+        if not hasattr(self, "_detail_panel") or not hasattr(self, "_detail_crown"):
+            return
+        size = self._detail_crown.sizeHint()
+        self._detail_crown.resize(size)
+        x = max(0, self._detail_panel.width() - size.width() - 10)
+        self._detail_crown.move(x, 2)
+
     def _update_creature_detail(self, creature: Creature) -> None:
         rank, ranked_count = self._species_sex_rank(creature)
         is_top_candidate = rank == 1 and ranked_count >= 2
@@ -3119,6 +3325,7 @@ class MainWindow(QtWidgets.QMainWindow):
         title = f"{self._sex_icon(creature.sex)} {creature.name or 'Unknown'}"
         self._detail_title.setText(title)
         self._detail_crown.setVisible(is_top_candidate)
+        self._position_detail_crown()
         if is_top_candidate:
             crown_glow = QtWidgets.QGraphicsDropShadowEffect(self._detail_crown)
             crown_glow.setBlurRadius(16)
@@ -3148,18 +3355,11 @@ class MainWindow(QtWidgets.QMainWindow):
             ("Melee", "MeleeDamageMultiplier"),
             ("Speed", "MovementSpeed"),
         ]
-        max_values = {
-            label: max(
-                (self._get_stat_value(c, key, use_points=use_points) for c in species_group),
-                default=0.0,
-            )
-            for label, key in radar_axes
-        }
-        values = {
-            label: self._get_stat_value(creature, key, use_points=use_points)
-            for label, key in radar_axes
-        }
-        radar_max = {label: max_values.get(label, 1.0) for label, _key in radar_axes}
+        values = {}
+        for label, key in radar_axes:
+            value = self._get_stat_value(creature, key, use_points=use_points)
+            values[label] = min(max(float(value), 0.0), 100.0)
+        radar_max = {label: 100.0 for label, _key in radar_axes}
         self._detail_radar.set_values(values, radar_max)
 
         for key, label in self._detail_stat_values.items():
@@ -3176,8 +3376,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self._build_detail_insights(
                 creature,
                 species_group,
-                strengths,
-                weaknesses,
             )
         )
         if len(species_group) <= 1:
@@ -3214,8 +3412,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self,
         creature: Creature,
         species_group: list[Creature],
-        strengths: list[str],
-        weaknesses: list[str],
     ) -> str:
         rank, ranked_count = self._species_sex_rank(creature)
         max_by_key: dict[str, int] = {}
