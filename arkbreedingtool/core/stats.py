@@ -5,7 +5,7 @@ import math
 import re
 from typing import Dict
 
-from arkbreeder.core.species_values import SpeciesValues, StatRaw
+from arkbreedingtool.core.species_values import SpeciesValues, StatRaw
 
 
 STAT_INDEX_BY_KEY: dict[str, int] = {

@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
 
-from arkbreeder.config import database_path, ensure_app_dirs
+from arkbreedingtool.config import database_path, ensure_app_dirs
 
 SCHEMA = '''
 CREATE TABLE IF NOT EXISTS creatures (

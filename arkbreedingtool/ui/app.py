@@ -5,18 +5,18 @@ from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from arkbreeder.config import APP_NAME, export_dir
-from arkbreeder.core.import_service import ExportImportService
-from arkbreeder.logging_config import setup_logging
-from arkbreeder.storage.database import get_connection, init_db
-from arkbreeder.ui.main_window import MainWindow
+from arkbreedingtool.config import APP_NAME, export_dir
+from arkbreedingtool.core.import_service import ExportImportService
+from arkbreedingtool.logging_config import setup_logging
+from arkbreedingtool.storage.database import get_connection, init_db
+from arkbreedingtool.ui.main_window import MainWindow
 
 logger = logging.getLogger(__name__)
 
 
 def _load_app_icon() -> QtGui.QIcon:
-    resources_icon = Path(__file__).resolve().parents[1] / "resources" / "arkbreeder.svg"
-    fallback_icon = Path(__file__).resolve().parents[2] / "packaging" / "arkbreeder.svg"
+    resources_icon = Path(__file__).resolve().parents[1] / "resources" / "arkbreedingtool.svg"
+    fallback_icon = Path(__file__).resolve().parents[2] / "packaging" / "arkbreedingtool.svg"
     for candidate in (resources_icon, fallback_icon):
         if candidate.exists():
             icon = QtGui.QIcon(str(candidate))
@@ -34,7 +34,7 @@ def main() -> int:
     app = QtWidgets.QApplication([])
     app.setApplicationName(APP_NAME)
     app.setApplicationDisplayName(APP_NAME)
-    app.setDesktopFileName("arkbreeder")
+    app.setDesktopFileName("arkbreedingtool")
     icon = _load_app_icon()
     if not icon.isNull():
         app.setWindowIcon(icon)

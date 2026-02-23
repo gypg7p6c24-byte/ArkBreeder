@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=Ark Breeding Tool
-Exec=arkbreeder
-Icon=arkbreeder
-StartupWMClass=arkbreeder
+Exec=arkbreedingtool
+Icon=arkbreedingtool
+StartupWMClass=arkbreedingtool
 Terminal=false
 Categories=Game;Utility;

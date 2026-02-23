@@ -17,12 +17,12 @@ Foundation only. Core breeding logic is not implemented yet.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-arkbreeder
+arkbreedingtool
 ```
 
 ## Logs
 ```bash
-ARKBREEDER_LOG_LEVEL=DEBUG arkbreeder
+ARKBREEDINGTOOL_LOG_LEVEL=DEBUG arkbreedingtool
 ```
 
 ## Export watcher
@@ -31,21 +31,22 @@ By default the app watches:
 
 Override the path if needed:
 ```bash
-ARKBREEDER_EXPORT_DIR=/custom/path arkbreeder
+ARKBREEDINGTOOL_EXPORT_DIR=/custom/path arkbreedingtool
 ```
 
 ## Project layout
-- `arkbreeder/core`: parsing and breeding domain logic
-- `arkbreeder/storage`: SQLite persistence and repositories
-- `arkbreeder/ui`: PySide6 desktop UI
+- `arkbreedingtool/core`: parsing and breeding domain logic
+- `arkbreedingtool/storage`: SQLite persistence and repositories
+- `arkbreedingtool/ui`: PySide6 desktop UI
 
 ## Packaging
 ```bash
 packaging/build_deb.sh 0.1.0
 ```
 
-## Project name
-The product name is now **Ark Breeding Tool**.
+## Naming
+- Product name: **Ark Breeding Tool**
+- Technical command/module names stay `arkbreedingtool` for compatibility.
 
 ## Wiki
 Wiki pages are versioned in this repository under:

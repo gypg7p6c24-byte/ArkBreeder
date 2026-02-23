@@ -24,4 +24,4 @@ htmlcov/
 .vscode/
 
 # Local app data (if created inside repo by mistake)
-arkbreeder.db
+arkbreedingtool.db

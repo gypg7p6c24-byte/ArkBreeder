@@ -6,9 +6,9 @@ from pathlib import Path
 import shutil
 from typing import Callable, Optional, Iterable
 
-from arkbreeder.core.parser import ParsedCreature, parse_creature_file
-from arkbreeder.storage.models import Creature
-from arkbreeder.storage.repository import upsert_creature
+from arkbreedingtool.core.parser import ParsedCreature, parse_creature_file
+from arkbreedingtool.storage.models import Creature
+from arkbreedingtool.storage.repository import upsert_creature
 
 logger = logging.getLogger(__name__)
 
