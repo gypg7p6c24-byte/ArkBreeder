@@ -27,7 +27,7 @@ def _load_app_icon() -> QtGui.QIcon:
 
 def main() -> int:
     setup_logging()
-    logger.info("Starting ARK Breeder")
+    logger.info("Starting Ark Breeding Tool")
     conn = get_connection()
     init_db(conn)
 

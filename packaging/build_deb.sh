@@ -34,7 +34,7 @@ Section: utils
 Priority: optional
 Architecture: all
 Depends: python3 (>=3.12), python3-pyside6
-Maintainer: ARK Breeder Contributors
+Maintainer: Ark Breeding Tool Contributors
 Description: Local breeding manager for ARK: Survival Evolved.
  Foundation release with parsing and storage scaffolding.
 EOF
