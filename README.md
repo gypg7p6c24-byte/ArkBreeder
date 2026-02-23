@@ -44,8 +44,9 @@ ARKBREEDER_EXPORT_DIR=/custom/path arkbreeder
 packaging/build_deb.sh 0.1.0
 ```
 
-## Project name
-The product name is now **Ark Breeding Tool**.
+## Naming
+- Product name: **Ark Breeding Tool**
+- Technical command/module names stay `arkbreeder` for compatibility.
 
 ## Wiki
 Wiki pages are versioned in this repository under:
