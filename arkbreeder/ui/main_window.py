@@ -468,12 +468,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self._creatures_table.setStyleSheet(
             """
             QTableWidget {
-                background: transparent;
+                background: rgba(30, 41, 59, 0.75);
                 border: none;
+                border-radius: 9px;
                 gridline-color: transparent;
             }
             QTableWidget::item { padding: 6px; border-bottom: 1px solid rgba(148, 163, 184, 0.18); }
             QTableWidget::item:selected { background: #1f2937; color: #f8fafc; }
+            QHeaderView {
+                background: transparent;
+                border: none;
+            }
             QHeaderView::section {
                 background: rgba(30, 41, 59, 0.75);
                 border: none;
@@ -483,15 +488,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 font-weight: 700;
             }
             QHeaderView::section:first {
-                border-top-left-radius: 8px;
+                border-top-left-radius: 9px;
             }
             QHeaderView::section:last {
-                border-top-right-radius: 8px;
+                border-top-right-radius: 9px;
             }
             QTableCornerButton::section {
                 background: rgba(30, 41, 59, 0.75);
                 border: none;
                 border-bottom: 1px solid #334155;
+                border-top-left-radius: 9px;
             }
             """
         )
@@ -3317,18 +3323,26 @@ class MainWindow(QtWidgets.QMainWindow):
         if not hasattr(self, "_detail_panel"):
             return
         accent = "rgba(148, 163, 184, 0.25)"
+        glow = QtGui.QColor(148, 163, 184, 105)
         lowered = (sex or "").lower()
         if lowered == "male":
             accent = "#60a5fa"
+            glow = QtGui.QColor(96, 165, 250, 120)
         elif lowered == "female":
             accent = "#f472b6"
+            glow = QtGui.QColor(244, 114, 182, 120)
         self._detail_panel.setStyleSheet(
             "#detailPanel {"
             f"background: rgba(15, 23, 42, {'0.52' if spotlight else '0.44'}); border: 2px solid {accent};"
             "border-radius: 16px;"
             "}"
         )
-        self._detail_panel.setGraphicsEffect(None)
+        effect = QtWidgets.QGraphicsDropShadowEffect(self._detail_panel)
+        effect.setBlurRadius(20 if spotlight else 14)
+        effect.setOffset(0, 0)
+        glow.setAlpha(160 if spotlight else 100)
+        effect.setColor(glow)
+        self._detail_panel.setGraphicsEffect(effect)
 
     def _compute_strengths_weaknesses(
         self,
