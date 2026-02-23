@@ -8,6 +8,7 @@ from typing import Iterable
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from arkbreeder.config import bundled_values_path, user_data_dir
+from arkbreeder.core.parser import parse_creature_file
 from arkbreeder.core.server_settings import parse_ini_file
 from arkbreeder.core.species_values import SpeciesValuesStore
 from arkbreeder.core.stats import StatMultipliers, compute_wild_levels, extract_stat_multipliers
@@ -3752,9 +3753,58 @@ class MainWindow(QtWidgets.QMainWindow):
         if not removed:
             self.show_toast("Failed to delete creature.", "error")
             return
+
+        files_removed, files_failed = self._delete_export_files_for_creature(creature)
         self._selected_creature = None
         self.refresh_data()
-        self.show_toast("Creature deleted.", "success")
+        if files_removed > 0 and files_failed == 0:
+            self.show_toast(f"Creature deleted. Removed {files_removed} export file(s).", "success")
+        elif files_removed > 0:
+            self.show_toast(
+                f"Creature deleted. Removed {files_removed} file(s), {files_failed} failed.",
+                "info",
+            )
+        else:
+            self.show_toast("Creature deleted.", "success")
+
+    def _delete_export_files_for_creature(self, creature: Creature) -> tuple[int, int]:
+        if not creature.external_id or not self._export_dir.exists():
+            return 0, 0
+
+        removed = 0
+        failed = 0
+        target_id = creature.external_id
+
+        for path in sorted(self._export_dir.rglob("*.ini")):
+            if not path.is_file():
+                continue
+            try:
+                parsed = parse_creature_file(path)
+            except Exception:
+                continue
+            if parsed.external_id != target_id:
+                continue
+            try:
+                path.unlink()
+                removed += 1
+            except OSError:
+                failed += 1
+
+        # Remove now-empty subfolders created under DinoExports/<id>/...
+        for folder in sorted(
+            (p for p in self._export_dir.rglob("*") if p.is_dir()),
+            key=lambda p: len(p.parts),
+            reverse=True,
+        ):
+            if folder == self._export_dir:
+                continue
+            try:
+                if not any(folder.iterdir()):
+                    folder.rmdir()
+            except OSError:
+                continue
+
+        return removed, failed
 
     def _apply_detail_panel_accent(self, sex: str | None, spotlight: bool = False) -> None:
         if not hasattr(self, "_detail_panel"):
