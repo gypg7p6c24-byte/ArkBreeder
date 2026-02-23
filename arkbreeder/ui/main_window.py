@@ -352,26 +352,12 @@ class MainWindow(QtWidgets.QMainWindow):
         extras = QtWidgets.QHBoxLayout()
         extras.setSpacing(8)
 
-        gender_panel, self._dashboard_gender_layout = self._dashboard_panel("Gender split")
-        self._gender_donut = DonutChartWidget()
-        self._gender_donut.setMinimumSize(96, 96)
-        self._gender_donut.setSizePolicy(
-            QtWidgets.QSizePolicy.Expanding,
-            QtWidgets.QSizePolicy.Expanding,
-        )
-        self._dashboard_gender_layout.addWidget(self._gender_donut, 1)
-        self._gender_legend = QtWidgets.QVBoxLayout()
-        self._gender_legend.setSpacing(2)
-        self._gender_legend.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
-        self._dashboard_gender_layout.addLayout(self._gender_legend)
-
         mutation_panel, self._dashboard_mutation_layout = self._dashboard_panel("Mutation pressure")
         self._mutation_bar = BarChartWidget()
         self._dashboard_mutation_layout.addWidget(self._mutation_bar, 1)
 
         points_panel, self._dashboard_points_layout = self._dashboard_panel("Best stat points")
 
-        extras.addWidget(gender_panel, 1)
         extras.addWidget(mutation_panel, 1)
         extras.addWidget(points_panel, 1)
 
@@ -559,10 +545,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def _build_breeding_page(self) -> QtWidgets.QWidget:
         widget = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(widget)
-        layout.setSpacing(4)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(1)
 
         toolbar = QtWidgets.QHBoxLayout()
-        toolbar.setSpacing(6)
+        toolbar.setContentsMargins(0, 0, 0, 0)
+        toolbar.setSpacing(4)
         self._breeding_back_btn = QtWidgets.QPushButton("← Back to overview")
         self._breeding_back_btn.clicked.connect(lambda: self._open_breeding_species_plan("All species"))
         self._breeding_back_btn.setVisible(False)
@@ -604,7 +592,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._breeding_overview_grid = QtWidgets.QGridLayout()
         self._breeding_overview_grid.setContentsMargins(0, 0, 0, 0)
         self._breeding_overview_grid.setHorizontalSpacing(2)
-        self._breeding_overview_grid.setVerticalSpacing(4)
+        self._breeding_overview_grid.setVerticalSpacing(2)
         self._breeding_overview_grid.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
         overview_layout.addLayout(self._breeding_overview_grid)
         self._breeding_overview_panel.setVisible(False)
@@ -669,7 +657,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._detail_crown = QtWidgets.QLabel("♛")
         self._detail_crown.setStyleSheet(
-            "color: rgba(103, 232, 249, 0.94); font-size: 98px; font-weight: 800; padding-right: 2px;"
+            "color: rgba(103, 232, 249, 0.96);"
+            "font-size: 86px;"
+            "font-weight: 800;"
+            "padding: 0px 2px 0px 2px;"
+            "background: rgba(11, 19, 36, 0.42);"
+            "border: 1px solid rgba(103, 232, 249, 0.35);"
+            "border-radius: 18px;"
         )
         self._detail_crown.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignRight)
         self._detail_crown.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
@@ -1823,6 +1817,10 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         columns = 1
+        if len(items) >= 2:
+            columns = 2
+        if len(items) >= 6:
+            columns = 3
         for idx, item in enumerate(items):
             species_name = str(item.get("species", "Unknown"))
             step_count = int(item.get("step_count", 1))
@@ -1839,18 +1837,24 @@ class MainWindow(QtWidgets.QMainWindow):
             lead_male = self._truncate_text(lead_male_name or "Male", 10)
             lead_female = self._truncate_text(lead_female_name or "Female", 10)
 
-            card = QtWidgets.QFrame()
-            card.setStyleSheet(
+            card = QtWidgets.QWidget()
+            card.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Maximum)
+            card_layout = QtWidgets.QVBoxLayout(card)
+            card_layout.setContentsMargins(2, 2, 2, 2)
+            card_layout.setSpacing(3)
+
+            plan_frame = QtWidgets.QFrame()
+            plan_frame.setMinimumWidth(330)
+            plan_frame.setStyleSheet(
                 "QFrame {"
                 "background: rgba(11, 19, 36, 0.28);"
                 "border: 1px solid #334155;"
                 "border-radius: 11px;"
                 "}"
             )
-            card.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Maximum)
-            card_layout = QtWidgets.QVBoxLayout(card)
-            card_layout.setContentsMargins(8, 7, 8, 7)
-            card_layout.setSpacing(4)
+            plan_layout = QtWidgets.QVBoxLayout(plan_frame)
+            plan_layout.setContentsMargins(8, 7, 8, 7)
+            plan_layout.setSpacing(4)
 
             title_row = QtWidgets.QHBoxLayout()
             title_row.setContentsMargins(0, 0, 0, 0)
@@ -1862,18 +1866,10 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             title_row.addWidget(species_label, alignment=QtCore.Qt.AlignLeft)
             title_row.addStretch(1)
-            card_layout.addLayout(title_row)
+            plan_layout.addLayout(title_row)
 
-            pair_frame = QtWidgets.QFrame()
-            pair_frame.setStyleSheet(
-                "QFrame {"
-                "background: rgba(11, 19, 36, 0.42);"
-                "border: 1px solid #334155;"
-                "border-radius: 10px;"
-                "}"
-            )
-            pair_row = QtWidgets.QHBoxLayout(pair_frame)
-            pair_row.setContentsMargins(5, 5, 5, 5)
+            pair_row = QtWidgets.QHBoxLayout()
+            pair_row.setContentsMargins(1, 1, 1, 1)
             pair_row.setSpacing(5)
             pair_row.addWidget(
                 self._overview_mini_breeder_card(
@@ -1896,7 +1892,8 @@ class MainWindow(QtWidgets.QMainWindow):
                     "female",
                 )
             )
-            card_layout.addWidget(pair_frame)
+            plan_layout.addLayout(pair_row)
+            card_layout.addWidget(plan_frame)
 
             next_label = QtWidgets.QLabel(f"Next action: {next_action}")
             next_label.setStyleSheet("color: #cbd5f5; font-size: 10px; font-weight: 600;")
@@ -2679,6 +2676,7 @@ class MainWindow(QtWidgets.QMainWindow):
         chain_title = QtWidgets.QLabel("Breeding plan")
         chain_title.setStyleSheet("color: #93c5fd; font-size: 14px; font-weight: 800;")
         parent_layout.addWidget(chain_title)
+        show_step_labels = len(sequence) > 1
 
         # Stage 1: explicit donor pairs per step.
         for idx, step_info in enumerate(sequence):
@@ -2696,10 +2694,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 if isinstance(key, str)
             }
 
-            step_label = QtWidgets.QLabel(f"Step {step}")
-            step_label.setAlignment(QtCore.Qt.AlignCenter)
-            step_label.setStyleSheet("color: #cbd5f5; font-size: 15px; font-weight: 800;")
-            parent_layout.addWidget(step_label)
+            if show_step_labels:
+                step_label = QtWidgets.QLabel(f"Step {step}")
+                step_label.setAlignment(QtCore.Qt.AlignCenter)
+                step_label.setStyleSheet("color: #cbd5f5; font-size: 15px; font-weight: 800;")
+                parent_layout.addWidget(step_label)
 
             step_box = QtWidgets.QFrame()
             step_box.setStyleSheet(
@@ -3645,8 +3644,8 @@ class MainWindow(QtWidgets.QMainWindow):
         size = self._detail_crown.sizeHint()
         self._detail_crown.resize(size)
         margins = self._detail_panel.contentsMargins()
-        x = max(0, self._detail_panel.width() - size.width() - margins.right() - 4)
-        y = 0
+        x = max(0, self._detail_panel.width() - size.width() - margins.right() - 1)
+        y = -10
         self._detail_crown.move(x, y)
 
     def _update_creature_detail(self, creature: Creature) -> None:
@@ -3661,7 +3660,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._position_detail_crown()
         if is_top_candidate:
             crown_glow = QtWidgets.QGraphicsDropShadowEffect(self._detail_crown)
-            crown_glow.setBlurRadius(26)
+            crown_glow.setBlurRadius(34)
             crown_glow.setOffset(0, 0)
             crown_glow.setColor(QtGui.QColor(103, 232, 249, 240))
             self._detail_crown.setGraphicsEffect(crown_glow)
